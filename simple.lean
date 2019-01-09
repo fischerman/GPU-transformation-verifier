@@ -36,9 +36,6 @@ def update {sig : signature} (name : string) (val : type_map (sig name)) (s : st
             apply s,
         }
     end 
-    
-
-
 
 inductive expression (sig : signature) : type → Type
 | var (n : string) : expression (sig n)
@@ -67,13 +64,16 @@ def den {sig : signature} : program sig → state sig → state sig
 | (loop loop_var h expr p) s := nat.iterate (λ s, update loop_var (s loop_var + 1) (den p s)) (eval_expression s expr) (update loop_var 0 s)
 
 
+def S1 := (create_signature [("m", int)])
 
-def P1 : program (create_signature [("m", int)]) :=
-assign "m" [] (const_int S1 5)
+def s : state S1 := sorry
 
+def P1 : program S1 :=
+assign "m" [] (add int (const_int S1 39) (const_int S1 3))
+
+#reduce den P1 s "m" -- computes 42
 
 example (s : state S1) : den P1 s "m" = 5 := sorry
 
--- #reduce den S1 P1
 
 end
