@@ -24,7 +24,7 @@ def type_map : type → Type
 def state (sig : signature) : Type := Π n : string, type_map (sig n)
 
 @[reducible]
-def update {sig : signature} (name : string) (val : type_map (sig name)) (s : state sig) : state sig := 
+def state.update {sig : signature} (name : string) (val : type_map (sig name)) (s : state sig) : state sig := 
     λ n, 
     -- if n = name then val else (s n)
     begin
@@ -36,6 +36,8 @@ def update {sig : signature} (name : string) (val : type_map (sig name)) (s : st
             apply s,
         }
     end 
+
+#print state.update -- val is not of type name, how does eq.mpr work??
 
 inductive expression (sig : signature) : type → Type
 | var (n : string) : expression (sig n)
@@ -59,17 +61,19 @@ def eval_expression {sig : signature} (s : state sig) : Π{t : type}, expression
 | _ (const_int sig a) := a
 
 def den {sig : signature} : program sig → state sig → state sig
-| (assign var_name indices expr) s := update var_name (eval_expression s expr) s
+| (assign var_name indices expr) s := s.update var_name (eval_expression s expr)
 | (seq p₁ p₂) s := den p₂ (den p₁ s)
-| (loop loop_var h expr p) s := nat.iterate (λ s, update loop_var (s loop_var + 1) (den p s)) (eval_expression s expr) (update loop_var 0 s)
+| (loop loop_var h expr p) s := nat.iterate (λ s, (den p s).update loop_var (s loop_var + 1)) (eval_expression s expr) (s.update loop_var 0)
 
 
-def S1 := (create_signature [("m", int)])
+def S1 := (create_signature [("m", int), ("n", int)])
 
 def s : state S1 := sorry
 
 def P1 : program S1 :=
-assign "m" [] (add int (const_int S1 39) (const_int S1 3))
+seq
+    (assign "n" [] (const_int S1 3))
+    (assign "m" [] (add int (const_int S1 39) (var S1 "n")))
 
 #reduce den P1 s "m" -- computes 42
 

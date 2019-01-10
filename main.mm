@@ -7,6 +7,19 @@
 <node CREATED="1546850203252" ID="ID_832759210" MODIFIED="1546850213075" TEXT="Do we model performance?"/>
 <node CREATED="1546850808472" ID="ID_20010912" MODIFIED="1546850827609" TEXT="Does MCPL have input arguments or IO?"/>
 <node CREATED="1546852593054" ID="ID_1064777065" MODIFIED="1546852641102" TEXT="How many example programs are there to do experiments on?"/>
+<node CREATED="1547111163673" ID="ID_1748733726" MODIFIED="1547111278646">
+<richcontent TYPE="NODE"><html>
+  <head>
+    
+  </head>
+  <body>
+    <p>
+      What's the difference between computation and reducing?
+    </p>
+  </body>
+</html>
+</richcontent>
+</node>
 </node>
 <node CREATED="1547028160664" ID="ID_1374406915" MODIFIED="1547028169408" POSITION="right" TEXT="Definitions">
 <node CREATED="1547028170586" ID="ID_909832221" MODIFIED="1547028178407" TEXT="Transformational Programming">
@@ -20,8 +33,7 @@
       Write a naive version which is correct and to correctness-preserving transformation
     </p>
   </body>
-</html>
-</richcontent>
+</html></richcontent>
 </node>
 </node>
 </node>
