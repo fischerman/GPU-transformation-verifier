@@ -131,22 +131,73 @@ def reads { sig : signature } : program sig → set (string)
 def uses {sig : signature} : program sig → set (string) 
 | p := modifies p ∪ reads p
 
--- (a != b) : get a (update b s) = get a s
--- (a != b) : (update a s) b = s b
+@[simp]
+lemma state_update_lookup_success (sig : signature) (s : state sig) (a : string) (va : type_map (sig a))
+    : (s.update a va) a = va :=
+begin
+    unfold state.update,
+    -- put simp here; but hole remains
+    rw dite,
+    simp,
+    cases string.has_decidable_eq a a,
+    { contradiction },
+    { refl }
+end
+
+@[simp]
+lemma state_update_lookup_skip (sig : signature) (s : state sig) (a b : string) (va : type_map (sig a))
+    : ¬(b = a) → (s.update a va) b = s b :=
+begin
+    intro hneq,
+    unfold state.update,
+    simp[hneq],
+end
+
+@[simp]
+lemma state_update_lookup_skip' (sig : signature) (s : state sig) (a b : string) (va : type_map (sig a))
+    : ¬(a = b) → (s.update a va) b = s b :=
+begin
+    intro hneq,
+    apply state_update_lookup_skip,
+    intro,
+    apply hneq,
+    simp[*]
+end
+
+lemma state_update_assoc (sig : signature) (s : state sig) (a b: string) (va : type_map (sig a)) (vb : type_map (sig b))
+    : ¬(a = b) → state.update a va (state.update b vb s) = state.update b vb (state.update a va s) :=
+begin
+    intro hneq,
+    funext x,
+    -- we do case distinction, either x is a or b or neither
+    by_cases hxa : x = a,
+    {
+        rw hxa,
+        simp,
+        rw state_update_lookup_skip,
+        simp,
+        assumption
+    }, {
+        by_cases hxb : x = b,
+        {
+            rw hxb,
+            simp,
+            rw state_update_lookup_skip',
+            simp,
+            assumption
+        }, {
+            repeat { rw state_update_lookup_skip },
+            repeat { assumption }
+        }
+    }
+end
 
 lemma state_eliminate_update' (sig : signature) (s : state sig) (a b : string) (t : type) (hat : sig a = t) (hnab : ¬(b = a) ) (val : type_map t) 
   : (s.update' hat val) b = s b :=
 begin
     rw state.update',
-    rw state.update,
-    show dite (b = a) (λ (h : b = a), eq.mpr _ (eq.mpr _ val)) (λ (h : ¬b = a), s b) = s b, 
-    rw dite,
-    cases string.has_decidable_eq b a,
-    {
-        refl
-    }, {
-        contradiction
-    }
+    apply state_update_lookup_skip,
+    assumption,
 end
 
 lemma uses_neq (sig : signature) (p : program sig) (a b : string) (hpua : uses p a) (hpnub : ¬(uses p b)) : ¬(a = b) := begin
@@ -169,8 +220,8 @@ lemma uses_neq (sig : signature) (p : program sig) (a b : string) (hpua : uses p
     }
 end
 
-lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string) (t : type) 
-    (hat : sig a = t) (val : type_map t) (expr : expression sig t) (hnu : ¬(expr_reads expr a))
+lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string) (t t' : type) 
+    (hat : sig a = t) (val : type_map t) (expr : expression sig t') (hnu : ¬(expr_reads expr a))
     : eval_expression (s.update' hat val) expr = eval_expression s expr := begin
     induction expr,
     case var {
@@ -193,14 +244,26 @@ begin
             rw uses,
             left,
             rw modifies,
+            
             sorry -- how???
         end,
         have hneq : ¬(b = a) := begin
             apply uses_neq sig (assign b idxs expr) b a,
             repeat { assumption }
         end,
-        rw ← expr_uses_update'_eliminate,
-        repeat { sorry }
+        have hnrea : ¬expr_reads expr a := begin
+            intro hrea,
+            apply hnu,
+            rw uses,
+            right,
+            exact hrea
+        end,
+        rw expr_uses_update'_eliminate,
+        repeat { exact hnrea },
+        rw state.update',
+        rw state.update',
+        rw state_update_assoc,
+        exact hneq,
     },
     repeat { sorry }
 end
