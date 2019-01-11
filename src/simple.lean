@@ -200,7 +200,9 @@ begin
             repeat { assumption }
         end,
         rw ← expr_uses_update'_eliminate,
-    }
+        repeat { sorry }
+    },
+    repeat { sorry }
 end
 
 -- seq p1 p1 = loop n 2 p1
@@ -219,7 +221,7 @@ begin
     repeat { assumption },
 end
 
-end
+end MCL
 
 
 -- todo: make sig a parameter
