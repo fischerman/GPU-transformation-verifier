@@ -37,6 +37,10 @@ inductive expression (sig : signature) (t : type) : Type
 | add : expression → expression → expression
 | const_int {} (n : ℕ) (h : t = int) : expression
 
+notation `v(` n `)`:= expression.var n (by refl)
+infixr ` ~+ `:90 := expression.add
+notation `i(` n `)`:= expression.const_int n (by refl)
+
 open expression
 
 inductive program (sig : signature)
@@ -56,7 +60,6 @@ def eval_expression {sig : signature} (s : state sig) : Π{t : type}, expression
 | float (add a b) := eval_expression a + eval_expression b
 | t (const_int n h) := (by rw [h]; exact n)  -- why does this one accept a signature but var does not
 
-
 def den {sig : signature} : program sig → state sig → state sig
 | (assign var_name indices expr) s := s.update var_name (eval_expression s expr)
 | (seq p₁ p₂) s := den p₂ (den p₁ s)
@@ -70,17 +73,19 @@ def S1 := (create_signature [("m", int), ("n", int)])
 
 def s : state S1 := sorry
 
+#eval eval_expression s i(10)
+
 def P1 : program S1 :=
-    (assign "n" [] (const_int 3 (by refl))) ;;
-    (assign "m" [] (add (const_int 39 (by refl)) (show expression S1 int, from var "n" (by refl))))
+    (assign "n" [] i(3)) ;;
+    (assign "m" [] (i(39) ~+ v("n")))
 
 #reduce den P1 s "m" -- computes 42
 example (s : state S1) : (show nat, from den P1 s "m") = 42 := rfl
 
 def P2 : program S1 :=
-    (assign "m" [] (const_int 0 (by refl))) ;;
-    (loop "n" (by refl) (const_int 10 (by refl)) (
-        (assign "m" [] (add (var "m" (by refl)) (var "n" (by refl))))
+    (assign "m" [] i(0)) ;;
+    (loop "n" (by refl) i(0)) (
+        (assign "m" [] (v("m") ~+ v("n"))
     ))
 
 #eval den P2 s "m"
@@ -164,7 +169,8 @@ lemma uses_neq (sig : signature) (p : program sig) (a b : string) (hpua : uses p
     }
 end
 
-lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string) (t : type) (hat : sig a = t) (val : type_map t) (expr : expression sig t) (hnu : ¬(expr_reads expr a))
+lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string) (t : type) 
+    (hat : sig a = t) (val : type_map t) (expr : expression sig t) (hnu : ¬(expr_reads expr a))
     : eval_expression (s.update' hat val) expr = eval_expression s expr := begin
     induction expr,
     case var {
@@ -175,7 +181,8 @@ lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string)
     sorry
 end
 
-lemma state_postpone_update' (sig : signature) (s : state sig) (a : string) (t : type) (hat : sig a = t) (val : type_map t) (p : program sig) (hnu : ¬(uses p a)) 
+lemma state_postpone_update' (sig : signature) (s : state sig) (a : string) (t : type) 
+    (hat : sig a = t) (val : type_map t) (p : program sig) (hnu : ¬(uses p a)) 
     : ⟦ p ⟧ (s.update' hat val) = (⟦ p ⟧ s).update' hat val :=
 begin
     induction p,
@@ -198,7 +205,7 @@ end
 
 -- seq p1 p1 = loop n 2 p1
 lemma loop_seq (sig : signature) (s₁ : state sig) (v : string) (l : string) (hli : sig l = int) 
-        (p : program sig) (hnu : ¬(uses p l)) (hnv : ¬ (v = l)) : ⟦ p ;; p ⟧ s₁ v = ⟦ loop l hli (const_int 2 (by refl)) p ⟧ s₁ v :=
+        (p : program sig) (hnu : ¬(uses p l)) (hnv : ¬ (v = l)) : ⟦ p ;; p ⟧ s₁ v = ⟦ loop l hli i(2) p ⟧ s₁ v :=
 begin
     rw den,
     rw eval_const_int,
