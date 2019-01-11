@@ -35,7 +35,7 @@ by rw [← eq]; exact s name
 inductive expression (sig : signature) (t : type) : Type
 | var (n : string) (h : sig n = t) : expression
 | add : expression → expression → expression
-| const_int (n : ℕ) (h : t = int) : expression
+| const_int {} (n : ℕ) (h : t = int) : expression
 
 open expression
 
@@ -54,7 +54,7 @@ def eval_expression {sig : signature} (s : state sig) : Π{t : type}, expression
 | t (var n h) := (by rw [←h]; exact s n)
 | int (add a b) := eval_expression a + eval_expression b
 | float (add a b) := eval_expression a + eval_expression b
-| t (const_int sig n h) := (by rw [h]; exact n)  -- why does this one accept a signature but var does not
+| t (const_int n h) := (by rw [h]; exact n)  -- why does this one accept a signature but var does not
 
 
 def den {sig : signature} : program sig → state sig → state sig
@@ -71,15 +71,15 @@ def S1 := (create_signature [("m", int), ("n", int)])
 def s : state S1 := sorry
 
 def P1 : program S1 :=
-    (assign "n" [] (const_int S1 3 (by refl))) ;;
-    (assign "m" [] (add (const_int S1 39 (by refl)) (show expression S1 int, from var "n" (by refl))))
+    (assign "n" [] (const_int 3 (by refl))) ;;
+    (assign "m" [] (add (const_int 39 (by refl)) (show expression S1 int, from var "n" (by refl))))
 
 #reduce den P1 s "m" -- computes 42
 example (s : state S1) : (show nat, from den P1 s "m") = 42 := rfl
 
 def P2 : program S1 :=
-    (assign "m" [] (const_int S1 0 (by refl))) ;;
-    (loop "n" (by refl) (const_int S1 10 (by refl)) (
+    (assign "m" [] (const_int 0 (by refl))) ;;
+    (loop "n" (by refl) (const_int 10 (by refl)) (
         (assign "m" [] (add (var "m" (by refl)) (var "n" (by refl))))
     ))
 
@@ -89,7 +89,7 @@ set_option trace.simplify.rewrite true
 
 example (sig : signature) (p₁ p₂ : program sig) (s : state sig) : ⟦ p₁ ;; p₂ ⟧ s = den p₂ (den p₁ s) := by reflexivity
 
-lemma eval_const_int { sig : signature } { s : state sig } (n : ℕ) : @eval_expression sig s int (const_int sig n (by refl)) = n := begin
+lemma eval_const_int { sig : signature } { s : state sig } (n : ℕ) : @eval_expression sig s int (const_int n (by refl)) = n := begin
     rw eval_expression,
     rw eq.mpr,
 end
@@ -103,7 +103,7 @@ def modifies {sig : signature} : program sig → set (string)
 def expr_reads {sig : signature} {t : type} : expression sig t → set (string) 
 | (var n _) := { n }
 | (add s₁ s₂) := expr_reads s₁ ∪ expr_reads s₂
-| (const_int _ _ _) := { }
+| (const_int  _ _) := { }
 
 #check (@var S1 int "m" (by refl))
 
@@ -198,7 +198,7 @@ end
 
 -- seq p1 p1 = loop n 2 p1
 lemma loop_seq (sig : signature) (s₁ : state sig) (v : string) (l : string) (hli : sig l = int) 
-        (p : program sig) (hnu : ¬(uses p l)) (hnv : ¬ (v = l)) : ⟦ p ;; p ⟧ s₁ v = ⟦ loop l hli (const_int sig 2 (by refl)) p ⟧ s₁ v :=
+        (p : program sig) (hnu : ¬(uses p l)) (hnv : ¬ (v = l)) : ⟦ p ;; p ⟧ s₁ v = ⟦ loop l hli (const_int 2 (by refl)) p ⟧ s₁ v :=
 begin
     rw den,
     rw eval_const_int,
@@ -209,7 +209,7 @@ begin
     rw state_eliminate_update',
     repeat { rw state_postpone_update' },
     repeat { rw state_eliminate_update' },
-    repeat { assumption }
+    repeat { assumption },
 end
 
 end
