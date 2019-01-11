@@ -17,8 +17,7 @@
       What's the difference between computation and reducing?
     </p>
   </body>
-</html>
-</richcontent>
+</html></richcontent>
 </node>
 </node>
 <node CREATED="1547028160664" ID="ID_1374406915" MODIFIED="1547028169408" POSITION="right" TEXT="Definitions">
@@ -43,6 +42,9 @@
 <node CREATED="1546946478649" ID="ID_453712957" MODIFIED="1546946496384" TEXT="Obviously (Scott Morrison)"/>
 <node CREATED="1546946559350" ID="ID_1948735207" MODIFIED="1546946565886" TEXT="Rcases (mathlib)"/>
 <node CREATED="1546946570845" ID="ID_169667138" MODIFIED="1546946573639" TEXT="Suffices"/>
+<node CREATED="1547203677576" ID="ID_801062750" MODIFIED="1547203680458" TEXT="RWA">
+<node CREATED="1547203680460" ID="ID_1716010468" MODIFIED="1547203688832" TEXT="rw followed by assumption"/>
+</node>
 </node>
 </node>
 </node>
