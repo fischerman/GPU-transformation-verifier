@@ -38,7 +38,7 @@ inductive expression (sig : signature) (t : type) : Type
 | const_int {} (n : ℕ) (h : t = int) : expression
 
 notation `v(` n `)`:= expression.var n (by refl)
-infixr ` ~+ `:120 := expression.add
+infixr ` ~+ `:90 := expression.add
 notation `i(` n `)`:= expression.const_int n (by refl)
 
 open expression
@@ -49,9 +49,7 @@ inductive program (sig : signature)
 | loop (n : string) (h : sig n = int) :
   expression sig int → program → program
 
-notation n `::=` expr:100 := program.assign n [] expr
 infixr ` ;; `:90 := program.seq
-notation `for` `(` n `::=` expr `)` `{` p `}`:110 := program.loop n (by refl) expr p
 
 open program
 
@@ -78,17 +76,17 @@ def s : state S1 := sorry
 #eval eval_expression s i(10)
 
 def P1 : program S1 :=
-    "n" ::= i(3) ;;
+    (assign "n" [] i(3)) ;;
     (assign "m" [] (i(39) ~+ v("n")))
 
 #reduce den P1 s "m" -- computes 42
 example (s : state S1) : (show nat, from den P1 s "m") = 42 := rfl
 
 def P2 : program S1 :=
-    "m" ::= i(0) ;;
-    for ("n" ::= i(4)) {
-        assign "m" [] (v("m") ~+ v("n"))
-    } 
+    (assign "m" [] i(0)) ;;
+    (loop "n" (by refl) i(0)) (
+        (assign "m" [] (v("m") ~+ v("n"))
+    ))
 
 #eval den P2 s "m"
 
