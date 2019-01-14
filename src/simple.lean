@@ -1,5 +1,8 @@
 
+import init.meta.relation_tactics init.meta.occurrences
+
 namespace MCL
+
 
 inductive type 
 | int
@@ -131,6 +134,8 @@ def reads { sig : signature } : program sig → set (string)
 def uses {sig : signature} : program sig → set (string) 
 | p := modifies p ∪ reads p
 
+-- lemma singleton_contains {α : Type} (a : α) [has_insert α _] : a ∈ { a }
+
 @[simp]
 lemma state_update_lookup_success (sig : signature) (s : state sig) (a : string) (va : type_map (sig a))
     : (s.update a va) a = va :=
@@ -220,9 +225,99 @@ lemma uses_neq (sig : signature) (p : program sig) (a b : string) (hpua : uses p
     }
 end
 
-lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string) (t t' : type) 
-    (hat : sig a = t) (val : type_map t) (expr : expression sig t') (hnu : ¬(expr_reads expr a))
-    : eval_expression (s.update' hat val) expr = eval_expression s expr := begin
+lemma uses_loop_condition (sig : signature) (n : string) 
+    (h : sig n = int) (p : program sig) (expr : expression sig int) 
+    : uses (loop n h expr p) n := begin
+    rw uses,
+    left,
+    rw modifies,
+    left,
+    sorry
+end
+
+lemma uses_not_seq_left (sig : signature) (p₁ p₂ : program sig) (a : string) : ¬uses (p₁ ;; p₂) a → ¬uses p₁ a := begin
+    intro hnseq,
+    intro hup1,
+    apply hnseq,
+    unfold uses,
+    cases hup1,
+    case or.inl {
+        left,
+        rw modifies,
+        left,
+        exact hup1,
+    },
+    case or.inr {
+        right,
+        rw reads,
+        left,
+        exact hup1
+    }
+end
+
+lemma uses_not_seq_right (sig : signature) (p₁ p₂ : program sig) (a : string) : ¬uses (p₁ ;; p₂) a → ¬uses p₂ a := begin
+    intro hnseq,
+    intro hup2,
+    apply hnseq,
+    unfold uses,
+    cases hup2,
+    case or.inl {
+        left,
+        rw modifies,
+        right,
+        exact hup2,
+    },
+    case or.inr {
+        right,
+        rw reads,
+        right,
+        exact hup2
+    }
+end
+
+lemma uses_not_loop_program (sig : signature) (n a : string) 
+    (h : sig n = int) (p : program sig) (expr : expression sig int) 
+    : ¬uses (loop n h expr p) a → ¬uses p a := begin
+    intro hlnu,
+    intro hpu,
+    apply hlnu,
+    rw uses,
+    cases hpu,
+    {
+        left,
+        rw modifies,
+        left,
+        sorry
+    }, {
+        right,
+        rw reads,
+        right,
+        assumption
+    }
+end
+
+-- potential tactic to solve uses
+
+-- end MCL
+-- namespace tactic.interactive
+
+-- open tactic MCL
+
+-- meta def solve_uses (h : name) : tactic unit := do
+--   t ← target,
+--   match t with
+--   | `(uses %%p %%n) := sorry
+--   | _ := fail "Not a uses"
+--   end
+
+-- end tactic.interactive
+
+-- namespace MCL
+
+lemma expr_uses_update_eliminate (sig : signature) (s : state sig) (a : string) (val : type_map (sig a)) 
+      (t : type) (expr : expression sig t) (hnu : ¬(expr_reads expr a))
+      : eval_expression (s.update a val) expr = eval_expression s expr :=
+begin
     induction expr,
     case var {
         -- how do I unfold eval_expression
@@ -232,11 +327,23 @@ lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string)
     sorry
 end
 
+lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string) (t t' : type) 
+    (hat : sig a = t) (val : type_map t) (expr : expression sig t') (hnu : ¬(expr_reads expr a))
+    : eval_expression (s.update' hat val) expr = eval_expression s expr := begin
+    unfold state.update',
+    apply expr_uses_update_eliminate,
+    exact hnu
+end
+
+lemma iterate_outer {α : Type} (f : α → α) (n : ℕ) (a : α) : f^[n+1] a = f ((f^[n]) a) := sorry
+
 lemma state_postpone_update' (sig : signature) (s : state sig) (a : string) (t : type) 
     (hat : sig a = t) (val : type_map t) (p : program sig) (hnu : ¬(uses p a)) 
     : ⟦ p ⟧ (s.update' hat val) = (⟦ p ⟧ s).update' hat val :=
 begin
-    induction p,
+    rw state.update',
+    rw state.update',
+    induction p generalizing s,
     case assign : b idxs expr {
         rw den,
         rw den,
@@ -258,14 +365,64 @@ begin
             right,
             exact hrea
         end,
-        rw expr_uses_update'_eliminate,
+        rw expr_uses_update_eliminate,
         repeat { exact hnrea },
-        rw state.update',
-        rw state.update',
         rw state_update_assoc,
         exact hneq,
     },
-    repeat { sorry }
+    case seq : p₁ p₂ ih₁ ih₂ {
+        repeat { rw den },
+        rw ih₁,
+        {
+            apply ih₂,
+            apply uses_not_seq_right,
+            exact hnu,
+        }, {
+            apply uses_not_seq_left,
+            exact hnu,
+        }
+    },
+    case loop : n h_n_is_int expr p ih {
+        have hneq : ¬(n = a) := begin
+            apply uses_neq _ (loop n h_n_is_int expr p),
+            {
+                apply uses_loop_condition,
+            },
+            assumption
+        end,
+        repeat { rw den },
+        simp,
+        repeat { rw state.update' },
+        rw state_update_assoc,
+        rw expr_uses_update_eliminate,
+        generalize : (eval_expression s expr) = i,
+        induction i,
+        case nat.zero {
+            rw nat.iterate,
+            rw nat.iterate,
+        },
+        case nat.succ : i loop_ih {
+            -- we must take of one loop, but it must the top one 
+            rw iterate_outer,
+            rw loop_ih,
+            rw ih,
+            rw state.update',
+            rw state_update_assoc,
+            rw state.get',
+            rw state_update_lookup_skip,
+            --level the RHS
+            rw iterate_outer,
+            rw state.update',
+            rw state.get',
+
+            repeat {assumption},
+            apply uses_not_loop_program,
+            apply hnu,
+        }, {
+            intro hrea,
+            apply hnu,
+        }
+    },
 end
 
 -- seq p1 p1 = loop n 2 p1
