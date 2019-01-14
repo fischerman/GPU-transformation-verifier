@@ -134,19 +134,14 @@ def reads { sig : signature } : program sig → set (string)
 def uses {sig : signature} : program sig → set (string) 
 | p := modifies p ∪ reads p
 
--- lemma singleton_contains {α : Type} (a : α) [has_insert α _] : a ∈ { a }
 
 @[simp]
 lemma state_update_lookup_success (sig : signature) (s : state sig) (a : string) (va : type_map (sig a))
     : (s.update a va) a = va :=
 begin
     unfold state.update,
-    -- put simp here; but hole remains
-    rw dite,
     simp,
-    cases string.has_decidable_eq a a,
-    { contradiction },
-    { refl }
+    rw eq.mpr,
 end
 
 @[simp]
@@ -440,6 +435,8 @@ begin
     repeat { rw state_eliminate_update' },
     repeat { assumption },
 end
+
+-- lemma : ⟦ assign a ; assign a ⟧ = ⟦ assign a ⟧
 
 end MCL
 
