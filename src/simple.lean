@@ -1,10 +1,9 @@
-
-import init.meta.relation_tactics init.meta.occurrences
+import data.set.basic
 
 namespace MCL
 
 
-inductive type 
+inductive type
 | int
 | float
 
@@ -40,6 +39,10 @@ inductive expression (sig : signature) (t : type) : Type
 | add : expression → expression → expression
 | const_int {} (n : ℕ) (h : t = int) : expression
 
+instance (sig : signature) (t : type) : has_add (expression sig t) := ⟨expression.add⟩
+instance (sig : signature) : has_zero (expression sig int) := ⟨expression.const_int 0 rfl⟩
+instance (sig : signature) : has_one (expression sig int) := ⟨expression.const_int 1 rfl⟩
+
 notation `v(` n `)`:= expression.var n (by refl)
 infixr ` ~+ `:90 := expression.add
 notation `i(` n `)`:= expression.const_int n (by refl)
@@ -56,12 +59,14 @@ infixr ` ;; `:90 := program.seq
 
 open program
 
+def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
+| int a b := a + b
+| float a b := a + b
 
-def eval_expression {sig : signature} (s : state sig) : Π{t : type}, expression sig t → type_map t
-| t (var n h) := (by rw [←h]; exact s n)
-| int (add a b) := eval_expression a + eval_expression b
-| float (add a b) := eval_expression a + eval_expression b
-| t (const_int n h) := (by rw [h]; exact n)  -- why does this one accept a signature but var does not
+def eval_expression {sig : signature} (s : state sig) {t : type} : expression sig t → type_map t
+| (var n h) := (by rw [←h]; exact s n)
+| (add a b) := type_map_add (eval_expression a) (eval_expression b)
+| (const_int n h) := (by rw [h]; exact n)  -- why does this one accept a signature but var does not
 
 def den {sig : signature} : program sig → state sig → state sig
 | (assign var_name indices expr) s := s.update var_name (eval_expression s expr)
@@ -93,7 +98,7 @@ def P2 : program S1 :=
 
 #eval den P2 s "m"
 
-set_option trace.simplify.rewrite true 
+set_option trace.simplify.rewrite true
 
 example (sig : signature) (p₁ p₂ : program sig) (s : state sig) : ⟦ p₁ ;; p₂ ⟧ s = den p₂ (den p₁ s) := by reflexivity
 
@@ -108,7 +113,7 @@ def modifies {sig : signature} : program sig → set (string)
 | (seq p₁ p₂) := modifies p₁ ∪ modifies p₂
 | (loop n _ _ p) := { n } ∪ modifies p
 
-def expr_reads {sig : signature} {t : type} : expression sig t → set (string) 
+def expr_reads {sig : signature} {t : type} : expression sig t → set (string)
 | (var n _) := { n }
 | (add s₁ s₂) := expr_reads s₁ ∪ expr_reads s₂
 | (const_int  _ _) := { }
@@ -119,7 +124,7 @@ def expr_reads {sig : signature} {t : type} : expression sig t → set (string)
 -- sets aren't computable
 --#reduce expr_reads (@var S1 int "m" (by refl)) "m"
 
-example : "m" ∈ expr_reads (@var S1 int "m" (by refl)) := 
+example : "m" ∈ expr_reads (@var S1 int "m" (by refl)) :=
 begin
     rw expr_reads,
     sorry
@@ -131,7 +136,7 @@ def reads { sig : signature } : program sig → set (string)
 | (seq p₁ p₂) := reads p₁ ∪ reads p₂
 | (loop _ _ expr p) := expr_reads expr ∪ reads p
 
-def uses {sig : signature} : program sig → set (string) 
+def uses {sig : signature} : program sig → set (string)
 | p := modifies p ∪ reads p
 
 -- lemma singleton_contains {α : Type} (a : α) [has_insert α _] : a ∈ { a }
@@ -197,7 +202,7 @@ begin
     }
 end
 
-lemma state_eliminate_update' (sig : signature) (s : state sig) (a b : string) (t : type) (hat : sig a = t) (hnab : ¬(b = a) ) (val : type_map t) 
+lemma state_eliminate_update' (sig : signature) (s : state sig) (a b : string) (t : type) (hat : sig a = t) (hnab : ¬(b = a) ) (val : type_map t)
   : (s.update' hat val) b = s b :=
 begin
     rw state.update',
@@ -225,8 +230,8 @@ lemma uses_neq (sig : signature) (p : program sig) (a b : string) (hpua : uses p
     }
 end
 
-lemma uses_loop_condition (sig : signature) (n : string) 
-    (h : sig n = int) (p : program sig) (expr : expression sig int) 
+lemma uses_loop_condition (sig : signature) (n : string)
+    (h : sig n = int) (p : program sig) (expr : expression sig int)
     : uses (loop n h expr p) n := begin
     rw uses,
     left,
@@ -275,8 +280,8 @@ lemma uses_not_seq_right (sig : signature) (p₁ p₂ : program sig) (a : string
     }
 end
 
-lemma uses_not_loop_program (sig : signature) (n a : string) 
-    (h : sig n = int) (p : program sig) (expr : expression sig int) 
+lemma uses_not_loop_program (sig : signature) (n a : string)
+    (h : sig n = int) (p : program sig) (expr : expression sig int)
     : ¬uses (loop n h expr p) a → ¬uses p a := begin
     intro hlnu,
     intro hpu,
@@ -314,20 +319,23 @@ end
 
 -- namespace MCL
 
-lemma expr_uses_update_eliminate (sig : signature) (s : state sig) (a : string) (val : type_map (sig a)) 
+
+#print prefix eval_expression
+-- set_option pp.proofs true
+
+lemma expr_uses_update_eliminate (sig : signature) (s : state sig) (a : string) (val : type_map (sig a))
       (t : type) (expr : expression sig t) (hnu : ¬(expr_reads expr a))
       : eval_expression (s.update a val) expr = eval_expression s expr :=
 begin
-    induction expr,
-    case var {
-        -- how do I unfold eval_expression
-        sorry
-    },
-    sorry,
-    sorry
+  induction expr,
+  case var {
+    have : state.update a val s expr_n = s expr_n := sorry,
+    simp [eval_expression, this], },
+  case add { simp [eval_expression], },
+  sorry
 end
 
-lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string) (t t' : type) 
+lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string) (t t' : type)
     (hat : sig a = t) (val : type_map t) (expr : expression sig t') (hnu : ¬(expr_reads expr a))
     : eval_expression (s.update' hat val) expr = eval_expression s expr := begin
     unfold state.update',
@@ -337,8 +345,10 @@ end
 
 lemma iterate_outer {α : Type} (f : α → α) (n : ℕ) (a : α) : f^[n+1] a = f ((f^[n]) a) := sorry
 
-lemma state_postpone_update' (sig : signature) (s : state sig) (a : string) (t : type) 
-    (hat : sig a = t) (val : type_map t) (p : program sig) (hnu : ¬(uses p a)) 
+-- set_option pp.all true
+
+lemma state_postpone_update' (sig : signature) (s : state sig) (a : string) (t : type)
+    (hat : sig a = t) (val : type_map t) (p : program sig) (hnu : ¬(uses p a))
     : ⟦ p ⟧ (s.update' hat val) = (⟦ p ⟧ s).update' hat val :=
 begin
     rw state.update',
@@ -351,8 +361,7 @@ begin
             rw uses,
             left,
             rw modifies,
-            
-            sorry -- how???
+            simp
         end,
         have hneq : ¬(b = a) := begin
             apply uses_neq sig (assign b idxs expr) b a,
@@ -402,7 +411,7 @@ begin
             rw nat.iterate,
         },
         case nat.succ : i loop_ih {
-            -- we must take of one loop, but it must the top one 
+            -- we must take of one loop, but it must the top one
             rw iterate_outer,
             rw loop_ih,
             rw ih,
@@ -426,8 +435,9 @@ begin
 end
 
 -- seq p1 p1 = loop n 2 p1
-lemma loop_seq (sig : signature) (s₁ : state sig) (v : string) (l : string) (hli : sig l = int) 
-        (p : program sig) (hnu : ¬(uses p l)) (hnv : ¬ (v = l)) : ⟦ p ;; p ⟧ s₁ v = ⟦ loop l hli i(2) p ⟧ s₁ v :=
+lemma loop_seq (sig : signature) (s₁ : state sig) (v : string) (l : string) (hli : sig l = int)
+        (p : program sig) (hnu : ¬(uses p l)) (hnv : ¬ (v = l)) :
+        ⟦ p ;; p ⟧ s₁ v = ⟦ loop l hli i(2) p ⟧ s₁ v :=
 begin
     rw den,
     rw eval_const_int,
@@ -435,8 +445,8 @@ begin
     rw nat.iterate,
     rw nat.iterate,
     rw den,
-    rw state_eliminate_update',
-    repeat { rw state_postpone_update' },
+    rw state_eliminate_update' ,
+    repeat { rw state_postpone_update' hnu },
     repeat { rw state_eliminate_update' },
     repeat { assumption },
 end
