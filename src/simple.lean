@@ -434,6 +434,11 @@ begin
     },
 end
 
+/-
+lemma loop_seq (sig : signature) (l : string) (hli : sig l = int) (p : program sig) (n : ℕ) :
+  ⟦ loop l hli i(n + 1) p ⟧ = ⟦ loop l hli i(n) p ;; assign l i(n + 1) ;; p ⟧ :=
+-/
+
 -- seq p1 p1 = loop n 2 p1
 lemma loop_seq (sig : signature) (s₁ : state sig) (v : string) (l : string) (hli : sig l = int)
         (p : program sig) (hnu : ¬(uses p l)) (hnv : ¬ (v = l)) :
