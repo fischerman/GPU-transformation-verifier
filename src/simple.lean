@@ -127,7 +127,7 @@ def expr_reads {sig : signature} {t : type} : expression sig t → set (string)
 example : "m" ∈ expr_reads (@var S1 int "m" (by refl)) :=
 begin
     rw expr_reads,
-    sorry
+    simp,
 end
 
 -- does not include array accesses yet
@@ -232,7 +232,7 @@ lemma uses_loop_condition (sig : signature) (n : string)
     left,
     rw modifies,
     left,
-    sorry
+    simp,
 end
 
 lemma uses_not_seq_left (sig : signature) (p₁ p₂ : program sig) (a : string) : ¬uses (p₁ ;; p₂) a → ¬uses p₁ a := begin
@@ -286,13 +286,13 @@ lemma uses_not_loop_program (sig : signature) (n a : string)
     {
         left,
         rw modifies,
-        left,
-        sorry
+        right,
+        assumption,
     }, {
         right,
         rw reads,
         right,
-        assumption
+        assumption,
     }
 end
 
@@ -303,17 +303,28 @@ end
 
 -- open tactic MCL
 
+-- @[reducible]
+-- meta def match_uses (n : expr) : expr → Prop
+-- | `(¬uses %%p %%m) := (n = m)
+-- | _ := false
+
+-- meta instance (n : expr) : decidable_pred (match_uses n) := sorry
+
 -- meta def solve_uses (h : name) : tactic unit := do
 --   t ← target,
 --   match t with
---   | `(uses %%p %%n) := sorry
---   | _ := fail "Not a uses"
+--   | `(¬uses %%p %%n) := do
+--     gs <- get_goals,
+--     trace "Possible candidates",
+--     trace (gs.filter (match_uses n))
+--   | _ := fail "Goal is not uses"
 --   end
 
 -- end tactic.interactive
 
 -- namespace MCL
 
+-- open expression program
 
 #print prefix eval_expression
 -- set_option pp.proofs true
@@ -323,11 +334,29 @@ lemma expr_uses_update_eliminate (sig : signature) (s : state sig) (a : string) 
       : eval_expression (s.update a val) expr = eval_expression s expr :=
 begin
   induction expr,
-  case var {
-    have : state.update a val s expr_n = s expr_n := sorry,
-    simp [eval_expression, this], },
-  case add { simp [eval_expression], },
-  sorry
+  case var : n h {
+    have hneq : ¬(a = n) := begin
+        intro han,
+        subst han,
+        apply hnu,
+        rw expr_reads,
+        sorry -- another one of those set things
+    end,
+    have : state.update a val s n = s n := begin
+        rw state_update_lookup_skip',
+        assumption,
+    end,
+    simp [eval_expression, this],
+  },
+    case add : a b ih_a ih_b {
+      simp [eval_expression],
+      rw ih_a,
+      rw ih_b,
+      repeat { sorry } -- use the yet to written tactic
+    },
+    case expression.const_int : {
+        simp [eval_expression],
+    }
 end
 
 lemma expr_uses_update'_eliminate (sig : signature) (s : state sig) (a : string) (t t' : type)
@@ -423,8 +452,12 @@ begin
             apply uses_not_loop_program,
             apply hnu,
         }, {
+            --
             intro hrea,
             apply hnu,
+            sorry, -- use cool new tactic
+        }, {
+            assumption
         }
     },
 end
@@ -446,7 +479,7 @@ begin
     rw nat.iterate,
     rw den,
     rw state_eliminate_update' ,
-    repeat { rw state_postpone_update' hnu },
+    repeat { rw state_postpone_update' },
     repeat { rw state_eliminate_update' },
     repeat { assumption },
 end
