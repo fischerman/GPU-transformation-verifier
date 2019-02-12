@@ -54,6 +54,7 @@ inductive program (sig : signature)
 | seq : program → program → program
 | loop (n : string) (h : sig n = int) :
   expression sig int → program → program
+| skip : program
 
 infixr ` ;; `:90 := program.seq
 
@@ -66,14 +67,17 @@ def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 def eval_expression {sig : signature} (s : state sig) {t : type} : expression sig t → type_map t
 | (var n h) := (by rw [←h]; exact s n)
 | (add a b) := type_map_add (eval_expression a) (eval_expression b)
-| (const_int n h) := (by rw [h]; exact n)  -- why does this one accept a signature but var does not
+| (const_int n h) := (by rw [h]; exact n)
 
 def den {sig : signature} : program sig → state sig → state sig
 | (assign var_name indices expr) s := s.update var_name (eval_expression s expr)
 | (seq p₁ p₂) s := den p₂ (den p₁ s)
 | (loop loop_var h expr p) s' := nat.iterate (λ s, (den p s).update' h (s.get' h + 1)) (eval_expression s' expr) (s'.update' h 0)
+| (skip _) s := s
 
 notation `⟦` p `⟧`:= den p
+
+inductive big_step {sig : signature} : (program sig × state) → 
 
 
 @[reducible]
@@ -85,14 +89,14 @@ def s : state S1 := sorry
 
 def P1 : program S1 :=
     (assign "n" [] i(3)) ;;
-    (assign "m" [] (i(39) ~+ v("n")))
+    (assign "m" [] (i(39) + v("n")))
 
 #reduce den P1 s "m" -- computes 42
 example (s : state S1) : (show nat, from den P1 s "m") = 42 := rfl
 
 def P2 : program S1 :=
     (assign "m" [] i(0)) ;;
-    (loop "n" (by refl) i(0)) (
+    (loop "n" (by refl) i(4)) (
         (assign "m" [] (v("m") ~+ v("n"))
     ))
 
@@ -102,10 +106,9 @@ set_option trace.simplify.rewrite true
 
 example (sig : signature) (p₁ p₂ : program sig) (s : state sig) : ⟦ p₁ ;; p₂ ⟧ s = den p₂ (den p₁ s) := by reflexivity
 
-lemma eval_const_int { sig : signature } { s : state sig } (n : ℕ) : @eval_expression sig s int (const_int n (by refl)) = n := begin
-    rw eval_expression,
-    rw eq.mpr,
-end
+--set_option pp.all true
+
+lemma eval_const_int { sig : signature } { s : state sig } (n : ℕ) : @eval_expression sig s int (const_int n (by refl)) = n := by refl
 
 -- overapproximated
 def modifies {sig : signature} : program sig → set (string)
@@ -462,13 +465,58 @@ begin
     },
 end
 
-/-
+lemma loop_var {sig : signature} {l : string} (hli : sig l = int) (p : program sig) (n : ℕ) (s : state sig) (expr : expression sig int) (he : eval_expression s expr = n) : 
+    (⟦loop l hli expr p⟧ s).get' hli = n := begin
+    rw den,
+    rw he,
+    clear he,
+    induction n,
+    case nat.zero {
+        rw nat.iterate,
+        rw state.update',
+        rw state.get',
+        rw state_update_lookup_success,
+        sorry
+    },
+    case nat.succ : n ih {
+        rw iterate_outer,
+        rw state.get',
+        rw [ih],
+        rw state.update',
+        rw state_update_lookup_success,
+        simp[nat.add_succ], 
+        sorry,
+    }
+end
+
+
+-- do we model for or foreach here?
 lemma loop_seq (sig : signature) (l : string) (hli : sig l = int) (p : program sig) (n : ℕ) :
-  ⟦ loop l hli i(n + 1) p ⟧ = ⟦ loop l hli i(n) p ;; assign l i(n + 1) ;; p ⟧ :=
--/
+  ⟦ loop l hli i(n + 1) p ⟧ = ⟦ loop l hli i(n) p ;; p ;; assign l [] (const_int (n + 1) hli) ⟧ := begin
+    funext s v,
+    rw den,
+    rw eval_const_int,
+    rw iterate_outer,
+    rw <- @eval_const_int sig s n,
+    rw [<-den],
+    rw [<-den],
+    rw loop_var hli _ n _ _,
+    simp,
+    rw eval_const_int,
+    rw [den],
+    rw [den],
+    rw [den],
+    rw [den],
+    rw [den],
+    rw [den],
+    rw eval_const_int,
+    rw eval_const_int (1 + n),
+    sorry
+end
+
 
 -- seq p1 p1 = loop n 2 p1
-lemma loop_seq (sig : signature) (s₁ : state sig) (v : string) (l : string) (hli : sig l = int)
+lemma loop_seq' (sig : signature) (s₁ : state sig) (v : string) (l : string) (hli : sig l = int)
         (p : program sig) (hnu : ¬(uses p l)) (hnv : ¬ (v = l)) :
         ⟦ p ;; p ⟧ s₁ v = ⟦ loop l hli i(2) p ⟧ s₁ v :=
 begin
