@@ -77,8 +77,20 @@ def den {sig : signature} : program sig → state sig → state sig
 
 notation `⟦` p `⟧`:= den p
 
-inductive big_step {sig : signature} : (program sig × state) → 
+inductive big_step {sig : signature} : (program sig × (state sig)) → (state sig) → Prop
+| skip {s} :
+    big_step (skip sig, s) s
+| seq {p₁ p₂ s t u} (h₁ : big_step (p₁, s) t) (h₂ : big_step (p₂, t) u) : 
+    big_step (seq p₁ p₂, s) u
+| assign {var_name indices s u ty} {expr : expression sig ty} (hvty : sig var_name = ty) 
+    (h : state.get' hvty u = eval_expression s expr) (h₂ : ∀m, ¬(var_name = m) → s m = u m) :
+    big_step (assign var_name indices expr, s) u
+| loop_zero {n hni expr p s} (h : eval_expression s expr = 0) : 
+    big_step (loop n hni expr p, s) s
+| loop_step {l hli expr p s u v} {n : type_map int} (h₁ : eval_expression s expr = (n + 1)) (h₂ : big_step (loop l hli i(n) p, u) v) (h₃ : big_step (p, s) v) :
+    big_step (loop l hli expr p, s) v
 
+infix ` ⟹ `:110 := big_step
 
 @[reducible]
 def S1 := (create_signature [("m", int), ("n", int)])
@@ -93,6 +105,48 @@ def P1 : program S1 :=
 
 #reduce den P1 s "m" -- computes 42
 example (s : state S1) : (show nat, from den P1 s "m") = 42 := rfl
+
+example {α β : Sort} (h : α = β) (b : β) : eq.mpr h b = eq.mpr h b := begin
+    refl,
+end
+
+example {α β : Sort} (h₁ : β = α) (h₂ : α = β) (b : β) : eq.mpr h₁ (eq.mpr h₂ b) = b := begin
+    refl,
+end
+
+theorem eq_mpr_switch {α β : Sort} {a b} (h : α = β)  : a = eq.mpr h b → eq.mpr (eq.symm h) a = b := begin
+    intro, 
+    refl,
+end
+
+theorem eq_mpr_switch' {α β : Type} {a : α} {b : β} (h : α = β)  : eq.mpr (eq.symm h) a = b → a = eq.mpr h b := begin
+    intro,
+    sorry
+end
+
+-- set_option pp.all true
+
+theorem w {n v} {sig : signature} {s u : state sig} (ht : sig v = int) (hp : (assign v list.nil (const_int n ht), s) ⟹ u) : u.get' ht = n := begin
+    cases hp,
+    rw state.get' at hp_h,
+    apply eq_mpr_switch',
+    rw hp_h,
+end
+
+example {t} : (P1, s)⟹t → (t "m") = (42 : nat) := begin
+    intro p,
+    cases p with _ _ _ _ u _ p₁ p₂,
+    have a : (show nat, from u "n") = 3 := begin
+        cases p₁,
+        rw eq.mpr  at p₁_h,
+        rw state.get' at p₁_h,
+        
+    end,
+    cases p_h₂,
+    simp at p_h₂_hvty,
+    unfold S1 at p_h₂_hvty,
+
+end
 
 def P2 : program S1 :=
     (assign "m" [] i(0)) ;;
