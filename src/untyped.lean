@@ -58,6 +58,12 @@ def int_expression_list_eval (idx_expr : list expression) (idx_evaled : list ℕ
     pred_on_list (λ x : (expression × ℕ), valid_int_expression x.1 x.2) (idx_expr.zip idx_evaled) ∧
     idx_expr.length = idx_evaled.length
 
+@[simp]
+lemma int_expression_list_eval_empty : int_expression_list_eval [] [] := begin
+    unfold int_expression_list_eval,
+    simp,
+end
+
 inductive big_step : (program × state) → state → Prop
 | assign_global_int {n expr val} {s u : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : valid_int_expression expr val) 
     (h_idx : int_expression_list_eval idx_expr idx_evaled)
@@ -104,7 +110,7 @@ lemma list_length_tail {α β : Type} {x : α} {y : β} {xs ys} (h : (x :: xs).l
 end
 
 lemma valid_int_expression_eq {expr r₁ r₂} (h₁ : valid_int_expression expr r₁) (h₂ : valid_int_expression expr r₂) : r₁ = r₂ := begin
-    cases h₁;
+    cases h₁; -- use induction instead
         cases h₂;
         try {refl},
     sorry
@@ -174,6 +180,7 @@ theorem int_expression_list_unique {expr eval₁ eval₂} (h₁ : int_expression
     }
 end
 
+-- could be changed to equality of the state
 @[simp]
 lemma big_step_assign {s u val n idx_expr idx_evaled} (hp : ((assign n idx_expr (literal_int val)), s) ⟹ u) (hi : int_expression_list_eval idx_expr idx_evaled) : 
     u.global n idx_evaled = val := 
@@ -194,7 +201,7 @@ def p : program :=
 example {s u} (hp : (p, s) ⟹ u) : u.global "n" [] = 1 := begin
     apply big_step_assign,
     assumption,
-    
+    simp,
 end
 
 end MCL_untyped
