@@ -60,19 +60,19 @@ def pred_on_list {α : Type} (f : α → Prop) : list α → Prop
 | [] := true
 
 @[reducible]
-def int_expression_list_eval (idx_expr : list expression) (idx_evaled : list ℕ) := 
-    pred_on_list (λ x : (expression × ℕ), valid_typed_expression x.1 int x.2) (idx_expr.zip idx_evaled) ∧
+def int_expression_list_eval (s) (idx_expr : list expression) (idx_evaled : list ℕ) := 
+    pred_on_list (λ x : (expression × ℕ), valid_typed_expression s x.1 int x.2) (idx_expr.zip idx_evaled) ∧
     idx_expr.length = idx_evaled.length
 
 @[simp]
-lemma int_expression_list_eval_empty : int_expression_list_eval [] [] := begin
+lemma int_expression_list_eval_empty (s) : int_expression_list_eval s [] [] := begin
     unfold int_expression_list_eval,
     simp,
 end
 
 inductive big_step : (program × state) → state → Prop
-| assign_global_int {t : type} {n expr} {val : type_map t} {s u : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : valid_typed_expression expr t val) 
-    (h_idx : int_expression_list_eval idx_expr idx_evaled)
+| assign_global_int {t : type} {n expr} {val : type_map t} {s u : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : valid_typed_expression s expr t val) 
+    (h_idx : int_expression_list_eval s idx_expr idx_evaled)
     (h_carryover : ∀ m m_idx, ¬(n = m ∧ idx_evaled = m_idx) → u.global t m m_idx = s.global t m m_idx)
     (h_updated : u.global t n idx_evaled = val) : 
     big_step ((assign n idx_expr expr), s) u
@@ -115,14 +115,15 @@ lemma list_length_tail {α β : Type} {x : α} {y : β} {xs ys} (h : (x :: xs).l
     assumption,
 end
 
-lemma valid_int_expression_eq {expr r₁ r₂} (h₁ : valid_typed_expression expr int r₁) (h₂ : valid_typed_expression expr int r₂) : r₁ = r₂ := begin
+lemma valid_int_expression_eq {s expr r₁ r₂} (h₁ : valid_typed_expression s expr int r₁) (h₂ : valid_typed_expression s expr int r₂) : r₁ = r₂ := begin
     cases h₁; -- use induction instead
         cases h₂;
         try {refl},
-    sorry
+    sorry,
+    sorry,
 end
 
-theorem int_expression_list_unique {expr eval₁ eval₂} (h₁ : int_expression_list_eval expr eval₁) (h₂ : int_expression_list_eval expr eval₂) : eval₁ = eval₂ := begin
+theorem int_expression_list_unique {s expr eval₁ eval₂} (h₁ : int_expression_list_eval s expr eval₁) (h₂ : int_expression_list_eval s expr eval₂) : eval₁ = eval₂ := begin
     cases h₁,
     cases h₂,
     induction eval₁ generalizing eval₂ expr, -- can pick any list (generalizing the others)
@@ -155,12 +156,12 @@ theorem int_expression_list_unique {expr eval₁ eval₂} (h₁ : int_expression
         cases this_h with expr_tl expr_eq,
         subst expr_eq,
         have : eval₁_hd = eval₂_hd := begin
-            have : valid_typed_expression expr_hd int eval₁_hd := begin
+            have : valid_typed_expression s expr_hd int eval₁_hd := begin
                 rw list.zip at h₁_left,
                 rw list.zip_with at h₁_left,
                 apply pred_on_list_head h₁_left,
             end,
-            have : valid_typed_expression expr_hd int eval₂_hd := begin
+            have : valid_typed_expression s expr_hd int eval₂_hd := begin
                 rw list.zip at h₂_left,
                 rw list.zip_with at h₂_left,
                 apply pred_on_list_head h₂_left,
@@ -188,7 +189,7 @@ end
 
 -- could be changed to equality of the state
 @[simp]
-lemma big_step_assign {s u val n idx_expr idx_evaled} (hp : ((assign n idx_expr (literal_int val)), s) ⟹ u) (hi : int_expression_list_eval idx_expr idx_evaled) : 
+lemma big_step_assign {s u val n idx_expr idx_evaled} (hp : ((assign n idx_expr (literal_int val)), s) ⟹ u) (hi : int_expression_list_eval s idx_expr idx_evaled) : 
     u.global int n idx_evaled = val := 
 begin
     cases hp,
