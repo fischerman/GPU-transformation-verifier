@@ -115,12 +115,19 @@ lemma list_length_tail {α β : Type} {x : α} {y : β} {xs ys} (h : (x :: xs).l
     assumption,
 end
 
-lemma valid_int_expression_eq {s expr r₁ r₂} (h₁ : valid_typed_expression s expr int r₁) (h₂ : valid_typed_expression s expr int r₂) : r₁ = r₂ := begin
-    cases h₁; -- use induction instead
+lemma valid_typed_expression_unique {s t expr r₁ r₂} (h₁ : valid_typed_expression s expr t r₁) (h₂ : valid_typed_expression s expr t r₂) : r₁ = r₂ := begin
+    induction h₁;
         cases h₂;
         try {refl},
-    sorry,
-    sorry,
+    {
+        rw  [←h₂_h, ←h₁_h],
+    }, {
+        have : h₁_n₁ = h₂_n₁ := by apply h₁_ih_h₁ h₂_h₁,
+        rw this,
+        have : h₁_n₂ = h₂_n₂ := by apply h₁_ih_h₂ h₂_h₂,
+        rw this,
+        refl,
+    }
 end
 
 theorem int_expression_list_unique {s expr eval₁ eval₂} (h₁ : int_expression_list_eval s expr eval₁) (h₂ : int_expression_list_eval s expr eval₂) : eval₁ = eval₂ := begin
@@ -156,18 +163,17 @@ theorem int_expression_list_unique {s expr eval₁ eval₂} (h₁ : int_expressi
         cases this_h with expr_tl expr_eq,
         subst expr_eq,
         have : eval₁_hd = eval₂_hd := begin
-            have : valid_typed_expression s expr_hd int eval₁_hd := begin
+            have hd_eq₁ : valid_typed_expression s expr_hd int eval₁_hd := begin
                 rw list.zip at h₁_left,
                 rw list.zip_with at h₁_left,
                 apply pred_on_list_head h₁_left,
             end,
-            have : valid_typed_expression s expr_hd int eval₂_hd := begin
+            have hd_eq₂ : valid_typed_expression s expr_hd int eval₂_hd := begin
                 rw list.zip at h₂_left,
                 rw list.zip_with at h₂_left,
                 apply pred_on_list_head h₂_left,
             end,
-            apply valid_int_expression_eq,
-            repeat { assumption },
+            apply valid_typed_expression_unique hd_eq₁ hd_eq₂,
         end,
         cases this,
         have : eval₁_tl = eval₂_tl := begin
