@@ -1,4 +1,7 @@
 import data.set.basic
+import data.list
+
+#check list.forall₂
 
 namespace MCL_untyped
 
@@ -18,16 +21,14 @@ def type_map : type → Type
 @[reducible]
 def untyped_value := ℕ
 
--- TODO this shouldn't be a function at all
--- that way we don't have to care about types of the values
 @[reducible]
 def var_map : Type := Π t : type, string → list ℕ → type_map t
 
 def var_map.update (t : type) (n : string) (n_idx : list ℕ) (v : type_map t) (s : var_map) := 
-    λ t' m m_idx, dite (n = m ∧ n_idx = m_idx ∧ t = t') (λc, begin
+    λ t' m m_idx, if c : (n = m ∧ n_idx = m_idx ∧ t = t') then (begin
         rw [and.right (and.right c)] at v,
         exact v,
-    end) (λ_, s t' m m_idx)
+    end) else s t' m m_idx
 
 structure state := (global : var_map)
 
@@ -42,7 +43,7 @@ instance : has_one expression := ⟨expression.literal_int 1⟩
 open expression
 
 inductive valid_typed_expression (s : state) : expression → Π t : type, type_map t → Prop
-| global_var (n : string) (t : type) (v : type_map t) (h : s.global t n [] = v) : valid_typed_expression (var n) t v -- variables can have arbitrary values
+| global_var (n : string) (t : type) : valid_typed_expression (var n) t (s.global t n []) -- variables can have arbitrary values
 | add {e₁ e₂ n₁ n₂} (h₁ : valid_typed_expression e₁ int n₁) (h₂ : valid_typed_expression e₂ int n₂) : valid_typed_expression (add e₁ e₂) int (n₁ + n₂)
 | literal {n} : valid_typed_expression (literal_int n) int n
 
@@ -111,7 +112,6 @@ lemma list_length_tail {α β : Type} {x : α} {y : β} {xs ys} (h : (x :: xs).l
     rw list.length at h,
     simp at h,
     repeat { rw nat.one_add at h },
-    simp at h,
     assumption,
 end
 
@@ -120,8 +120,6 @@ lemma valid_typed_expression_unique {s t expr r₁ r₂} (h₁ : valid_typed_exp
         cases h₂;
         try {refl},
     {
-        rw  [←h₂_h, ←h₁_h],
-    }, {
         have : h₁_n₁ = h₂_n₁ := by apply h₁_ih_h₁ h₂_h₁,
         rw this,
         have : h₁_n₂ = h₂_n₂ := by apply h₁_ih_h₂ h₂_h₂,
@@ -206,6 +204,21 @@ begin
     cases hp_h_eval,
     rw hp_h_updated,
 end
+
+@[simp]
+lemma big_step_assign' {s u val n idx_expr idx_evaled} (hp : ((assign n idx_expr (literal_int val)), s) ⟹ u) (hi : int_expression_list_eval s idx_expr idx_evaled) : 
+    s.global.update int n idx_evaled val = u.global := 
+begin
+    cases hp,
+    have : hp_idx_evaled = idx_evaled := begin
+        apply int_expression_list_unique hp_h_idx hi,
+    end,
+    rw <- this,
+    cases hp_h_eval,
+    rw ← hp_h_updated,
+end
+
+-- lemma big_step_seq {s} () : := begin
 
 def p : program :=
     assign "n" [] (literal_int 1)
