@@ -8,6 +8,8 @@ inductive type
 
 open type
 
+instance : decidable_eq type := sorry
+
 @[reducible]
 def type_map : type → Type
 | int := ℕ
@@ -19,9 +21,13 @@ def untyped_value := ℕ
 -- TODO this shouldn't be a function at all
 -- that way we don't have to care about types of the values
 @[reducible]
-def var_map : Type := string → list ℕ → untyped_value
+def var_map : Type := Π t : type, string → list ℕ → type_map t
 
-def var_map.update (n : string) (n_idx : list ℕ) (v : untyped_value) (s : var_map) := λm m_idx, if n = m ∧ n_idx = m_idx then v else s m m_idx
+def var_map.update (t : type) (n : string) (n_idx : list ℕ) (v : type_map t) (s : var_map) := 
+    λ t' m m_idx, dite (n = m ∧ n_idx = m_idx ∧ t = t') (λc, begin
+        rw [and.right (and.right c)] at v,
+        exact v,
+    end) (λ_, s t' m m_idx)
 
 structure state := (global : var_map)
 
@@ -35,10 +41,10 @@ instance : has_zero expression := ⟨expression.literal_int 0⟩
 instance : has_one expression := ⟨expression.literal_int 1⟩
 open expression
 
-inductive valid_int_expression : expression → ℕ → Prop
-| var (n : string) : valid_int_expression (var n) 0 -- all variable are 0 at the moment
-| add {e₁ e₂ n₁ n₂} (h₁ : valid_int_expression e₁ n₁) (h₂ : valid_int_expression e₂ n₂) : valid_int_expression (add e₁ e₂) (n₁ + n₂)
-| literal {n} : valid_int_expression (literal_int n) n
+inductive valid_typed_expression (s : state) : expression → Π t : type, type_map t → Prop
+| global_var (n : string) (t : type) (v : type_map t) (h : s.global t n [] = v) : valid_typed_expression (var n) t v -- variables can have arbitrary values
+| add {e₁ e₂ n₁ n₂} (h₁ : valid_typed_expression e₁ int n₁) (h₂ : valid_typed_expression e₂ int n₂) : valid_typed_expression (add e₁ e₂) int (n₁ + n₂)
+| literal {n} : valid_typed_expression (literal_int n) int n
 
 inductive program
 | assign (n : string) : list (expression) → expression → program
@@ -55,7 +61,7 @@ def pred_on_list {α : Type} (f : α → Prop) : list α → Prop
 
 @[reducible]
 def int_expression_list_eval (idx_expr : list expression) (idx_evaled : list ℕ) := 
-    pred_on_list (λ x : (expression × ℕ), valid_int_expression x.1 x.2) (idx_expr.zip idx_evaled) ∧
+    pred_on_list (λ x : (expression × ℕ), valid_typed_expression x.1 int x.2) (idx_expr.zip idx_evaled) ∧
     idx_expr.length = idx_evaled.length
 
 @[simp]
@@ -65,10 +71,10 @@ lemma int_expression_list_eval_empty : int_expression_list_eval [] [] := begin
 end
 
 inductive big_step : (program × state) → state → Prop
-| assign_global_int {n expr val} {s u : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : valid_int_expression expr val) 
+| assign_global_int {t : type} {n expr} {val : type_map t} {s u : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : valid_typed_expression expr t val) 
     (h_idx : int_expression_list_eval idx_expr idx_evaled)
-    (h_carryover : ∀ m m_idx, ¬(n = m ∧ idx_evaled = m_idx) → u.global m m_idx = s.global m m_idx)
-    (h_updated : u.global n idx_evaled = val) : 
+    (h_carryover : ∀ m m_idx, ¬(n = m ∧ idx_evaled = m_idx) → u.global t m m_idx = s.global t m m_idx)
+    (h_updated : u.global t n idx_evaled = val) : 
     big_step ((assign n idx_expr expr), s) u
 | seq {s u v p₁ p₂} (hp₁ : big_step (p₁, s) u) (hp₂ : big_step (p₂, u) v) :
     big_step (seq p₁ p₂, s) v
@@ -109,7 +115,7 @@ lemma list_length_tail {α β : Type} {x : α} {y : β} {xs ys} (h : (x :: xs).l
     assumption,
 end
 
-lemma valid_int_expression_eq {expr r₁ r₂} (h₁ : valid_int_expression expr r₁) (h₂ : valid_int_expression expr r₂) : r₁ = r₂ := begin
+lemma valid_int_expression_eq {expr r₁ r₂} (h₁ : valid_typed_expression expr int r₁) (h₂ : valid_typed_expression expr int r₂) : r₁ = r₂ := begin
     cases h₁; -- use induction instead
         cases h₂;
         try {refl},
@@ -149,12 +155,12 @@ theorem int_expression_list_unique {expr eval₁ eval₂} (h₁ : int_expression
         cases this_h with expr_tl expr_eq,
         subst expr_eq,
         have : eval₁_hd = eval₂_hd := begin
-            have : valid_int_expression expr_hd eval₁_hd := begin
+            have : valid_typed_expression expr_hd int eval₁_hd := begin
                 rw list.zip at h₁_left,
                 rw list.zip_with at h₁_left,
                 apply pred_on_list_head h₁_left,
             end,
-            have : valid_int_expression expr_hd eval₂_hd := begin
+            have : valid_typed_expression expr_hd int eval₂_hd := begin
                 rw list.zip at h₂_left,
                 rw list.zip_with at h₂_left,
                 apply pred_on_list_head h₂_left,
@@ -183,22 +189,21 @@ end
 -- could be changed to equality of the state
 @[simp]
 lemma big_step_assign {s u val n idx_expr idx_evaled} (hp : ((assign n idx_expr (literal_int val)), s) ⟹ u) (hi : int_expression_list_eval idx_expr idx_evaled) : 
-    u.global n idx_evaled = val := 
+    u.global int n idx_evaled = val := 
 begin
     cases hp,
     have : hp_idx_evaled = idx_evaled := begin
         apply int_expression_list_unique hp_h_idx hi,
     end,
     rw <- this,
-    rw hp_h_updated,
     cases hp_h_eval,
-    refl,
+    rw hp_h_updated,
 end
 
 def p : program :=
     assign "n" [] (literal_int 1)
 
-example {s u} (hp : (p, s) ⟹ u) : u.global "n" [] = 1 := begin
+example {s u} (hp : (p, s) ⟹ u) : u.global int "n" [] = 1 := begin
     apply big_step_assign,
     assumption,
     simp,
