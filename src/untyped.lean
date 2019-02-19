@@ -51,10 +51,10 @@ instance : has_zero expression := ⟨expression.literal_int 0⟩
 instance : has_one expression := ⟨expression.literal_int 1⟩
 open expression
 
-inductive valid_typed_expression (s : state) : Π t : type, expression → type_map t → Prop
-| global_var (n : string) (t : type) : valid_typed_expression t (var n) (s.global t n []) -- variables can have arbitrary values
-| add {e₁ e₂ n₁ n₂} (h₁ : valid_typed_expression int e₁ n₁) (h₂ : valid_typed_expression int e₂ n₂) : valid_typed_expression int (add e₁ e₂) (n₁ + n₂)
-| literal {n} : valid_typed_expression int (literal_int n) n
+inductive compute_typed_expression (s : state) : Π t : type, expression → type_map t → Prop
+| global_var (n : string) (t : type) : compute_typed_expression t (var n) (s.global t n []) -- variables can have arbitrary values
+| add {e₁ e₂ n₁ n₂} (h₁ : compute_typed_expression int e₁ n₁) (h₂ : compute_typed_expression int e₂ n₂) : compute_typed_expression int (add e₁ e₂) (n₁ + n₂)
+| literal {n} : compute_typed_expression int (literal_int n) n
 
 inductive program
 | assign (n : string) : list (expression) → expression → program
@@ -66,13 +66,13 @@ infixr ` ;; `:90 := program.seq
 open program
 
 @[simp] -- causes the empty list to be simplified immediately (no unfold required)
-def compute_expr_list (t s) (idx_expr : list expression) (idx_evaled : list (type_map t)) := list.forall₂ (λ expr eval, valid_typed_expression s t expr eval) idx_expr idx_evaled
+def compute_expr_list (t s) (idx_expr : list expression) (idx_evaled : list (type_map t)) := list.forall₂ (λ expr eval, compute_typed_expression s t expr eval) idx_expr idx_evaled
 
 @[simp]
 def compute_idx_expr := compute_expr_list int
 
 inductive big_step : (program × state) → state → Prop
-| assign_global {t : type} {n expr} {val : type_map t} {s : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : valid_typed_expression s t expr val) 
+| assign_global {t : type} {n expr} {val : type_map t} {s : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : compute_typed_expression s t expr val) 
     (h_idx : compute_idx_expr s idx_expr idx_evaled) : 
     big_step ((assign n idx_expr expr), s) { global := s.global.update t n idx_evaled val , ..s }
 | seq {s u v p₁ p₂} (hp₁ : big_step (p₁, s) u) (hp₂ : big_step (p₂, u) v) :
@@ -101,7 +101,7 @@ lemma list_length_tail {α β : Type} {x : α} {y : β} {xs ys} (h : (x :: xs).l
     assumption,
 end
 
-lemma valid_typed_expression_unique {s t expr r₁ r₂} (h₁ : valid_typed_expression s expr t r₁) (h₂ : valid_typed_expression s expr t r₂) : r₁ = r₂ := begin
+lemma compute_typed_expression_unique {s t expr r₁ r₂} (h₁ : compute_typed_expression s expr t r₁) (h₂ : compute_typed_expression s expr t r₂) : r₁ = r₂ := begin
     induction h₁;
         cases h₂;
         try {refl},
@@ -114,10 +114,10 @@ lemma valid_typed_expression_unique {s t expr r₁ r₂} (h₁ : valid_typed_exp
     }
 end
 
-lemma valid_typed_expression_right_unique {s t} : relator.right_unique (valid_typed_expression s t) := begin
+lemma compute_typed_expression_right_unique {s t} : relator.right_unique (compute_typed_expression s t) := begin
     unfold relator.right_unique,
     intros expr val₁ val₂ h₁ h₂,
-    apply valid_typed_expression_unique,
+    apply compute_typed_expression_unique,
     repeat { assumption },
 end
 
@@ -125,7 +125,7 @@ lemma compute_expr_list_unique {s} {t : type} {idx_expr : list expression}  {eva
     (h₁ : compute_expr_list t s idx_expr eval₁) (h₂ : compute_expr_list t s idx_expr eval₂) : eval₁ = eval₂ := 
 begin
     -- rw ← list.forall₂_eq_eq_eq, -- does rewrite perform funext here? -- why doesn't it work to the rw first
-    apply list.right_unique_forall₂ (@valid_typed_expression_right_unique s t),
+    apply list.right_unique_forall₂ (@compute_typed_expression_right_unique s t),
     repeat { assumption },
 end
 
