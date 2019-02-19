@@ -41,6 +41,10 @@ end
 structure state := (global : var_map)
 def state.updateGloabl (g : var_map) (s : state) : state := {global := g, ..s}
 
+
+structure declaration := (scope : ℕ)(type : type)(nridx : ℕ)
+def signature := string → option declaration
+
 inductive expression : Type
 | var (n : string) : expression
 | add : expression → expression → expression
@@ -71,10 +75,12 @@ def compute_expr_list (t s) (idx_expr : list expression) (idx_evaled : list (typ
 @[simp]
 def compute_idx_expr := compute_expr_list int
 
-inductive big_step : (program × state) → state → Prop
-| assign_global {t : type} {n expr} {val : type_map t} {s : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : compute_typed_expression s t expr val) 
-    (h_idx : compute_idx_expr s idx_expr idx_evaled) : 
-    big_step ((assign n idx_expr expr), s) { global := s.global.update t n idx_evaled val , ..s }
+inductive big_step : (program × signature × state) → state → Prop
+| assign_global {t : type} {n expr d} {sig : signature} {val} {s : state} {idx_expr : list expression} {idx_evaled : list ℕ} 
+    (ht : sig n = some d) 
+    (h_eval : compute_typed_expression s d.type expr val) 
+    (h_idx : compute_idx_expr s idx_expr idx_evaled) :
+    big_step ((assign n idx_expr expr), sig, s) { global := s.global.update d.type n idx_evaled val , ..s }
 | seq {s u v p₁ p₂} (hp₁ : big_step (p₁, s) u) (hp₂ : big_step (p₂, u) v) :
     big_step (seq p₁ p₂, s) v
 
@@ -108,43 +114,51 @@ begin
     repeat { assumption },
 end
 
--- could be changed to equality of the state
 @[simp]
-lemma big_step_assign_int {s u val n idx_expr idx_evaled} (hp : ((assign n idx_expr (literal_int val)), s) ⟹ u) (hi : compute_idx_expr s idx_expr idx_evaled) : 
-    u.global int n idx_evaled = val := 
+lemma big_step_assign {sig s u expr n idx_expr idx_evaled} {d : declaration} {val : type_map (d.type)}
+    (hp : ((assign n idx_expr expr), sig, s) ⟹ u) (hi : compute_idx_expr s idx_expr idx_evaled) 
+    (hd : sig n = some d) (he : compute_typed_expression s (d.type) expr val) : 
+    s.global.update (d.type) n idx_evaled val = u.global := 
 begin
     cases hp,
-    have : hp_idx_evaled = idx_evaled := begin
-        apply compute_expr_list_unique hp_h_idx hi,
-    end,
-    rw <- this,
-    cases hp_h_eval,
     simp,
+    have : hp_idx_evaled = idx_evaled := by apply compute_expr_list_unique hp_h_idx hi,
+    subst this,
+    rw hd at hp_ht,
+    simp at hp_ht,
+    subst hp_ht,
+    have : val = hp_val := by apply compute_typed_expression_unique he hp_h_eval,
+    subst this,
 end
 
-@[simp]
-lemma big_step_assign {s u t expr val n idx_expr idx_evaled} 
-    (hp : ((assign n idx_expr expr), s) ⟹ u) (hi : compute_idx_expr s idx_expr idx_evaled) (he : compute_typed_expression s t expr val) : 
-    s.global.update t n idx_evaled val = u.global := 
-begin
+lemma big_step_assign' {sig s u expr n idx_expr}
+    (hp : ((assign n idx_expr expr), sig, s) ⟹ u) :
+    ∃ (d : declaration) idx_evaled val, s.global.update (d.type) n idx_evaled val = u.global := begin
     cases hp,
+    apply Exists.intro hp_d,
+    apply Exists.intro hp_idx_evaled,
+    apply Exists.intro hp_val,
     simp,
-    have : hp_idx_evaled = idx_evaled := begin
-        apply compute_expr_list_unique hp_h_idx hi,
-    end,
-    subst this,
-    -- it cannot be proven, because assign can assume an type
-    cases hp_h_eval,
 end
 
 -- lemma big_step_seq {s} () : := begin
 
+def s₁ : signature
+| "n" := some {scope := 1, type := int, nridx := 0}
+| _ := none
+
 def p : program :=
     assign "n" [] (literal_int 1)
 
-example {s u} (hp : (p, s) ⟹ u) : u.global int "n" [] = 1 := begin
-    apply big_step_assign_int,
-    assumption,
+set_option trace.simplify.rewrite true 
+
+example {s u} (hp : (p, s₁, s) ⟹ u) : u.global int "n" [] = 1 := begin
+    cases hp,
+    simp at hp_ht,
+    cases hp_ht,
+    simp,
+    cases hp_h_eval,
+    apply var_map_update_get,
     simp,
 end
 
