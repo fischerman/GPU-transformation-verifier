@@ -30,7 +30,14 @@ def var_map.update (t : type) (n : string) (n_idx : list ℕ) (v : type_map t) (
         exact v,
     end) else s t' m m_idx
 
+lemma var_map_update_get {t n idx v} {a : var_map} : a.update t n idx v t n idx = v := begin
+    unfold var_map.update,
+    simp,
+    refl,
+end
+
 structure state := (global : var_map)
+def state.updateGloabl (g : var_map) (s : state) : state := {global := g, ..s}
 
 inductive expression : Type
 | var (n : string) : expression
@@ -72,11 +79,9 @@ lemma int_expression_list_eval_empty (s) : int_expression_list_eval s [] [] := b
 end
 
 inductive big_step : (program × state) → state → Prop
-| assign_global_int {t : type} {n expr} {val : type_map t} {s u : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : valid_typed_expression s expr t val) 
-    (h_idx : int_expression_list_eval s idx_expr idx_evaled)
-    (h_carryover : ∀ m m_idx, ¬(n = m ∧ idx_evaled = m_idx) → u.global t m m_idx = s.global t m m_idx)
-    (h_updated : u.global t n idx_evaled = val) : 
-    big_step ((assign n idx_expr expr), s) u
+| assign_global {t : type} {n expr} {val : type_map t} {s : state} {idx_expr : list expression} {idx_evaled : list ℕ} (h_eval : valid_typed_expression s expr t val) 
+    (h_idx : int_expression_list_eval s idx_expr idx_evaled) : 
+    big_step ((assign n idx_expr expr), s) { global := s.global.update t n idx_evaled val , ..s }
 | seq {s u v p₁ p₂} (hp₁ : big_step (p₁, s) u) (hp₂ : big_step (p₂, u) v) :
     big_step (seq p₁ p₂, s) v
 
@@ -202,7 +207,8 @@ begin
     end,
     rw <- this,
     cases hp_h_eval,
-    rw hp_h_updated,
+    simp,
+    apply var_map_update_get,
 end
 
 @[simp]
@@ -215,7 +221,7 @@ begin
     end,
     rw <- this,
     cases hp_h_eval,
-    rw ← hp_h_updated,
+    simp,
 end
 
 -- lemma big_step_seq {s} () : := begin
