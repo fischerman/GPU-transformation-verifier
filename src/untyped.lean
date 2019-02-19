@@ -103,14 +103,14 @@ end
 lemma compute_expr_list_unique {s} {t : type} {idx_expr : list expression}  {eval₁ eval₂} 
     (h₁ : compute_expr_list t s idx_expr eval₁) (h₂ : compute_expr_list t s idx_expr eval₂) : eval₁ = eval₂ := 
 begin
-    -- rw ← list.forall₂_eq_eq_eq, -- does rewrite perform funext here? -- why doesn't it work to the rw first
+    -- rw ← list.forall₂_eq_eq_eq, -- does rewrite perform funext here?
     apply list.right_unique_forall₂ (@compute_typed_expression_right_unique s t),
     repeat { assumption },
 end
 
 -- could be changed to equality of the state
 @[simp]
-lemma big_step_assign {s u val n idx_expr idx_evaled} (hp : ((assign n idx_expr (literal_int val)), s) ⟹ u) (hi : compute_idx_expr s idx_expr idx_evaled) : 
+lemma big_step_assign_int {s u val n idx_expr idx_evaled} (hp : ((assign n idx_expr (literal_int val)), s) ⟹ u) (hi : compute_idx_expr s idx_expr idx_evaled) : 
     u.global int n idx_evaled = val := 
 begin
     cases hp,
@@ -123,16 +123,18 @@ begin
 end
 
 @[simp]
-lemma big_step_assign' {s u val n idx_expr idx_evaled} (hp : ((assign n idx_expr (literal_int val)), s) ⟹ u) (hi : compute_idx_expr s idx_expr idx_evaled) : 
-    s.global.update int n idx_evaled val = u.global := 
+lemma big_step_assign {s u t expr val n idx_expr idx_evaled} 
+    (hp : ((assign n idx_expr expr), s) ⟹ u) (hi : compute_idx_expr s idx_expr idx_evaled) (he : compute_typed_expression s t expr val) : 
+    s.global.update t n idx_evaled val = u.global := 
 begin
     cases hp,
+    simp,
     have : hp_idx_evaled = idx_evaled := begin
         apply compute_expr_list_unique hp_h_idx hi,
     end,
-    rw <- this,
+    subst this,
+    -- it cannot be proven, because assign can assume an type
     cases hp_h_eval,
-    simp,
 end
 
 -- lemma big_step_seq {s} () : := begin
@@ -141,7 +143,7 @@ def p : program :=
     assign "n" [] (literal_int 1)
 
 example {s u} (hp : (p, s) ⟹ u) : u.global int "n" [] = 1 := begin
-    apply big_step_assign,
+    apply big_step_assign_int,
     assumption,
     simp,
 end
