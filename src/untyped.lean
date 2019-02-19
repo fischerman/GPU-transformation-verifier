@@ -81,8 +81,8 @@ inductive big_step : (program × signature × state) → state → Prop
     (h_eval : compute_typed_expression s d.type expr val) 
     (h_idx : compute_idx_expr s idx_expr idx_evaled) :
     big_step ((assign n idx_expr expr), sig, s) { global := s.global.update d.type n idx_evaled val , ..s }
-| seq {s u v p₁ p₂} (hp₁ : big_step (p₁, s) u) (hp₂ : big_step (p₂, u) v) :
-    big_step (seq p₁ p₂, s) v
+| seq {s u v sig p₁ p₂} (hp₁ : big_step (p₁, sig, s) u) (hp₂ : big_step (p₂, sig, u) v) :
+    big_step (seq p₁ p₂, sig, s) v
 
 infix ` ⟹ `:110 := big_step
 
