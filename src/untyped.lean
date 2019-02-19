@@ -55,8 +55,8 @@ instance : has_zero expression := ⟨expression.literal_int 0⟩
 instance : has_one expression := ⟨expression.literal_int 1⟩
 open expression
 
-inductive compute_typed_expression (s : state) : Π t : type, expression → type_map t → Prop
-| global_var (n : string) (t : type) : compute_typed_expression t (var n) (s.global t n []) -- variables can have arbitrary values
+inductive compute_typed_expression (sig : signature) (s : state) : Π t : type, expression → type_map t → Prop
+| global_var (n : string) (d) {t : type} (h : sig n = some d) (h' : t = d.type) : compute_typed_expression t (var n) (s.global t n []) -- equality as hypthoses allows to to call cases on h₂ in compute_typed_expression_unique
 | add {e₁ e₂ n₁ n₂} (h₁ : compute_typed_expression int e₁ n₁) (h₂ : compute_typed_expression int e₂ n₂) : compute_typed_expression int (add e₁ e₂) (n₁ + n₂)
 | literal {n} : compute_typed_expression int (literal_int n) n
 
@@ -70,7 +70,7 @@ infixr ` ;; `:90 := program.seq
 open program
 
 @[simp] -- causes the empty list to be simplified immediately (no unfold required)
-def compute_expr_list (t s) (idx_expr : list expression) (idx_evaled : list (type_map t)) := list.forall₂ (λ expr eval, compute_typed_expression s t expr eval) idx_expr idx_evaled
+def compute_expr_list (t sig s) (idx_expr : list expression) (idx_evaled : list (type_map t)) := list.forall₂ (λ expr eval, compute_typed_expression sig s t expr eval) idx_expr idx_evaled
 
 @[simp]
 def compute_idx_expr := compute_expr_list int
@@ -78,46 +78,54 @@ def compute_idx_expr := compute_expr_list int
 inductive big_step : (program × signature × state) → state → Prop
 | assign_global {t : type} {n expr d} {sig : signature} {val} {s : state} {idx_expr : list expression} {idx_evaled : list ℕ} 
     (ht : sig n = some d) 
-    (h_eval : compute_typed_expression s d.type expr val) 
-    (h_idx : compute_idx_expr s idx_expr idx_evaled) :
+    (h_eval : compute_typed_expression sig s d.type expr val) 
+    (h_idx : compute_idx_expr sig s idx_expr idx_evaled) :
     big_step ((assign n idx_expr expr), sig, s) { global := s.global.update d.type n idx_evaled val , ..s }
 | seq {s u v sig p₁ p₂} (hp₁ : big_step (p₁, sig, s) u) (hp₂ : big_step (p₂, sig, u) v) :
     big_step (seq p₁ p₂, sig, s) v
 
 infix ` ⟹ `:110 := big_step
 
-lemma compute_typed_expression_unique {s t expr r₁ r₂} (h₁ : compute_typed_expression s expr t r₁) (h₂ : compute_typed_expression s expr t r₂) : r₁ = r₂ := begin
-    induction h₁;
-        cases h₂;
-        try {refl},
+lemma compute_typed_expression_unique {sig s t expr r₁ r₂} (h₁ : compute_typed_expression sig s expr t r₁) (h₂ : compute_typed_expression sig s expr t r₂) : r₁ = r₂ := begin
+    induction h₁,
     {
+        -- generalize heq : h₁_d.type = x,
+        --rw heq at h₂,
+        cases h₂,
+        refl,
+    },
+    {
+        cases h₂,
         have : h₁_n₁ = h₂_n₁ := by apply h₁_ih_h₁ h₂_h₁,
         rw this,
         have : h₁_n₂ = h₂_n₂ := by apply h₁_ih_h₂ h₂_h₂,
         rw this,
         refl,
+    }, {
+        cases h₂,
+        refl,
     }
 end
 
-lemma compute_typed_expression_right_unique {s t} : relator.right_unique (compute_typed_expression s t) := begin
+lemma compute_typed_expression_right_unique {sig s t} : relator.right_unique (compute_typed_expression sig s t) := begin
     unfold relator.right_unique,
     intros expr val₁ val₂ h₁ h₂,
     apply compute_typed_expression_unique,
     repeat { assumption },
 end
 
-lemma compute_expr_list_unique {s} {t : type} {idx_expr : list expression}  {eval₁ eval₂} 
-    (h₁ : compute_expr_list t s idx_expr eval₁) (h₂ : compute_expr_list t s idx_expr eval₂) : eval₁ = eval₂ := 
+lemma compute_expr_list_unique {sig s} {t : type} {idx_expr : list expression}  {eval₁ eval₂} 
+    (h₁ : compute_expr_list t sig s idx_expr eval₁) (h₂ : compute_expr_list t sig s idx_expr eval₂) : eval₁ = eval₂ := 
 begin
     -- rw ← list.forall₂_eq_eq_eq, -- does rewrite perform funext here?
-    apply list.right_unique_forall₂ (@compute_typed_expression_right_unique s t),
+    apply list.right_unique_forall₂ (@compute_typed_expression_right_unique sig s t),
     repeat { assumption },
 end
 
 @[simp]
 lemma big_step_assign {sig s u expr n idx_expr idx_evaled} {d : declaration} {val : type_map (d.type)}
-    (hp : ((assign n idx_expr expr), sig, s) ⟹ u) (hi : compute_idx_expr s idx_expr idx_evaled) 
-    (hd : sig n = some d) (he : compute_typed_expression s (d.type) expr val) : 
+    (hp : ((assign n idx_expr expr), sig, s) ⟹ u) (hi : compute_idx_expr sig s idx_expr idx_evaled) 
+    (hd : sig n = some d) (he : compute_typed_expression sig s (d.type) expr val) : 
     s.global.update (d.type) n idx_evaled val = u.global := 
 begin
     cases hp,
