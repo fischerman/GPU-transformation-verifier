@@ -7,9 +7,6 @@ variables {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 
 /- TODO:
 
-* τ dependent on ι: `τ : ι → Type`
-  (incl `load : (σ → (Σi:ι, (τ i → σ))) → kernel`)
-
 * add `active` to `thread_state`
 
 * `loop : (σ → bool) → kernel → kernel`
