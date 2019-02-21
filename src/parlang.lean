@@ -3,7 +3,7 @@ import data.option.basic -- basic operations on `option`
 import logic.function    -- function update and inverses
 
 namespace parlang
-variables {σ : Type} {ι : Type} {τ : Type} [decidable_eq ι]
+variables {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 
 /- TODO:
 
@@ -31,9 +31,9 @@ We use the following conventions for type variables:
 The general idea is to not have explicit expressions, but use Lean functions to compute values. What
 we are explicit global loads and stores.
 -/
-inductive kernel (σ ι τ : Type) : Type
-| load       : (σ → ι) → (τ → σ → σ) → kernel
-| store      : (σ → ι × τ) → kernel
+inductive kernel (σ ι : Type) (τ : ι → Type) : Type
+| load       : (σ → (Σi:ι, (τ i → σ))) → kernel
+| store      : (σ → (Σi:ι, τ i)) → kernel
 | compute {} : (σ → σ) → kernel
 | seq        : kernel → kernel → kernel
 | loop       : (σ → ℕ) → kernel → kernel
@@ -42,19 +42,19 @@ inductive kernel (σ ι τ : Type) : Type
 open kernel
 
 /-- Memory view -/
-def memory (ι : Type) (τ : Type) := ι → τ
+def memory (ι : Type) (τ : ι → Type) := Π (i : ι), τ i
 
 namespace memory
 
-def get (i : ι) (m : memory ι τ) : τ := m i
+def get (i : ι) (m : memory ι τ) : τ i := m i
 
-def update (i : ι) (v : τ) (m : memory ι τ) : memory ι τ := function.update m i v
+def update (i : ι) (v : τ i) (m : memory ι τ) : memory ι τ := function.update m i v
 
 end memory
 
 /-- Thread state inclusing a global memory *view*, the list of loads and stores tells what should
 differ between differnet threads. -/
-structure thread_state (σ ι τ : Type) : Type :=
+structure thread_state (σ ι : Type) (τ : ι → Type) : Type :=
 (state  : σ)
 (global : memory ι τ)
 (loads  : set ι := ∅)
@@ -62,14 +62,14 @@ structure thread_state (σ ι τ : Type) : Type :=
 
 namespace thread_state
 
-def load (i : σ → ι) (f : τ → σ → σ) (t : thread_state σ ι τ) : thread_state σ ι τ :=
-let i := i t.state in
-{ state := f (t.global.get i) t.state,
+def load (f : σ → (Σi:ι, (τ i → σ))) (t : thread_state σ ι τ) : thread_state σ ι τ :=
+let ⟨i, tr⟩ := f t.state in
+{ state := tr (t.global.get i),
   loads := insert i t.loads,
   .. t }
 
-def store (i : σ → ι × τ) (t : thread_state σ ι τ) : thread_state σ ι τ :=
-let ⟨i, v⟩ := i t.state in
+def store (f : σ → (Σi:ι, τ i)) (t : thread_state σ ι τ) : thread_state σ ι τ :=
+let ⟨i, v⟩ := f t.state in
 { global := t.global.update i v,
   stores := insert i t.stores,
   .. t}
@@ -89,7 +89,7 @@ def accesses (t : thread_state σ ι τ) : set ι := t.stores ∪ t.loads
 end thread_state
 
 /-- Global program state -/
-structure state (σ ι τ : Type) : Type :=
+structure state (σ ι : Type) (τ : ι → Type) : Type :=
 (threads : list (thread_state σ ι τ))
 
 namespace state
@@ -110,10 +110,10 @@ end state
 
 /-- Execute a kernel on a global state, i.e. a list of threads -/
 inductive exec : kernel σ ι τ → state σ ι τ → state σ ι τ → Prop
-| load (i : σ → ι) (f : τ → σ → σ) (s : state σ ι τ) :
-  exec (load i f) s (s.map_threads $ thread_state.load i f)
-| store (i : σ → ι × τ) (s : state σ ι τ) :
-  exec (store i) s (s.map_threads $ thread_state.store i)
+| load (f) (s : state σ ι τ) :
+  exec (load f) s (s.map_threads $ thread_state.load f)
+| store (f) (s : state σ ι τ) :
+  exec (store f) s (s.map_threads $ thread_state.store f)
 | compute (f : σ → σ) (s : state σ ι τ) :
   exec (compute f) s (s.map_threads $ thread_state.map f)
 | sync (s : state σ ι τ) (m : memory ι τ) (h : s.syncable m) :
