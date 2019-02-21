@@ -59,9 +59,11 @@ open expression
 
 inductive compute_typed_expression (sig : signature) (s : state) : Π t : type, expression → ▸t → Prop
 | global_var (n : string) (d) {t : type} {idx_expr idx_evaled} (hs : sig n = some d) (ht : t = d.type) (hi : list.forall₂ (compute_typed_expression int) idx_expr idx_evaled) : 
-    compute_typed_expression t (var n []) (s.global t n []) -- equality as hypthoses allows to to call cases on h₂ in compute_typed_expression_unique
+    compute_typed_expression t (var n idx_expr) (s.global t n idx_evaled) -- equality as hypthoses allows to to call cases on h₂ in compute_typed_expression_unique
 | add {e₁ e₂ n₁ n₂} (h₁ : compute_typed_expression int e₁ n₁) (h₂ : compute_typed_expression int e₂ n₂) : compute_typed_expression int (add e₁ e₂) (n₁ + n₂)
 | literal {n} : compute_typed_expression int (literal_int n) n
+
+#check compute_typed_expression.literal 
 
 @[simp] -- causes the empty list to be simplified immediately (no unfold required)
 def compute_expr_list (t sig s) (idx_expr : list expression) (idx_evaled : list (▸t)) := list.forall₂ (λ expr eval, compute_typed_expression sig s t expr eval) idx_expr idx_evaled
@@ -89,11 +91,23 @@ inductive big_step : (program × signature × state) → state → Prop
 
 infix ` ⟹ `:110 := big_step
 
-lemma compute_typed_expression_unique {sig s t expr r₁ r₂} (h₁ : compute_typed_expression sig s expr t r₁) (h₂ : compute_typed_expression sig s expr t r₂) : r₁ = r₂ := begin
+lemma compute_typed_expression_unique {sig s t expr r₁ r₂} (h₂ : compute_typed_expression sig s t expr r₂) (h₁ : compute_typed_expression sig s t expr r₁) :
+    r₁ = r₂ := begin
     induction h₁,
     {
         cases h₂,
-        refl,
+        have : h₁_idx_evaled = h₁_idx_evaled := begin
+            have : relator.right_unique (compute_typed_expression sig s int) := begin
+                unfold relator.right_unique,
+                intros expr val₁ val₂ h₁ h₂,
+                -- PROBLEM: i don't get IH for (list.forall₂ (compute_typed_expression)) because the recursor does not support it
+                sorry
+            end,
+            sorry,
+            --apply list.right_unique_forall₂,
+        end,
+        sorry,
+        -- refl,
     },
     {
         cases h₂,
