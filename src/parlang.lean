@@ -121,4 +121,11 @@ inductive exec : kernel σ ι τ → state σ ι τ → state σ ι τ → Prop
   (∀t∈s.threads, f (t:thread_state σ ι τ).state) →
   exec k s t → exec (loop f k) t u → exec (loop f k) s u
 
+/-
+
+exec' (k : kernel) (i : [σ]) (m : memory) : Prop
+| intro (u) (hk : exec k (create_state i) u) (syncable : u.syncable m) : exec' k i m
+
+-/
+
 end parlang
