@@ -9,6 +9,8 @@ variables {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 
 * add `active` to `thread_state`
 
+* make vars implicit
+
 -/
 
 
@@ -31,6 +33,7 @@ inductive kernel (σ ι : Type) (τ : ι → Type) : Type
 | store      : (σ → (Σi:ι, τ i)) → kernel
 | compute {} : (σ → σ) → kernel
 | seq        : kernel → kernel → kernel
+| ite        : (σ → bool) → kernel → kernel → kernel
 | loop       : (σ → bool) → kernel → kernel
 | sync {}    : kernel
 
@@ -54,6 +57,7 @@ structure thread_state (σ ι : Type) (τ : ι → Type) : Type :=
 (global : memory ι τ)
 (loads  : set ι := ∅)
 (stores : set ι := ∅)
+(active : bool := tt)
 
 namespace thread_state
 
@@ -93,7 +97,21 @@ def th (s : state σ ι τ) {t : ℕ} (h : t < s.threads.length) : thread_state 
 (s.threads.nth_le t h)
 
 def map_threads (f : thread_state σ ι τ → thread_state σ ι τ) (s : state σ ι τ) : state σ ι τ :=
-{ threads := s.threads.map f }
+{ threads := s.threads.map f, ..s }
+
+def map_active_threads (f : thread_state σ ι τ → thread_state σ ι τ) (s : state σ ι τ) : state σ ι τ :=
+s.map_threads (λ t, if t.active then f t else t)
+
+def no_thread_active (s : state σ ι τ) : bool := ¬s.threads.any (λ t, t.active)
+
+def all_threads_active (s : state σ ι τ) : bool := s.threads.all (λ t, t.active)
+
+def active_threads (s : state σ ι τ) : list (thread_state σ ι τ) := s.threads.filter (λ t, t.active)
+
+def deactive_threads (f : σ → bool) (s : state σ ι τ) := s.map_active_threads (λt, { active := f t.state, ..t})
+
+def mirror_active_threads (u : state σ ι τ) (s : state σ ι τ) : state σ ι τ := 
+{ threads := s.threads.zip_with (λt t' : thread_state σ ι τ, { active := t'.active, ..t}) u.threads }
 
 def syncable (s : state σ ι τ) (m : memory ι τ) : Prop :=
 ∀i:ι,
@@ -103,23 +121,29 @@ def syncable (s : state σ ι τ) (m : memory ι τ) : Prop :=
 
 end state
 
+def bool_complement {α : Type} (f: α → bool) : α → bool := λa:α, ¬f a
+
 /-- Execute a kernel on a global state, i.e. a list of threads -/
 inductive exec : kernel σ ι τ → state σ ι τ → state σ ι τ → Prop
 | load (f) (s : state σ ι τ) :
-  exec (load f) s (s.map_threads $ thread_state.load f)
+  exec (load f) s (s.map_active_threads $ thread_state.load f)
 | store (f) (s : state σ ι τ) :
-  exec (store f) s (s.map_threads $ thread_state.store f)
+  exec (store f) s (s.map_active_threads $ thread_state.store f)
 | compute (f : σ → σ) (s : state σ ι τ) :
-  exec (compute f) s (s.map_threads $ thread_state.map f)
-| sync (s : state σ ι τ) (m : memory ι τ) (h : s.syncable m) :
+  exec (compute f) s (s.map_active_threads $ thread_state.map f)
+| sync_all (s : state σ ι τ) (m : memory ι τ) (hs : s.syncable m) (ha : s.all_threads_active) :
   exec sync s (s.map_threads $ thread_state.sync m)
+| sync_none (s : state σ ι τ) (h : s.no_thread_active) :
+  exec sync s s
 | seq (s t u : state σ ι τ) (k₁ k₂ : kernel σ ι τ) :
   exec k₁ s t → exec k₂ t u → exec (seq k₁ k₂) s u
+| ite (s t u : state σ ι τ) (f : σ → bool) (k₁ k₂ : kernel σ ι τ) :
+  exec k₁ (s.deactive_threads (λl, ¬f l)) t → exec k₂ (t.deactive_threads f) u → exec (ite f k₁ k₂) s u -- in the then-branch we deactive those threads where the condition is false and vice versa
 | loop_stop (s : state σ ι τ) (f : σ → bool) (k : kernel σ ι τ) :
-  (∀t∈s.threads, ¬f (t:thread_state σ ι τ).state) → exec (loop f k) s s
-| loop_step (s t u : state σ ι τ) (f : σ → bool) (k : kernel σ ι τ) (c : ℕ) :
-  (∀t∈s.threads, f (t:thread_state σ ι τ).state) →
-  exec k s t → exec (loop f k) t u → exec (loop f k) s u
+  (∀t∈s.active_threads, ¬f (t:thread_state σ ι τ).state) → exec (loop f k) s s
+| loop_step (s t u : state σ ι τ) (f : σ → bool) (k : kernel σ ι τ) :
+  (∃t∈s.active_threads, f (t:thread_state σ ι τ).state) →
+  exec k (s.deactive_threads (bool_complement f)) t → exec (loop f k) (t.deactive_threads (bool_complement f)) u → exec (loop f k) s (u.mirror_active_threads s) -- IS THIS CORRECT?
 
 /-
 
