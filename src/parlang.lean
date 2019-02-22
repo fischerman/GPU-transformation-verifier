@@ -9,8 +9,6 @@ variables {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 
 * add `active` to `thread_state`
 
-* `loop : (σ → bool) → kernel → kernel`
-
 -/
 
 
@@ -33,7 +31,7 @@ inductive kernel (σ ι : Type) (τ : ι → Type) : Type
 | store      : (σ → (Σi:ι, τ i)) → kernel
 | compute {} : (σ → σ) → kernel
 | seq        : kernel → kernel → kernel
-| loop       : (σ → ℕ) → kernel → kernel
+| loop       : (σ → bool) → kernel → kernel
 | sync {}    : kernel
 
 open kernel
@@ -117,10 +115,10 @@ inductive exec : kernel σ ι τ → state σ ι τ → state σ ι τ → Prop
   exec sync s (s.map_threads $ thread_state.sync m)
 | seq (s t u : state σ ι τ) (k₁ k₂ : kernel σ ι τ) :
   exec k₁ s t → exec k₂ t u → exec (seq k₁ k₂) s u
-| loop_stop (s : state σ ι τ) (f : σ → ℕ) (k : kernel σ ι τ) :
-  (∀t∈s.threads, f (t:thread_state σ ι τ).state = 0) → exec (loop f k) s s
-| loop_step (s t u : state σ ι τ) (f : σ → ℕ) (k : kernel σ ι τ) (c : ℕ) :
-  (∀t∈s.threads, f (t:thread_state σ ι τ).state > 0) →
+| loop_stop (s : state σ ι τ) (f : σ → bool) (k : kernel σ ι τ) :
+  (∀t∈s.threads, ¬f (t:thread_state σ ι τ).state) → exec (loop f k) s s
+| loop_step (s t u : state σ ι τ) (f : σ → bool) (k : kernel σ ι τ) (c : ℕ) :
+  (∀t∈s.threads, f (t:thread_state σ ι τ).state) →
   exec k s t → exec (loop f k) t u → exec (loop f k) s u
 
 end parlang
