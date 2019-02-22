@@ -52,7 +52,7 @@ end memory
 
 /-- Thread state inclusing a global memory *view*, the list of loads and stores tells what should
 differ between differnet threads. -/
-structure thread_state (σ ι : Type) (τ : ι → Type) : Type :=
+structure thread_state {ι : Type} (σ : Type) (τ : ι → Type) : Type :=
 (tlocal : σ)
 (global : memory ι τ)
 (loads  : set ι := ∅)
@@ -61,61 +61,61 @@ structure thread_state (σ ι : Type) (τ : ι → Type) : Type :=
 
 namespace thread_state
 
-def load (f : σ → (Σi:ι, (τ i → σ))) (t : thread_state σ ι τ) : thread_state σ ι τ :=
+def load (f : σ → (Σi:ι, (τ i → σ))) (t : thread_state σ τ) : thread_state σ τ :=
 let ⟨i, tr⟩ := f t.tlocal in
 { tlocal := tr (t.global.get i),
   loads := insert i t.loads,
   .. t }
 
-def store (f : σ → (Σi:ι, τ i)) (t : thread_state σ ι τ) : thread_state σ ι τ :=
+def store (f : σ → (Σi:ι, τ i)) (t : thread_state σ τ) : thread_state σ τ :=
 let ⟨i, v⟩ := f t.tlocal in
 { global := t.global.update i v,
   stores := insert i t.stores,
   .. t}
 
-def map (f : σ → σ) (t : thread_state σ ι τ) : thread_state σ ι τ :=
+def map (f : σ → σ) (t : thread_state σ τ) : thread_state σ τ :=
 { tlocal := f t.tlocal,
   .. t}
 
-def sync (g : memory ι τ) (t : thread_state σ ι τ) : thread_state σ ι τ :=
+def sync (g : memory ι τ) (t : thread_state σ τ) : thread_state σ τ :=
 { global := g,
   loads := ∅,
   stores := ∅,
   .. t}
 
-def accesses (t : thread_state σ ι τ) : set ι := t.stores ∪ t.loads
+def accesses (t : thread_state σ τ) : set ι := t.stores ∪ t.loads
 
 end thread_state
 
 /-- Global program state -/
 structure state (σ ι : Type) (τ : ι → Type) : Type :=
-(threads : list (thread_state σ ι τ))
+(threads : list (thread_state σ τ))
 
 namespace state
 
-def th (s : state σ ι τ) {t : ℕ} (h : t < s.threads.length) : thread_state σ ι τ :=
+def th (s : state σ ι τ) {t : ℕ} (h : t < s.threads.length) : thread_state σ τ :=
 (s.threads.nth_le t h)
 
-def map_threads (f : thread_state σ ι τ → thread_state σ ι τ) (s : state σ ι τ) : state σ ι τ :=
+def map_threads (f : thread_state σ τ → thread_state σ τ) (s : state σ ι τ) : state σ ι τ :=
 { threads := s.threads.map f, ..s }
 
-def map_active_threads (f : thread_state σ ι τ → thread_state σ ι τ) (s : state σ ι τ) : state σ ι τ :=
+def map_active_threads (f : thread_state σ τ → thread_state σ τ) (s : state σ ι τ) : state σ ι τ :=
 s.map_threads (λ t, if t.active then f t else t)
 
 def no_thread_active (s : state σ ι τ) : bool := ¬s.threads.any (λ t, t.active)
 
 def all_threads_active (s : state σ ι τ) : bool := s.threads.all (λ t, t.active)
 
-def active_threads (s : state σ ι τ) : list (thread_state σ ι τ) := s.threads.filter (λ t, t.active)
+def active_threads (s : state σ ι τ) : list (thread_state σ τ) := s.threads.filter (λ t, t.active)
 
 def deactive_threads (f : σ → bool) (s : state σ ι τ) := s.map_active_threads (λt, { active := f t.tlocal, ..t})
 
 def mirror_active_threads (u : state σ ι τ) (s : state σ ι τ) : state σ ι τ := 
-{ threads := s.threads.zip_with (λt t' : thread_state σ ι τ, { active := t'.active, ..t}) u.threads }
+{ threads := s.threads.zip_with (λt t' : thread_state σ τ, { active := t'.active, ..t}) u.threads }
 
 def syncable (s : state σ ι τ) (m : memory ι τ) : Prop :=
 ∀i:ι,
-  (∀t∈s.threads, i ∉ (t : thread_state _ _ _).stores ∧ m i = t.global i) ∨
+  (∀t∈s.threads, i ∉ (t : thread_state _ _).stores ∧ m i = t.global i) ∨
   (∃t (h : t < s.threads.length), i ∈ (s.th h).stores ∧ m i = (s.th h).global i ∧
     (∀t' (h' : t' < s.threads.length), t ≠ t' → i ∉ (s.th h).accesses))
 
@@ -140,13 +140,14 @@ inductive exec_state : kernel σ ι τ → state σ ι τ → state σ ι τ →
 | ite (s t u : state σ ι τ) (f : σ → bool) (k₁ k₂ : kernel σ ι τ) :
   exec_state k₁ (s.deactive_threads (λl, ¬f l)) t → exec_state k₂ (t.deactive_threads f) u → exec_state (ite f k₁ k₂) s u -- in the then-branch we deactive those threads where the condition is false and vice versa
 | loop_stop (s : state σ ι τ) (f : σ → bool) (k : kernel σ ι τ) :
-  (∀t∈s.active_threads, ¬f (t:thread_state σ ι τ).tlocal) → exec_state (loop f k) s s
+  (∀t∈s.active_threads, ¬f (t:thread_state σ τ).tlocal) → exec_state (loop f k) s s
 | loop_step (s t u : state σ ι τ) (f : σ → bool) (k : kernel σ ι τ) :
-  (∃t∈s.active_threads, f (t:thread_state σ ι τ).tlocal) →
+  (∃t∈s.active_threads, f (t:thread_state σ τ).tlocal) →
   exec_state k (s.deactive_threads (bool_complement f)) t → exec_state (loop f k) (t.deactive_threads (bool_complement f)) u → exec_state (loop f k) s (u.mirror_active_threads s) -- IS THIS CORRECT?
 
 inductive exec_memory (k : kernel σ ι τ) (s : state σ ι τ) (m : memory ι τ) : Prop
 | intro (u) (hk : exec_state k s u) (syncable : u.syncable m) : exec_memory
 
+-- example {s u t : state σ ι τ} {k} (h₁ : exec_state k s u) (h₂ : exec_state k s t) : t = u := 
 
 end parlang
