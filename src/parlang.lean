@@ -53,7 +53,7 @@ end memory
 /-- Thread state inclusing a global memory *view*, the list of loads and stores tells what should
 differ between differnet threads. -/
 structure thread_state (σ ι : Type) (τ : ι → Type) : Type :=
-(state  : σ)
+(tlocal : σ)
 (global : memory ι τ)
 (loads  : set ι := ∅)
 (stores : set ι := ∅)
@@ -62,19 +62,19 @@ structure thread_state (σ ι : Type) (τ : ι → Type) : Type :=
 namespace thread_state
 
 def load (f : σ → (Σi:ι, (τ i → σ))) (t : thread_state σ ι τ) : thread_state σ ι τ :=
-let ⟨i, tr⟩ := f t.state in
-{ state := tr (t.global.get i),
+let ⟨i, tr⟩ := f t.tlocal in
+{ tlocal := tr (t.global.get i),
   loads := insert i t.loads,
   .. t }
 
 def store (f : σ → (Σi:ι, τ i)) (t : thread_state σ ι τ) : thread_state σ ι τ :=
-let ⟨i, v⟩ := f t.state in
+let ⟨i, v⟩ := f t.tlocal in
 { global := t.global.update i v,
   stores := insert i t.stores,
   .. t}
 
 def map (f : σ → σ) (t : thread_state σ ι τ) : thread_state σ ι τ :=
-{ state := f t.state,
+{ tlocal := f t.tlocal,
   .. t}
 
 def sync (g : memory ι τ) (t : thread_state σ ι τ) : thread_state σ ι τ :=
@@ -108,7 +108,7 @@ def all_threads_active (s : state σ ι τ) : bool := s.threads.all (λ t, t.act
 
 def active_threads (s : state σ ι τ) : list (thread_state σ ι τ) := s.threads.filter (λ t, t.active)
 
-def deactive_threads (f : σ → bool) (s : state σ ι τ) := s.map_active_threads (λt, { active := f t.state, ..t})
+def deactive_threads (f : σ → bool) (s : state σ ι τ) := s.map_active_threads (λt, { active := f t.tlocal, ..t})
 
 def mirror_active_threads (u : state σ ι τ) (s : state σ ι τ) : state σ ι τ := 
 { threads := s.threads.zip_with (λt t' : thread_state σ ι τ, { active := t'.active, ..t}) u.threads }
@@ -140,9 +140,9 @@ inductive exec : kernel σ ι τ → state σ ι τ → state σ ι τ → Prop
 | ite (s t u : state σ ι τ) (f : σ → bool) (k₁ k₂ : kernel σ ι τ) :
   exec k₁ (s.deactive_threads (λl, ¬f l)) t → exec k₂ (t.deactive_threads f) u → exec (ite f k₁ k₂) s u -- in the then-branch we deactive those threads where the condition is false and vice versa
 | loop_stop (s : state σ ι τ) (f : σ → bool) (k : kernel σ ι τ) :
-  (∀t∈s.active_threads, ¬f (t:thread_state σ ι τ).state) → exec (loop f k) s s
+  (∀t∈s.active_threads, ¬f (t:thread_state σ ι τ).tlocal) → exec (loop f k) s s
 | loop_step (s t u : state σ ι τ) (f : σ → bool) (k : kernel σ ι τ) :
-  (∃t∈s.active_threads, f (t:thread_state σ ι τ).state) →
+  (∃t∈s.active_threads, f (t:thread_state σ ι τ).tlocal) →
   exec k (s.deactive_threads (bool_complement f)) t → exec (loop f k) (t.deactive_threads (bool_complement f)) u → exec (loop f k) s (u.mirror_active_threads s) -- IS THIS CORRECT?
 
 /-
