@@ -245,8 +245,6 @@ end
 
 end state
 
-def bool_complement {α : Type} (f: α → bool) : α → bool := λa:α, ¬f a
-
 /-- Execute a kernel on a global state, i.e. a list of threads -/
 inductive exec_state : kernel σ τ → state σ τ → state σ τ → Prop
 | load (f) (s : state σ τ) :
@@ -267,7 +265,7 @@ inductive exec_state : kernel σ τ → state σ τ → state σ τ → Prop
   (∀t∈s.active_threads, ¬f (t:thread_state σ τ).tlocal) → exec_state (loop f k) s s
 | loop_step (s t u : state σ τ) (f : σ → bool) (k : kernel σ τ) :
   (∃t∈s.active_threads, f (t:thread_state σ τ).tlocal) →
-  exec_state k (s.deactive_threads (bool_complement f)) t → exec_state (loop f k) (t.deactive_threads (bool_complement f)) u → exec_state (loop f k) s (u.mirror_active_threads s) -- IS THIS CORRECT?
+  exec_state k (s.deactive_threads (bnot ∘ f)) t → exec_state (loop f k) (t.deactive_threads (bnot ∘ f)) u → exec_state (loop f k) s (u.mirror_active_threads s) -- IS THIS CORRECT?
 
 lemma exec_state_unique {s u t : state σ τ} {k} (h₁ : exec_state k s u) (h₂ : exec_state k s t) : t = u := begin
   induction h₁,
