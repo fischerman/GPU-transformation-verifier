@@ -1,6 +1,7 @@
 import data.list.basic   -- basic operations on `list`
 import data.option.basic -- basic operations on `option`
 import data.set.basic
+import data.vector
 import logic.function    -- function update and inverses
 import aux
 
@@ -59,7 +60,6 @@ structure thread_state {ι : Type} (σ : Type) (τ : ι → Type) : Type :=
 (global : memory τ)
 (loads  : set ι := ∅)
 (stores : set ι := ∅)
-(active : bool := tt)
 
 namespace thread_state
 
@@ -133,19 +133,11 @@ lemma th_mem (s : state σ τ) {ts : thread_state σ τ} {t : ℕ} (hl : t < s.t
 def map_threads (f : thread_state σ τ → thread_state σ τ) (s : state σ τ) : state σ τ :=
 { threads := s.threads.map f, ..s }
 
-def map_active_threads (f : thread_state σ τ → thread_state σ τ) (s : state σ τ) : state σ τ :=
-s.map_threads (λ t, if t.active then f t else t)
+def map_active_threads (ac : list bool) (f : thread_state σ τ → thread_state σ τ) (s : state σ τ) : state σ τ :=
+{ threads := (s.threads.zip ac).map (λ ⟨t, a⟩, if a then f t else t), ..s }
 
-def no_thread_active (s : state σ τ) : bool := ¬s.threads.any (λ t, t.active)
-
-def all_threads_active (s : state σ τ) : bool := s.threads.all (λ t, t.active)
-
-def active_threads (s : state σ τ) : list (thread_state σ τ) := s.threads.filter (λ t, t.active)
-
-def deactive_threads (f : σ → bool) (s : state σ τ) := s.map_active_threads (λt, { active := f t.tlocal, ..t})
-
-def mirror_active_threads (u : state σ τ) (s : state σ τ) : state σ τ := 
-{ threads := s.threads.zip_with (λt t' : thread_state σ τ, { active := t'.active, ..t}) u.threads }
+def active_threads (ac : list bool) (s : state σ τ) : list (thread_state σ τ) :=
+((s.threads.zip ac).filter (λ c : (thread_state σ τ × bool), c.2)).map (λ ⟨t, a⟩, t)
 
 -- case 1: no thread changed ι and shadows must be equal at ι
 -- case 2: thread t changed ι and all other threads must not access ι
@@ -245,27 +237,33 @@ end
 
 end state
 
+def no_thread_active (ac : list bool) : bool := ¬ac.any id
+
+def all_threads_active (ac : list bool) : bool := ac.all id
+
+def deactivate_threads (f : σ → bool) (ac : list bool) (s : state σ τ) : list bool := (ac.zip s.threads).map (λ ⟨a, t⟩, if a then f t.tlocal else a)
+
 /-- Execute a kernel on a global state, i.e. a list of threads -/
-inductive exec_state : kernel σ τ → state σ τ → state σ τ → Prop
-| load (f) (s : state σ τ) :
-  exec_state (load f) s (s.map_active_threads $ thread_state.load f)
-| store (f) (s : state σ τ) :
-  exec_state (store f) s (s.map_active_threads $ thread_state.store f)
-| compute (f : σ → σ) (s : state σ τ) :
-  exec_state (compute f) s (s.map_active_threads $ thread_state.map f)
-| sync_all (s : state σ τ) (m : memory τ) (hs : s.syncable m) (ha : s.all_threads_active) :
-  exec_state sync s (s.map_threads $ thread_state.sync m)
-| sync_none (s : state σ τ) (h : s.no_thread_active) :
-  exec_state sync s s
-| seq (s t u : state σ τ) (k₁ k₂ : kernel σ τ) :
-  exec_state k₁ s t → exec_state k₂ t u → exec_state (seq k₁ k₂) s u
-| ite (s t u : state σ τ) (f : σ → bool) (k₁ k₂ : kernel σ τ) :
-  exec_state k₁ (s.deactive_threads (λl, ¬f l)) t → exec_state k₂ (t.deactive_threads f) u → exec_state (ite f k₁ k₂) s u -- in the then-branch we deactive those threads where the condition is false and vice versa
-| loop_stop (s : state σ τ) (f : σ → bool) (k : kernel σ τ) :
-  (∀t∈s.active_threads, ¬f (t:thread_state σ τ).tlocal) → exec_state (loop f k) s s
-| loop_step (s t u : state σ τ) (f : σ → bool) (k : kernel σ τ) :
-  (∃t∈s.active_threads, f (t:thread_state σ τ).tlocal) →
-  exec_state k (s.deactive_threads (bnot ∘ f)) t → exec_state (loop f k) (t.deactive_threads (bnot ∘ f)) u → exec_state (loop f k) s (u.mirror_active_threads s) -- IS THIS CORRECT?
+inductive exec_state (n : ℕ) : kernel σ τ → list bool → state σ τ → state σ τ → Prop
+| load (f) (s : state σ τ) (a : list bool) :
+  exec_state (load f) a s (s.map_active_threads a $ thread_state.load f)
+| store (f) (s : state σ τ) (a : list bool) :
+  exec_state (store f) a s (s.map_active_threads a $ thread_state.store f)
+| compute (f : σ → σ) (s : state σ τ) (a : list bool) :
+  exec_state (compute f) a s (s.map_active_threads a $ thread_state.map f)
+| sync_all (s : state σ τ) (a : list bool) (m : memory τ) (hs : s.syncable m) (ha : all_threads_active a) :
+  exec_state sync a s (s.map_threads $ thread_state.sync m)
+| sync_none (s : state σ τ) (a : list bool) (h : no_thread_active a) :
+  exec_state sync a s s
+| seq (s t u : state σ τ) (a : list bool) (k₁ k₂ : kernel σ τ) :
+  exec_state k₁ a s t → exec_state k₂ a t u → exec_state (seq k₁ k₂) a s u
+| ite (s t u : state σ τ) (a : list bool) (f : σ → bool) (k₁ k₂ : kernel σ τ) :
+  exec_state k₁ (deactivate_threads (bnot ∘ f) a s) s t → exec_state k₂ (deactivate_threads f a s) t u → exec_state (ite f k₁ k₂) a s u -- in the then-branch we deactive those threads where the condition is false and vice versa
+| loop_stop (s : state σ τ) (a : list bool) (f : σ → bool) (k : kernel σ τ) :
+  (∀t ∈ s.active_threads a, ¬f (t:thread_state σ τ).tlocal) → exec_state (loop f k) a s s
+| loop_step (s t u : state σ τ) (a : list bool) (f : σ → bool) (k : kernel σ τ) :
+  (∃t∈s.active_threads a, f (t:thread_state σ τ).tlocal) →
+  exec_state k (deactivate_threads (bnot ∘ f) a s) s t → exec_state (loop f k) (deactivate_threads (bnot ∘ f) a s) t u → exec_state (loop f k) a s u
 
 lemma exec_state_unique {s u t : state σ τ} {k} (h₁ : exec_state k s u) (h₂ : exec_state k s t) : t = u := begin
   induction h₁,
