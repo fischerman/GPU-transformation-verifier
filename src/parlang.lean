@@ -2,11 +2,12 @@ import data.list.basic   -- basic operations on `list`
 import data.option.basic -- basic operations on `option`
 import data.set.basic
 import data.vector
+import data.vector2
 import logic.function    -- function update and inverses
 import aux
 
 namespace parlang
-variables {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
+variables {n : ℕ} {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 
 /- TODO:
 
@@ -90,66 +91,31 @@ def accesses (t : thread_state σ τ) : set ι := t.stores ∪ t.loads
 end thread_state
 
 /-- Global program state -/
-structure state {ι : Type} (σ : Type) (τ : ι → Type) : Type :=
-(threads : list (thread_state σ τ))
+structure state {ι : Type} (n : ℕ) (σ : Type) (τ : ι → Type) : Type :=
+(threads : vector (thread_state σ τ) n)
 
 namespace state
 
-def th (s : state σ τ) {t : ℕ} (h : t < s.threads.length) : thread_state σ τ :=
-(s.threads.nth_le t h)
-
-lemma th_mem (s : state σ τ) {ts : thread_state σ τ} {t : ℕ} (hl : t < s.threads.length) (h : th s hl = ts) : ts ∈ s.threads := sorry
--- begin
---   have h_hdtl : ∃ x xs, s.threads = (x :: xs) := begin
---     apply list_aux.list_length_neq_zero,
---     apply nat_aux.lt_neq_zeor t,
---     assumption,
---   end,
---   cases h_hdtl with ts' h_hdtl,
---   cases h_hdtl with tail heq,
---   induction t,
---   case nat.zero {
---     have : ts = ts' := begin
---       rw ← h,
---       rw heq at hl,
---       rw th,
---       sorry,
---     end,
---     rw this,
---     rw heq,
---     simp,
---   },
---   case nat.succ {
---     by_cases hleq : t_n < list.length (s.threads),
---     {
---       apply t_ih hleq,
---       assumption,
---     }, {
-
---     }
---   }
--- end
-
-def map_threads (f : thread_state σ τ → thread_state σ τ) (s : state σ τ) : state σ τ :=
+def map_threads (f : thread_state σ τ → thread_state σ τ) (s : state n σ τ) : state n σ τ :=
 { threads := s.threads.map f, ..s }
 
-def map_active_threads (ac : list bool) (f : thread_state σ τ → thread_state σ τ) (s : state σ τ) : state σ τ :=
-{ threads := (s.threads.zip ac).map (λ ⟨t, a⟩, if a then f t else t), ..s }
+def map_active_threads (ac : vector bool n) (f : thread_state σ τ → thread_state σ τ) (s : state n σ τ) : state n σ τ :=
+{ threads := (s.threads.map₂ (λ t (a : bool), if a then f t else t) ac), ..s }
 
-def active_threads (ac : list bool) (s : state σ τ) : list (thread_state σ τ) :=
-((s.threads.zip ac).filter (λ c : (thread_state σ τ × bool), c.2)).map (λ ⟨t, a⟩, t)
+def active_threads (ac : vector bool n) (s : state n σ τ) : list (thread_state σ τ) :=
+((s.threads.map₂ prod.mk ac).to_list.filter (λ c : (thread_state σ τ × bool), c.2)).map (λ ⟨t, a⟩, t)
 
 -- case 1: no thread changed ι and shadows must be equal at ι
 -- case 2: thread t changed ι and all other threads must not access ι
-def syncable (s : state σ τ) (m : memory τ) : Prop :=
+def syncable (s : state n σ τ) (m : memory τ) : Prop :=
 ∀i:ι,
   (∀t∈s.threads, i ∉ (t : thread_state _ _).stores ∧ m i = t.global i) ∨
-  (∃t (h : t < s.threads.length), i ∈ (s.th h).stores ∧ m i = (s.th h).global i ∧
-    (∀t' (h' : t' < s.threads.length), t ≠ t' → i ∉ (s.th h).accesses))
+  (∃t (h : t < n), i ∈ (s.threads.nth ⟨t, h⟩).stores ∧ m i = (s.threads.nth ⟨t, h⟩).global i ∧
+    (∀t' (h' : t' < n), t ≠ t' → i ∉ (s.threads.nth ⟨t, h⟩).accesses))
 
 -- we have to prove all four combinations (2 by contradiction and 2 because they match)
 -- there must be at least one thread otherwise memory can be arbitrary
-lemma syncable_unique (s : state σ τ) (m m') (h₁ : syncable s m) (h₂ : syncable s m') (hl : s.threads.length ≠ 0) : m = m' := begin
+lemma syncable_unique (s : state n σ τ) (m m') (h₁ : syncable s m) (h₂ : syncable s m') (hl : 0 < n) : m = m' := begin
   funext,
   specialize h₁ x,
   specialize h₂ x,
@@ -157,38 +123,19 @@ lemma syncable_unique (s : state σ τ) (m m') (h₁ : syncable s m) (h₂ : syn
   case or.inl {
     cases h₂,
     case or.inl {
-      have : ∃ x xs, s.threads = (x :: xs) := by apply list_aux.list_length_neq_zero hl,
-      cases this with head this,
-      cases this with tail eq,
-      have : head ∈ s.threads := begin
-        unfold has_mem.mem,
-        rw eq,
-        rw list.mem,
-        simp,
-      end,
-      specialize h₁ head this,
-      specialize h₂ head this,
+      have i : fin n := ⟨0, hl⟩,
+      specialize h₁ (s.threads.nth i) vector.contains_nth,
+      specialize h₂ (s.threads.nth i) vector.contains_nth,
       rw h₁.right,
       rw h₂.right,
     },
     case or.inr {
-      cases h₂ with n h₂,
+      cases h₂ with i h₂,
       cases h₂ with h₂_hl h₂,
-      generalize_hyp heq : (th s h₂_hl) = ts at h₂,
-      specialize h₁ ts,
-      specialize h₁ _,
-      {
-        have : x ∈ ts.stores := begin
-          apply h₂.left,
-        end,
-        have : x ∉ ts.stores := begin
-          apply h₁.left,
-        end,
-        contradiction,
-      },
-      {
-        apply th_mem s h₂_hl heq,
-      }
+      specialize h₁ (s.threads.nth ⟨i, h₂_hl⟩) vector.contains_nth,
+      have : x ∈ (s.threads.nth ⟨i, h₂_hl⟩).stores := by apply h₂.left,
+      have : x ∉ (s.threads.nth ⟨i, h₂_hl⟩).stores := by apply h₁.left,
+      contradiction,
     }
   },
   case or.inr {
@@ -198,16 +145,8 @@ lemma syncable_unique (s : state σ τ) (m m') (h₁ : syncable s m) (h₂ : syn
     cases h₁ with h₁_2 h₁_3,
     cases h₂,
     case or.inl {
-      generalize_hyp htseq : (th s h₁_hl) = ts at h₁_1 h₁_2 h₁_3,
-      specialize h₂ ts,
-      have : x ∉ ts.stores := begin
-        suffices : x ∉ ts.stores ∧ m' x = ts.global x,
-        cases this,
-        assumption,
-        apply h₂,
-        apply th_mem s h₁_hl,
-        assumption,
-      end,
+      specialize h₂ (s.threads.nth ⟨h₁l, h₁_hl⟩) vector.contains_nth,
+      have : x ∉ (vector.nth (s.threads) ⟨h₁l, h₁_hl⟩).stores := by apply h₂.left,
       contradiction,
     },
     case or.inr {
@@ -217,55 +156,54 @@ lemma syncable_unique (s : state σ τ) (m m') (h₁ : syncable s m) (h₂ : syn
       cases h₂ with h₂_2 h₂_3,
       rw h₁_2,
       rw h₂_2,
-      by_cases hleq : h₁l = h₂l, -- thread id's must be equal otherwise contradiction
-      {
-        subst hleq,
-      }, {
-        have : x ∉ thread_state.accesses (th s h₁_hl) := begin
+      have hleq : h₁l = h₂l := begin
+        by_contra hlneq,
+        have : x ∉ thread_state.accesses (vector.nth (s.threads) ⟨h₁l, h₁_hl⟩) := begin
           specialize h₁_3 h₂l,
-          apply h₁_3 h₂_hl hleq,
+          apply h₁_3 h₂_hl hlneq,
         end,
         unfold thread_state.accesses at this,
-        have : x ∉ (th s h₁_hl).stores := begin
+        have : x ∉ (vector.nth (s.threads) ⟨h₁l, h₁_hl⟩).stores := begin
           apply set_aux.union_no_mem_left this,
         end,
         contradiction,
-      },
+      end,
+      subst hleq,
     }
   }
 end
 
 end state
 
-def no_thread_active (ac : list bool) : bool := ¬ac.any id
+def no_thread_active (ac : vector bool n) : bool := ¬ac.to_list.any id
 
-def all_threads_active (ac : list bool) : bool := ac.all id
+def all_threads_active (ac : vector bool n) : bool := ac.to_list.all id
 
-def deactivate_threads (f : σ → bool) (ac : list bool) (s : state σ τ) : list bool := (ac.zip s.threads).map (λ ⟨a, t⟩, if a then f t.tlocal else a)
+def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := (ac.map₂ prod.mk s.threads).map (λ ⟨a, t⟩, if a then f t.tlocal else a)
 
 /-- Execute a kernel on a global state, i.e. a list of threads -/
-inductive exec_state (n : ℕ) : kernel σ τ → list bool → state σ τ → state σ τ → Prop
-| load (f) (s : state σ τ) (a : list bool) :
-  exec_state (load f) a s (s.map_active_threads a $ thread_state.load f)
-| store (f) (s : state σ τ) (a : list bool) :
-  exec_state (store f) a s (s.map_active_threads a $ thread_state.store f)
-| compute (f : σ → σ) (s : state σ τ) (a : list bool) :
-  exec_state (compute f) a s (s.map_active_threads a $ thread_state.map f)
-| sync_all (s : state σ τ) (a : list bool) (m : memory τ) (hs : s.syncable m) (ha : all_threads_active a) :
-  exec_state sync a s (s.map_threads $ thread_state.sync m)
-| sync_none (s : state σ τ) (a : list bool) (h : no_thread_active a) :
-  exec_state sync a s s
-| seq (s t u : state σ τ) (a : list bool) (k₁ k₂ : kernel σ τ) :
-  exec_state k₁ a s t → exec_state k₂ a t u → exec_state (seq k₁ k₂) a s u
-| ite (s t u : state σ τ) (a : list bool) (f : σ → bool) (k₁ k₂ : kernel σ τ) :
-  exec_state k₁ (deactivate_threads (bnot ∘ f) a s) s t → exec_state k₂ (deactivate_threads f a s) t u → exec_state (ite f k₁ k₂) a s u -- in the then-branch we deactive those threads where the condition is false and vice versa
-| loop_stop (s : state σ τ) (a : list bool) (f : σ → bool) (k : kernel σ τ) :
-  (∀t ∈ s.active_threads a, ¬f (t:thread_state σ τ).tlocal) → exec_state (loop f k) a s s
-| loop_step (s t u : state σ τ) (a : list bool) (f : σ → bool) (k : kernel σ τ) :
-  (∃t∈s.active_threads a, f (t:thread_state σ τ).tlocal) →
-  exec_state k (deactivate_threads (bnot ∘ f) a s) s t → exec_state (loop f k) (deactivate_threads (bnot ∘ f) a s) t u → exec_state (loop f k) a s u
+inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ τ → state n σ τ → Prop
+| load (f) (s : state n σ τ) (ac : vector bool n) :
+  exec_state (load f) ac s (s.map_active_threads ac $ thread_state.load f)
+| store (f) (s : state n σ τ) (ac : vector bool n) :
+  exec_state (store f) ac s (s.map_active_threads ac $ thread_state.store f)
+| compute (f : σ → σ) (s : state n σ τ) (ac : vector bool n) :
+  exec_state (compute f) ac s (s.map_active_threads ac $ thread_state.map f)
+| sync_all (s : state n σ τ) (ac : vector bool n) (m : memory τ) (hs : s.syncable m) (ha : all_threads_active ac) :
+  exec_state sync ac s (s.map_threads $ thread_state.sync m)
+| sync_none (s : state n σ τ) (ac : vector bool n) (h : no_thread_active ac) :
+  exec_state sync ac s s
+| seq (s t u : state n σ τ) (ac : vector bool n) (k₁ k₂ : kernel σ τ) :
+  exec_state k₁ ac s t → exec_state k₂ ac t u → exec_state (seq k₁ k₂) ac s u
+| ite (s t u : state n σ τ) (ac : vector bool n) (f : σ → bool) (k₁ k₂ : kernel σ τ) :
+  exec_state k₁ (deactivate_threads (bnot ∘ f) ac s) s t → exec_state k₂ (deactivate_threads f ac s) t u → exec_state (ite f k₁ k₂) ac s u -- in the then-branch we deactive those threads where the condition is false and vice versa
+| loop_stop (s : state n σ τ) (ac : vector bool n) (f : σ → bool) (k : kernel σ τ) :
+  (∀t ∈ s.active_threads ac, ¬f (t:thread_state σ τ).tlocal) → exec_state (loop f k) ac s s
+| loop_step (s t u : state n σ τ) (ac : vector bool n) (f : σ → bool) (k : kernel σ τ) :
+  (∃t∈s.active_threads ac, f (t:thread_state σ τ).tlocal) →
+  exec_state k (deactivate_threads (bnot ∘ f) ac s) s t → exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u → exec_state (loop f k) ac s u
 
-lemma exec_state_unique {s u t : state σ τ} {k} (h₁ : exec_state k s u) (h₂ : exec_state k s t) : t = u := begin
+lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ : exec_state k ac s u) (h₂ : exec_state k ac s t) : t = u := begin
   induction h₁,
   case exec_state.load {
     cases h₂, refl,
@@ -283,7 +221,7 @@ lemma exec_state_unique {s u t : state σ τ} {k} (h₁ : exec_state k s u) (h�
   
 end
 
-inductive exec_memory (k : kernel σ τ) (s : state σ τ) (m : memory τ) : Prop
-| intro (u) (hk : exec_state k s u) (syncable : u.syncable m) : exec_memory
+inductive exec_memory (ac : vector bool n) (k : kernel σ τ) (s : state n σ τ) (m : memory τ) : Prop
+| intro (u) (hk : exec_state k ac s u) (syncable : u.syncable m) : exec_memory
 
 end parlang
