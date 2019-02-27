@@ -179,6 +179,26 @@ def no_thread_active (ac : vector bool n) : bool := ¬ac.to_list.any id
 
 def all_threads_active (ac : vector bool n) : bool := ac.to_list.all id
 
+lemma no_threads_active_nth_zero (ac : vector bool (nat.succ n)) : no_thread_active ac → ¬ac.nth 0 := begin
+  cases ac,
+  cases ac_val,
+  case list.nil {
+    sorry, --contr
+  },
+  case list.cons {
+    rw vector.nth_zero,
+    rw no_thread_active,
+    rw list.any,
+    simp,
+    rw vector.head,
+    intro h,
+    by_contra,
+    apply h,
+    left,
+    sorry, -- should be trivial
+  }
+end
+
 lemma all_threads_active_nth_zero (ac : vector bool (nat.succ n)) : all_threads_active ac → ac.nth 0 := begin
   cases ac,
   cases ac_val,
@@ -238,16 +258,22 @@ lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ :
       subst this,
       refl,
     },
-    case parlang.exec_state.sync_none {
-      have : ac.nth ⟨0, hl⟩ := begin
-        cases n,
-        case nat.zero {
-          sorry -- contr
-        },
-        case nat.succ {
+    case parlang.exec_state.sync_none {  -- contr.: all and no threads are active at the same time
+      cases n,
+      case nat.zero {
+        sorry -- contr
+      },
+      case nat.succ {
+        have : ↥(h₁_ac.nth ⟨0, hl⟩) := begin  
           apply all_threads_active_nth_zero,
-        }
-      end
+          assumption,
+        end,
+        have : ¬↥(h₁_ac.nth ⟨0, hl⟩) := begin
+          apply no_threads_active_nth_zero,
+          assumption,
+        end,
+        contradiction,
+      },
     },
   }
   
