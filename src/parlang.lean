@@ -176,7 +176,7 @@ end
 end state
 
 def no_thread_active (ac : vector bool n) : bool := ¬ac.to_list.any id
-
+def any_thread_active (ac : vector bool n) : bool := ac.to_list.any id
 def all_threads_active (ac : vector bool n) : bool := ac.to_list.all id
 
 lemma no_threads_active_nth_zero (ac : vector bool (nat.succ n)) : no_thread_active ac → ¬ac.nth 0 := begin
@@ -216,6 +216,29 @@ lemma all_threads_active_nth_zero (ac : vector bool (nat.succ n)) : all_threads_
   }
 end
 
+lemma no_threads_active_not_all_threads {ac : vector bool n} (hl : 0 < n) : no_thread_active ac → ¬↥(all_threads_active ac) := begin
+  cases n,
+  case nat.zero {
+    sorry -- contr
+  },
+  case nat.succ {
+    intros a b,
+    have : ↥(ac.nth ⟨0, hl⟩) := begin  
+      apply all_threads_active_nth_zero,
+      assumption,
+    end,
+    have : ¬↥(ac.nth ⟨0, hl⟩) := begin
+      apply no_threads_active_nth_zero,
+      assumption,
+    end,
+    contradiction,
+  },
+end
+
+lemma no_threads_active_no_active_thread {ac : vector bool n} : no_thread_active ac → ¬any_thread_active ac := begin
+  sorry,
+end
+
 def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := (ac.map₂ prod.mk s.threads).map (λ ⟨a, t⟩, if a then f t.tlocal else a)
 
 /-- Execute a kernel on a global state, i.e. a list of threads -/
@@ -235,13 +258,13 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
 | ite (s t u : state n σ τ) (ac : vector bool n) (f : σ → bool) (k₁ k₂ : kernel σ τ) :
   exec_state k₁ (deactivate_threads (bnot ∘ f) ac s) s t → exec_state k₂ (deactivate_threads f ac s) t u → exec_state (ite f k₁ k₂) ac s u -- in the then-branch we deactive those threads where the condition is false and vice versa
 | loop_stop (s : state n σ τ) (ac : vector bool n) (f : σ → bool) (k : kernel σ τ) :
-  (∀t ∈ s.active_threads ac, ¬f (t:thread_state σ τ).tlocal) → exec_state (loop f k) ac s s
+  (no_thread_active (deactivate_threads (bnot ∘ f) ac s)) → exec_state (loop f k) ac s s
 | loop_step (s t u : state n σ τ) (ac : vector bool n) (f : σ → bool) (k : kernel σ τ) :
-  (∃t∈s.active_threads ac, f (t:thread_state σ τ).tlocal) →
+  (any_thread_active (deactivate_threads (bnot ∘ f) ac s)) →
   exec_state k (deactivate_threads (bnot ∘ f) ac s) s t → exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u → exec_state (loop f k) ac s u
 
 lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ : exec_state k ac s u) (h₂ : exec_state k ac s t) (hl : 0 < n) : t = u := begin
-  induction h₁,
+  induction h₁ generalizing t,
   case exec_state.load {
     cases h₂, refl,
   },
@@ -258,25 +281,54 @@ lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ :
       subst this,
       refl,
     },
-    case parlang.exec_state.sync_none {  -- contr.: all and no threads are active at the same time
-      cases n,
-      case nat.zero {
-        sorry -- contr
-      },
-      case nat.succ {
-        have : ↥(h₁_ac.nth ⟨0, hl⟩) := begin  
-          apply all_threads_active_nth_zero,
-          assumption,
-        end,
-        have : ¬↥(h₁_ac.nth ⟨0, hl⟩) := begin
-          apply no_threads_active_nth_zero,
-          assumption,
-        end,
-        contradiction,
-      },
+    case parlang.exec_state.sync_none {
+      apply false.elim (no_threads_active_not_all_threads hl h₂_h h₁_ha),
     },
+  },
+  case exec_state.sync_none {
+    cases h₂,
+    case parlang.exec_state.sync_all {
+      apply false.elim (no_threads_active_not_all_threads hl h₁_h h₂_ha),
+    },
+    case parlang.exec_state.sync_none {
+      refl,
+    }
+  },
+  case parlang.exec_state.seq {
+    cases h₂,
+    specialize h₁_ih_a h₂_a,
+    subst h₁_ih_a,
+    specialize h₁_ih_a_1 h₂_a_1,
+    assumption,
+  },
+  case parlang.exec_state.ite {
+    cases h₂,
+    specialize h₁_ih_a h₂_a,
+    subst h₁_ih_a,
+    specialize h₁_ih_a_1 h₂_a_1,
+    assumption,
+  },
+  case parlang.exec_state.loop_stop {
+    cases h₂,
+    case parlang.exec_state.loop_stop {
+      refl,
+    },
+    case parlang.exec_state.loop_step {
+      apply false.elim (no_threads_active_no_active_thread h₁_a h₂_a),
+    }
+  },
+  case parlang.exec_state.loop_step {
+    cases h₂,
+    case parlang.exec_state.loop_stop {
+      apply false.elim (no_threads_active_no_active_thread h₂_a h₁_a),
+    },
+    case parlang.exec_state.loop_step {
+      specialize h₁_ih_a h₂_a_1,
+      subst h₁_ih_a,
+      specialize h₁_ih_a_1 h₂_a_2,
+      assumption,
+    }
   }
-  
 end
 
 inductive exec_memory (ac : vector bool n) (k : kernel σ τ) (s : state n σ τ) (m : memory τ) : Prop
