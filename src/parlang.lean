@@ -203,7 +203,8 @@ lemma all_threads_active_nth_zero (ac : vector bool (nat.succ n)) : all_threads_
   cases ac,
   cases ac_val,
   case list.nil {
-    sorry -- contr
+    have : list.length (@list.nil bool) = 0 := by rw list.length,
+    contradiction,
   },
   case list.cons {
     rw vector.nth_zero,
@@ -219,7 +220,8 @@ end
 lemma no_threads_active_not_all_threads {ac : vector bool n} (hl : 0 < n) : no_thread_active ac → ¬↥(all_threads_active ac) := begin
   cases n,
   case nat.zero {
-    sorry -- contr
+    have : ¬ 0 < 0 := by simp,
+    contradiction,
   },
   case nat.succ {
     intros a b,
@@ -236,7 +238,22 @@ lemma no_threads_active_not_all_threads {ac : vector bool n} (hl : 0 < n) : no_t
 end
 
 lemma no_threads_active_no_active_thread {ac : vector bool n} : no_thread_active ac → ¬any_thread_active ac := begin
-  sorry,
+  induction n,
+  case nat.zero {
+    cases ac,
+    cases ac_val,
+    case list.nil {
+      rw no_thread_active,
+      rw any_thread_active,
+      simp,
+    },
+    case list.cons {
+      contradiction,
+    }
+  },
+  case nat.succ {
+    sorry -- TODO simplify and generalize proofs on vectors
+  }
 end
 
 def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := (ac.map₂ prod.mk s.threads).map (λ ⟨a, t⟩, if a then f t.tlocal else a)
