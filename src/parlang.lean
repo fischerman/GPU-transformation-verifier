@@ -115,7 +115,7 @@ def syncable (s : state n σ τ) (m : memory τ) : Prop :=
 
 -- we have to prove all four combinations (2 by contradiction and 2 because they match)
 -- there must be at least one thread otherwise memory can be arbitrary
-lemma syncable_unique (s : state n σ τ) (m m') (h₁ : syncable s m) (h₂ : syncable s m') (hl : 0 < n) : m = m' := begin
+lemma syncable_unique {s : state n σ τ} {m m'} (h₁ : syncable s m) (h₂ : syncable s m') (hl : 0 < n) : m = m' := begin
   funext,
   specialize h₁ x,
   specialize h₂ x,
@@ -179,6 +179,23 @@ def no_thread_active (ac : vector bool n) : bool := ¬ac.to_list.any id
 
 def all_threads_active (ac : vector bool n) : bool := ac.to_list.all id
 
+lemma all_threads_active_nth_zero (ac : vector bool (nat.succ n)) : all_threads_active ac → ac.nth 0 := begin
+  cases ac,
+  cases ac_val,
+  case list.nil {
+    sorry -- contr
+  },
+  case list.cons {
+    rw vector.nth_zero,
+    rw all_threads_active,
+    rw list.all,
+    simp,
+    intros h _,
+    rw vector.head,
+    assumption,
+  }
+end
+
 def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := (ac.map₂ prod.mk s.threads).map (λ ⟨a, t⟩, if a then f t.tlocal else a)
 
 /-- Execute a kernel on a global state, i.e. a list of threads -/
@@ -203,7 +220,7 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
   (∃t∈s.active_threads ac, f (t:thread_state σ τ).tlocal) →
   exec_state k (deactivate_threads (bnot ∘ f) ac s) s t → exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u → exec_state (loop f k) ac s u
 
-lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ : exec_state k ac s u) (h₂ : exec_state k ac s t) : t = u := begin
+lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ : exec_state k ac s u) (h₂ : exec_state k ac s t) (hl : 0 < n) : t = u := begin
   induction h₁,
   case exec_state.load {
     cases h₂, refl,
@@ -216,7 +233,22 @@ lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ :
   },
   case exec_state.sync_all {
     cases h₂,
-    
+    case parlang.exec_state.sync_all {
+      have : h₁_m = h₂_m := by apply state.syncable_unique h₁_hs h₂_hs hl,
+      subst this,
+      refl,
+    },
+    case parlang.exec_state.sync_none {
+      have : ac.nth ⟨0, hl⟩ := begin
+        cases n,
+        case nat.zero {
+          sorry -- contr
+        },
+        case nat.succ {
+          apply all_threads_active_nth_zero,
+        }
+      end
+    },
   }
   
 end
