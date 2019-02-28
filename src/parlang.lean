@@ -41,6 +41,7 @@ inductive kernel {ι : Type} (σ : Type) (τ : ι → Type) : Type
 | loop       : (σ → bool) → kernel → kernel
 | sync {}    : kernel
 
+infixr ` ;; `:90 := kernel.seq
 open kernel
 
 /-- Memory view -/
@@ -112,6 +113,9 @@ def syncable (s : state n σ τ) (m : memory τ) : Prop :=
   (∀t∈s.threads, i ∉ (t : thread_state _ _).stores ∧ m i = t.global i) ∨
   (∃t (h : t < n), i ∈ (s.threads.nth ⟨t, h⟩).stores ∧ m i = (s.threads.nth ⟨t, h⟩).global i ∧
     (∀t' (h' : t' < n), t ≠ t' → i ∉ (s.threads.nth ⟨t, h⟩).accesses))
+
+def precedes (s u : state n σ τ) : Prop := 
+∀ (t : thread_state σ τ × thread_state σ τ), t ∈ (s.threads.map₂ prod.mk u.threads) → t.1.stores ⊆ t.2.stores ∧ t.1.loads ⊆ t.2.loads
 
 -- we have to prove all four combinations (2 by contradiction and 2 because they match)
 -- there must be at least one thread otherwise memory can be arbitrary
@@ -348,7 +352,71 @@ lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ :
   }
 end
 
-inductive exec_memory (ac : vector bool n) (k : kernel σ τ) (s : state n σ τ) (m : memory τ) : Prop
-| intro (u) (hk : exec_state k ac s u) (syncable : u.syncable m) : exec_memory
+lemma exec_state_precedes {s u : state n σ τ} {ac : vector bool n} {k} : exec_state (k) ac s u → s.precedes u := begin
+  intro he,
+  cases he,
+  case parlang.exec_state.load {
+    unfold state.precedes,
+    simp,
+    intros a b,
+    induction n,
+    case nat.zero {
+      exact match ac with
+      | ⟨[], h⟩ := begin
+          rw vector.map₂_nil',
+          rw vector.map₂_nil,
+          intro,
+          have : (a, b) ∉ (@vector.nil (thread_state σ τ × thread_state σ τ)) := by apply vector.mem_nil,
+          contradiction,
+        end
+      end,
+    },
+    case nat.succ {
+      exact match ac, s.threads with
+      | ⟨list.cons a ac_tl, h ⟩ := begin
+          
+        end
+      end,
+    },
+    
+    unfold thread_state.load,
+  }
+end
+
+lemma exec_state_seq_left {s u : state n σ τ} {ac : vector bool n} {k₁ k₂} : exec_state (k₁ ;; k₂) ac s u → ∃t, exec_state k₁ ac s t ∧ t.precedes u := begin
+  intro he,
+  cases he,
+  apply Exists.intro he_t,
+  apply and.intro he_a _,
+  apply exec_state_precedes he_a_1,
+end
+
+-- lemma exec_state_seq_sync_left {s u : state n σ τ} {ac : vector bool n} {k₁ k₂} {m} : exec_state (k₁ ;; k₂) ac s u → u.syncable m → ∃m'  := begin
+
+-- end
+
+inductive exec_memory (k : kernel σ τ) (ac : vector bool n) (s : state n σ τ) (m m' : memory τ) : Prop
+| intro {u} (hk : exec_state k ac (s.map_threads $ thread_state.sync m) u) (syncable : u.syncable m') : exec_memory
+
+lemma exec_memory_unique {s : state n σ τ} {m o o': memory τ} {ac : vector bool n} {k} (h₁ : exec_memory k ac s m o) (h₂ : exec_memory k ac s m o') (hl : 0 < n) : o = o' := begin
+  cases h₁,
+  cases h₂,
+  have : h₂_u = h₁_u := by apply exec_state_unique h₁_hk h₂_hk hl,
+  subst this,
+  apply state.syncable_unique h₁_syncable h₂_syncable hl,
+end
+
+lemma exec_memory_seq_left {k₁ k₂ : kernel σ τ} {ac : vector bool n} {s} {m o} : exec_memory (k₁ ;; k₂) ac s m o → ∃r, exec_memory k₁ ac s m r := begin
+  intro he,
+  cases he,
+  have hesk₁ : _ := by apply exec_state_seq_left he_hk,
+  cases hesk₁ with t hesk₁,
+  have hk₁s : ∃r, t.syncable r := begin
+    
+  end,
+  cases hk₁s with r,
+  apply Exists.intro r,
+  apply exec_memory.intro hesk₁ hk₁s_h,
+end
 
 end parlang

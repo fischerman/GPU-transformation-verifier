@@ -53,6 +53,8 @@ protected def mem {α : Type u} {n : ℕ} : α → vector α n → Prop
 instance {α : Type u} {n : ℕ} : has_mem α (vector α n) :=
 ⟨vector.mem⟩
 
+lemma mem_nil {α : Type u} {a : α} : a ∉ (@vector.nil α) := by sorry
+
 lemma nat_le_zero {n : ℕ} : n < 0 → false := by sorry
 
 lemma mem_elim_head {α : Type u} {n} {tl : list α} {a hd : α} (h) : 
@@ -99,5 +101,20 @@ lemma contains_nth {α : Type} {n : ℕ} {v : vector α n} {i : fin n} : (v.nth 
         }
     }
 end
+
+@[simp] lemma map₂_nil {α β γ : Type} {f : α → β → γ} (v : vector α 0) : vector.map₂ f v vector.nil = vector.nil := begin
+    cases v,
+    cases v_val,
+    case list.nil {
+        refl,
+    },
+    case list.cons {
+        refl,
+    }
+end
+
+@[simp] lemma map₂_nil' {α β γ : Type} {f : α → β → γ} (v : vector α 0) (p) : vector.map₂ f v ⟨list.nil, p⟩ = vector.nil := sorry
+
+example {f a as b bs h h' h''} : vector.map₂ f ⟨ a :: as, h⟩ ⟨b :: bs, h'⟩ = ⟨f a b :: vector.map₂ f as bs, h''⟩
 
 end vector
