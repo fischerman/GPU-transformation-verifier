@@ -1,34 +1,21 @@
+import data.list.basic
 import data.vector
 
 universes u v w
 
-namespace list_aux
+namespace list
 
-lemma list_length_neq_zero {α} {l : list α} (h : ¬(l.length = 0)) : ∃ x xs, l = (x :: xs) := begin
-    cases l,
-    case list.nil {
-        simp at h,
-        contradiction
-    },
-    case list.cons {
-        apply Exists.intro l_hd,
-        apply Exists.intro l_tl,
-        refl,
-    }
-end
+lemma list_length_neq_zero {α} : ∀{l : list α}, l.length ≠ 0 → ∃ x xs, l = (x :: xs)
+| []     h := (h rfl).elim
+| (a::l) h := ⟨_, _, rfl⟩
 
-lemma list_length_tail {α β : Type} {x : α} {y : β} {xs ys} (h : (x :: xs).length = (y :: ys).length) : xs.length = ys.length := begin
-    rw list.length at h,
-    rw list.length at h,
-    simp at h,
-    repeat { rw nat.one_add at h },
-    simp at h,
-    assumption,
-end
+lemma list_length_tail {α β : Type} {x : α} {y : β} {xs ys : list _}
+  (h : (x :: xs).length = (y :: ys).length) : xs.length = ys.length :=
+by simpa using h
 
-end list_aux
+end list
 
-namespace nat_aux
+namespace nat
 
 lemma lt_neq_zeor (n m : ℕ) : n < m → m ≠ 0 := begin
     intro,
@@ -37,13 +24,13 @@ lemma lt_neq_zeor (n m : ℕ) : n < m → m ≠ 0 := begin
     cases a,
 end
 
-end nat_aux
+end nat
 
-namespace set_aux
+namespace set
 
 lemma union_no_mem_left {α : Type} {a : α} {b c : set α} (h : a ∉ b ∪ c) : a ∉ b := sorry
 
-end set_aux
+end set
 
 namespace vector
 
@@ -53,56 +40,33 @@ protected def mem {α : Type u} {n : ℕ} : α → vector α n → Prop
 instance {α : Type u} {n : ℕ} : has_mem α (vector α n) :=
 ⟨vector.mem⟩
 
+lemma mem_def {α : Type*} {n : ℕ} (a : α) (v : vector α n) : a ∈ v ↔ a ∈ v.to_list :=
+iff.rfl
+
 lemma mem_nil {α : Type u} {a : α} : a ∉ (@vector.nil α) := by sorry
 
 lemma nat_le_zero {n : ℕ} : n < 0 → false := by sorry
 
-lemma mem_elim_head {α : Type u} {n} {tl : list α} {a hd : α} (h) : 
-a ∈ (show vector α n, from ⟨tl, h⟩) → a ∈ (show vector α (nat.succ n), from ⟨hd :: tl, congr_arg nat.succ h⟩) := sorry
+#check vector.cons
 
-lemma contains_nth {α : Type} {n : ℕ} {v : vector α n} {i : fin n} : (v.nth i) ∈ v := begin
-    induction n,
-    case nat.zero {
-        cases i,
-        apply false.elim,
-        apply nat_le_zero i_is_lt,
-    },
-    case nat.succ {
-        cases i,
-        cases v,
-        cases v_val,
-        case list.nil {
-            rw list.length at v_property,
-            contradiction,
-        },
-        case list.cons {
-            cases i_val,
-            case nat.zero {
-                rw nth,
-                simp, -- should be trivial but how to unfold ∈?
-                sorry,
-            },
-            case nat.succ {
-                rw nth,
-                simp,
-                have: list.length v_val_tl = n_n := begin 
-                    apply nat.succ_inj,
-                    rw list.length at v_property,
-                    assumption,
-                end,
-                apply mem_elim_head this,
-                specialize @n_ih (⟨v_val_tl, this⟩),
-                have val_lt_n : i_val < n_n := by apply nat.lt_of_succ_lt_succ i_is_lt,
-                specialize @n_ih ⟨i_val, val_lt_n⟩,
-                rw nth at n_ih,
-                simp at n_ih,
-                assumption,
-            }
-        }
-    }
-end
+lemma mem_elim_head {α : Type u} {n} {tl : vector α n} {a hd : α} :
+  a ∈ tl → a ∈ cons hd tl :=
+sorry
 
-@[simp] lemma map₂_nil {α β γ : Type} {f : α → β → γ} (v : vector α 0) : vector.map₂ f v vector.nil = vector.nil := begin
+lemma contains_nth {α : Type} : ∀{n : ℕ} {v : vector α n} {i : fin n}, (v.nth i) ∈ v
+| n ⟨l, rfl⟩ ⟨i, hi⟩ :=
+  begin
+    dsimp only [vector.nth, vector.has_mem, vector.mem, to_list],
+    rw list.mem_iff_nth_le,
+    exact ⟨i, hi, rfl⟩
+  end
+
+lemma vector_0_eq {α : Type*} : ∀(v : vector α 0), v = vector.nil
+| ⟨l, hl⟩ := subtype.eq $ show l = list.nil, from list.length_eq_zero.1 hl
+
+@[simp] lemma map₂_nil {α β γ : Type} {f : α → β → γ} (v : vector α 0) (w) :
+  vector.map₂ f v w = vector.nil :=
+begin
     cases v,
     cases v_val,
     case list.nil {
@@ -113,8 +77,11 @@ end
     }
 end
 
-@[simp] lemma map₂_nil' {α β γ : Type} {f : α → β → γ} (v : vector α 0) (p) : vector.map₂ f v ⟨list.nil, p⟩ = vector.nil := sorry
+@[simp] lemma map₂_nil' {α β γ : Type} {f : α → β → γ} (v : vector α 0) (p) :
+  vector.map₂ f v ⟨list.nil, p⟩ = vector.nil := sorry
 
-example {f a as b bs h h' h''} : vector.map₂ f ⟨ a :: as, h⟩ ⟨b :: bs, h'⟩ = ⟨f a b :: vector.map₂ f as bs, h''⟩
+example {f a as b bs h h' h''} :
+  vector.map₂ f ⟨ a :: as, h⟩ ⟨b :: bs, h'⟩ = ⟨f a b :: vector.map₂ f as bs, h''⟩ :=
+sorry
 
 end vector
