@@ -291,7 +291,7 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
   exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u →
   exec_state (loop f k) ac s u
 
-lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ : exec_state k ac s u) (h₂ : exec_state k ac s t) (hl : 0 < n) : t = u := begin
+lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ : exec_state k ac s u) (h₂ : exec_state k ac s t) : t = u := begin
   induction h₁ generalizing t,
   case exec_state.load {
     cases h₂, refl,
@@ -305,12 +305,26 @@ lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ :
   case exec_state.sync_all {
     cases h₂,
     case parlang.exec_state.sync_all {
-      have : h₁_m = h₂_m := by apply state.syncable_unique h₁_hs h₂_hs hl,
-      subst this,
-      refl,
+      by_cases hl : 0 < n,
+      {
+        have : h₁_m = h₂_m := by apply state.syncable_unique h₁_hs h₂_hs hl,
+        subst this,
+        refl,
+      },
+      {
+        have : n = 0 := by simpa using hl,
+        subst this,
+        simp [state.map_threads],
+        rw [vector.vector_0_eq h₁_s.threads, vector.map_nil, vector.map_nil],
+      }
     },
     case parlang.exec_state.sync_none {
-      apply false.elim (no_threads_active_not_all_threads hl h₂_h h₁_ha),
+      by_cases hl : 0 < n,
+      exact false.elim (no_threads_active_not_all_threads hl h₂_h h₁_ha),
+      have : n = 0 := by simpa using hl,
+      subst this,
+      rw [state.map_threads, vector.vector_0_eq h₁_s.threads, vector.map_nil],
+      sorry,
     },
   },
   case exec_state.sync_none {
