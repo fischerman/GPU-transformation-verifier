@@ -64,24 +64,15 @@ lemma contains_nth {α : Type} : ∀{n : ℕ} {v : vector α n} {i : fin n}, (v.
 lemma vector_0_eq {α : Type*} : ∀(v : vector α 0), v = vector.nil
 | ⟨l, hl⟩ := subtype.eq $ show l = list.nil, from list.length_eq_zero.1 hl
 
-@[simp] lemma map₂_nil {α β γ : Type} {f : α → β → γ} (v : vector α 0) (w) :
-  vector.map₂ f v w = vector.nil :=
-begin
-    cases v,
-    cases v_val,
-    case list.nil {
-        refl,
-    },
-    case list.cons {
-        refl,
-    }
-end
+@[simp] lemma map₂_nil {α β γ : Type} {f : α → β → γ} :
+  ∀ (v : vector α 0) w, vector.map₂ f v w = vector.nil
+| ⟨[], _⟩ ⟨[], _⟩ := by simp [vector.map₂, vector.nil]
 
 @[simp] lemma map₂_nil' {α β γ : Type} {f : α → β → γ} (v : vector α 0) (p) :
   vector.map₂ f v ⟨list.nil, p⟩ = vector.nil := sorry
 
-example {f a as b bs h h' h''} :
-  vector.map₂ f ⟨ a :: as, h⟩ ⟨b :: bs, h'⟩ = ⟨f a b :: vector.map₂ f as bs, h''⟩ :=
-sorry
+-- example {f a as b bs h h' h''} :
+--   vector.map₂ f ⟨ a :: as, h⟩ ⟨b :: bs, h'⟩ = ⟨f a b :: vector.map₂ f as bs, h''⟩ :=
+-- sorry
 
 end vector
