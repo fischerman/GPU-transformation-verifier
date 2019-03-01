@@ -114,7 +114,7 @@ def syncable (s : state n σ τ) (m : memory τ) : Prop :=
   (∃t (h : t < n), i ∈ (s.threads.nth ⟨t, h⟩).stores ∧ m i = (s.threads.nth ⟨t, h⟩).global i ∧
     (∀t' (h' : t' < n), t ≠ t' → i ∉ (s.threads.nth ⟨t, h⟩).accesses))
 
-def precedes (s u : state n σ τ) : Prop := 
+def precedes (s u : state n σ τ) : Prop :=
 ∀ (t : thread_state σ τ × thread_state σ τ), t ∈ (s.threads.map₂ prod.mk u.threads) → t.1.stores ⊆ t.2.stores ∧ t.1.loads ⊆ t.2.loads
 
 -- we have to prove all four combinations (2 by contradiction and 2 because they match)
@@ -229,7 +229,7 @@ lemma no_threads_active_not_all_threads {ac : vector bool n} (hl : 0 < n) : no_t
   },
   case nat.succ {
     intros a b,
-    have : ↥(ac.nth ⟨0, hl⟩) := begin  
+    have : ↥(ac.nth ⟨0, hl⟩) := begin
       apply all_threads_active_nth_zero,
       assumption,
     end,
@@ -260,7 +260,7 @@ lemma no_threads_active_no_active_thread {ac : vector bool n} : no_thread_active
   }
 end
 
-def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := (ac.map₂ prod.mk s.threads).map (λ ⟨a, t⟩, if a then f t.tlocal else a)
+def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := (ac.map₂ prod.mk s.threads).map (λ ⟨a, t⟩, f t.tlocal && a)
 
 /-- Execute a kernel on a global state, i.e. a list of threads -/
 inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ τ → state n σ τ → Prop
@@ -270,19 +270,26 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
   exec_state (store f) ac s (s.map_active_threads ac $ thread_state.store f)
 | compute (f : σ → σ) (s : state n σ τ) (ac : vector bool n) :
   exec_state (compute f) ac s (s.map_active_threads ac $ thread_state.map f)
-| sync_all (s : state n σ τ) (ac : vector bool n) (m : memory τ) (hs : s.syncable m) (ha : all_threads_active ac) :
+| sync_all (s : state n σ τ) (ac : vector bool n) (m : memory τ) (hs : s.syncable m)
+  (ha : all_threads_active ac) :
   exec_state sync ac s (s.map_threads $ thread_state.sync m)
 | sync_none (s : state n σ τ) (ac : vector bool n) (h : no_thread_active ac) :
   exec_state sync ac s s
 | seq (s t u : state n σ τ) (ac : vector bool n) (k₁ k₂ : kernel σ τ) :
   exec_state k₁ ac s t → exec_state k₂ ac t u → exec_state (seq k₁ k₂) ac s u
 | ite (s t u : state n σ τ) (ac : vector bool n) (f : σ → bool) (k₁ k₂ : kernel σ τ) :
-  exec_state k₁ (deactivate_threads (bnot ∘ f) ac s) s t → exec_state k₂ (deactivate_threads f ac s) t u → exec_state (ite f k₁ k₂) ac s u -- in the then-branch we deactive those threads where the condition is false and vice versa
+  exec_state k₁ (deactivate_threads (bnot ∘ f) ac s) s t →
+  exec_state k₂ (deactivate_threads f ac s) t u →
+  exec_state (ite f k₁ k₂) ac s u
+  -- in the then-branch we deactive those threads where the condition is false and vice versa
 | loop_stop (s : state n σ τ) (ac : vector bool n) (f : σ → bool) (k : kernel σ τ) :
-  (no_thread_active (deactivate_threads (bnot ∘ f) ac s)) → exec_state (loop f k) ac s s
+  no_thread_active (deactivate_threads (bnot ∘ f) ac s) →
+  exec_state (loop f k) ac s s
 | loop_step (s t u : state n σ τ) (ac : vector bool n) (f : σ → bool) (k : kernel σ τ) :
-  (any_thread_active (deactivate_threads (bnot ∘ f) ac s)) →
-  exec_state k (deactivate_threads (bnot ∘ f) ac s) s t → exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u → exec_state (loop f k) ac s u
+  any_thread_active (deactivate_threads (bnot ∘ f) ac s) →
+  exec_state k (deactivate_threads (bnot ∘ f) ac s) s t →
+  exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u →
+  exec_state (loop f k) ac s u
 
 lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ : exec_state k ac s u) (h₂ : exec_state k ac s t) (hl : 0 < n) : t = u := begin
   induction h₁ generalizing t,
@@ -374,11 +381,11 @@ lemma exec_state_precedes {s u : state n σ τ} {ac : vector bool n} {k} : exec_
     case nat.succ {
       exact match ac, s.threads with
       | ⟨list.cons a ac_tl, h ⟩ := begin
-          
+
         end
       end,
     },
-    
+
     unfold thread_state.load,
   }
 end
@@ -408,7 +415,7 @@ lemma exec_memory_seq_left {k₁ k₂ : kernel σ τ} {ac : vector bool n} {s} {
   have hesk₁ : _ := by apply exec_state_seq_left he_hk,
   cases hesk₁ with t hesk₁,
   have hk₁s : ∃r, t.syncable r := begin
-    
+
   end,
   cases hk₁s with r,
   apply Exists.intro r,
