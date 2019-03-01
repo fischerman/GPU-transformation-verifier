@@ -391,10 +391,6 @@ lemma exec_state_seq_left {s u : state n σ τ} {ac : vector bool n} {k₁ k₂}
   apply exec_state_precedes he_a_1,
 end
 
--- lemma exec_state_seq_sync_left {s u : state n σ τ} {ac : vector bool n} {k₁ k₂} {m} : exec_state (k₁ ;; k₂) ac s u → u.syncable m → ∃m'  := begin
-
--- end
-
 inductive exec_memory (k : kernel σ τ) (ac : vector bool n) (s : state n σ τ) (m m' : memory τ) : Prop
 | intro {u} (hk : exec_state k ac (s.map_threads $ thread_state.sync m) u) (syncable : u.syncable m') : exec_memory
 
