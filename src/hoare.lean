@@ -20,6 +20,7 @@ example (P Q : thread_state σ τ → Prop) (k₁ k₂ : kernel σ τ) (c : σ �
 begin
     intros h_then h_else n s u ac hp he i hac,
     cases he,
+    -- we reorder the execution (and state transition respectively) to macht the hoare triplets using exec_state_comm_distinct_ac
     -- either the condition holds or not for any thread i
     -- ?? in either case we have to go through both executions ??
     by_cases hc : (c (vector.nth (s.threads) i).tlocal = tt),

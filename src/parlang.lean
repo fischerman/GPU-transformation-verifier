@@ -91,6 +91,11 @@ def accesses (t : thread_state σ τ) : set ι := t.stores ∪ t.loads
 
 end thread_state
 
+def no_thread_active (ac : vector bool n) : bool := ¬ac.to_list.any id
+def any_thread_active (ac : vector bool n) : bool := ac.to_list.any id
+def all_threads_active (ac : vector bool n) : bool := ac.to_list.all id
+def ac_distinct (ac₁ ac₂ : vector bool n) : Prop := ∀ (i : fin n), ac₁.nth i ≠ ac₂.nth i
+
 /-- Global program state -/
 structure state {ι : Type} (n : ℕ) (σ : Type) (τ : ι → Type) : Type :=
 (threads : vector (thread_state σ τ) n)
@@ -177,12 +182,12 @@ lemma syncable_unique {s : state n σ τ} {m m'} (h₁ : syncable s m) (h₂ : s
   }
 end
 
-lemma state_eq_per_thread {s u : state n σ τ} : ∀ i, s.threads.nth i = u.threads.nth i → s = u := begin
-  intros i hieq,
+lemma state_eq_per_thread {s u : state n σ τ} : (∀ i, s.threads.nth i = u.threads.nth i) → s = u := begin
+  intros hieq,
   cases s,
   cases u,
   simp at *,
-  apply vector.eq_element_wise i hieq,
+  apply vector.eq_element_wise hieq,
 end
 
 lemma map_active_threads_nth {s : state n σ τ} {ac : vector bool n} {f i} : ¬ ac.nth i → s.threads.nth i = (s.map_active_threads ac f).threads.nth i := begin
@@ -191,11 +196,55 @@ lemma map_active_threads_nth {s : state n σ τ} {ac : vector bool n} {f i} : ¬
   simp [hnac],
 end
 
-end state
+lemma ac_distinct_cases {ac₁ ac₂ : vector bool n} (h : ac_distinct ac₁ ac₂) (i : fin n) : 
+  (ac₁.nth i ∧ ¬ac₂.nth i) ∨ (ac₂.nth i ∧ ¬ac₁.nth i) ∨ (¬ac₁.nth i ∧ ¬ac₂.nth i) := begin
+  unfold ac_distinct at h,
+  by_cases h1 : ↥(vector.nth ac₁ i),
+  {
+    left,
+    specialize h i,
+    simp [h1] at h,
+    apply and.intro,
+    { assumption, },
+    {
+      intro,
+      apply h,
+      sorry,
+    }
+  }, {
+    by_cases h2 : ↥(vector.nth ac₂ i),
+    {
+      right,
+      left,
+      sorry,
+    }, {
+      right,
+      right,
+      exact ⟨h1, h2⟩,
+    }
+  }
+end
 
-def no_thread_active (ac : vector bool n) : bool := ¬ac.to_list.any id
-def any_thread_active (ac : vector bool n) : bool := ac.to_list.any id
-def all_threads_active (ac : vector bool n) : bool := ac.to_list.all id
+lemma map_active_threads_comm {s : state n σ τ} {ac₁ ac₂ : vector bool n} {f g} (h : ac_distinct ac₁ ac₂) : 
+  (s.map_active_threads ac₁ f).map_active_threads ac₂ g = (s.map_active_threads ac₂ g).map_active_threads ac₁ f := begin
+  simp [map_active_threads],
+  apply vector.eq_element_wise,
+  intro i,
+  repeat { rw vector.nth_map₂},
+  cases (ac_distinct_cases h i),
+  {
+    simp[h_1],
+  }, {
+    cases h_1,
+    {
+      simp[h_1],
+    }, {
+      simp[h_1],
+    }
+  }
+end
+
+end state
 
 lemma no_threads_active_nth_zero (ac : vector bool (nat.succ n)) : no_thread_active ac → ¬ac.nth 0 := begin
   cases ac,
@@ -284,8 +333,6 @@ lemma no_threads_active_no_active_thread {ac : vector bool n} : no_thread_active
 end
 
 def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := (ac.map₂ prod.mk s.threads).map (λ ⟨a, t⟩, (bnot ∘ f) t.tlocal && a)
-
-def ac_distinct (ac₁ ac₂ : vector bool n) : Prop := ∀ (i : fin n), ac₁.nth i ≠ ac₂.nth i
 
 lemma deactivate_threads_alive {f : σ → bool} {ac : vector bool n} {s : state n σ τ} {i} : (deactivate_threads f ac s).nth i → ac.nth i := begin
   intro hd,
@@ -490,14 +537,74 @@ lemma exec_state_inactive_threads_untouched {s u : state n σ τ} {ac : vector b
   }
 end
 
-lemma exec_state_order_distinct_ac {s t u : state n σ τ} {ac₁ ac₂ : vector bool n} {k₁ k₂} :
+def kernel_transform_func (k) (f) : Prop := ∀ (n) (s u : state n σ τ) (ac : vector bool n), exec_state k ac s u ↔ u = s.map_active_threads ac f
+
+lemma kernel_transform_inhab (k : kernel σ τ) : ∃ f, kernel_transform_func k f := begin
+  unfold kernel_transform_func,
+  cases k,
+  case parlang.kernel.load {
+    apply exists.intro (thread_state.load k),
+    intros n s u ac,
+    apply iff.intro,
+    {
+      intro he,
+      cases he,
+      simp [state.map_active_threads],
+    }, {
+      intro hm,
+      subst hm,
+      apply exec_state.load,
+    }
+  },
+  case parlang.kernel.sync {
+    apply exists.intro id,
+    intros n s u ac,
+    apply iff.intro,
+    {
+      intro he,
+      cases he,
+      case parlang.exec_state.sync_all {
+        simp [state.map_active_threads],
+        sorry, -- need some nice aux lemma for map₂
+      },
+      case parlang.exec_state.sync_none {
+        sorry,
+      },
+    }, {
+      intro hm,
+      subst hm,
+      apply exec_state.sync_none,
+    }
+  }
+end
+
+lemma exec_state_comm_distinct_ac {s t u : state n σ τ} {ac₁ ac₂ : vector bool n} {k₁ k₂} :
   ac_distinct ac₁ ac₂ →
   exec_state k₁ ac₁ s t →
   exec_state k₂ ac₂ t u →
   ∃ t', exec_state k₂ ac₂ s t' ∧ exec_state k₁ ac₁ t' u :=
 begin
   intros hd hk₁ hk₂,
-  
+  have hf₁ : _ := kernel_transform_inhab k₁,
+  have hf₂ : _ := kernel_transform_inhab k₂,
+  cases hf₁ with f₁ hf₁,
+  cases hf₂ with f₂ hf₂,
+  have h : u = state.map_active_threads ac₂ f₂ (state.map_active_threads ac₁ f₁ s) := begin
+    have hkst : t = state.map_active_threads ac₁ f₁ s := ((hf₁ n s t ac₁).mp hk₁), -- an underscore as a type would break the rw below
+    have hktu : _ := (hf₂ n t u ac₂).mp hk₂,
+    rw ← hkst,
+    exact hktu,
+  end,
+  rw state.map_active_threads_comm hd at h,
+  apply exists.intro (state.map_active_threads ac₂ f₂ s),
+  apply and.intro, 
+  {
+    apply (hf₂ n _ _ _).mpr,
+    refl,
+  }, {
+    apply (hf₁ n _ _ _).mpr,
+    exact h,
+  }
 end
 
 inductive exec_memory (k : kernel σ τ) (ac : vector bool n) (s : state n σ τ) (m m' : memory τ) : Prop

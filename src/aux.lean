@@ -62,7 +62,8 @@ lemma contains_nth {α : Type} : ∀{n : ℕ} {v : vector α n} {i : fin n}, (v.
     exact ⟨i, hi, rfl⟩
   end
 
-lemma eq_element_wise {α : Type} : ∀{a b : vector α n}, ∀ i, a.nth i = b.nth i → a = b := begin
+lemma eq_element_wise {α : Type} : ∀{a b : vector α n}, (∀ i, a.nth i = b.nth i) → a = b := begin
+  -- TODO needs fixing
   intros a b i hieq,
   apply vector.eq,
   cases a,
