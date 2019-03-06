@@ -20,26 +20,38 @@ example (P Q : thread_state σ τ → Prop) (k₁ k₂ : kernel σ τ) (c : σ �
 begin
     intros h_then h_else n s u ac hp he i hac,
     cases he,
+    have : _ := exec_state_comm_distinct_ac _ he_a he_a_1,
+    cases this with t' this,
     -- we reorder the execution (and state transition respectively) to macht the hoare triplets using exec_state_comm_distinct_ac
     -- either the condition holds or not for any thread i
     -- ?? in either case we have to go through both executions ??
     by_cases hc : (c (vector.nth (s.threads) i).tlocal = tt),
     {
         apply h_then,
-        -- apply h_then _ he_a,
-        -- { apply active_map_deactivate_threads hac hc, },
-        -- intros i' hac',
-        -- apply and.intro,
-        -- {
-        --     apply hp i',
-        --     apply deactivate_threads_alive hac',
-        -- }, {
-        --     sorry
-        -- }
+        tactic.swap,
+        exact this.right,
+        intros i hh,
+        apply and.intro,
+        {
+            sorry, -- possible with hp and some lemmas
+        }, {
+            sorry, -- possible with hc and this.left. Tlocal does not change if the thread is inactive
+        }, {
+            sorry, -- possible with hc and hac
+        },
     }, {
-        unfold hoare at h_then h_else,
-        apply h_else _,
-
+        apply h_else,
+        tactic.swap,
+        exact he_a_1,
+        intros i hh,
+        apply and.intro,
+        {
+            sorry, -- possible with hp and some lemmas
+        }, {
+            sorry, -- possible with hc and he_a, Tlocal does not change if the thread is inactive
+        }, {
+            sorry, -- possible with hc and hac
+        }
     }
     
 end
