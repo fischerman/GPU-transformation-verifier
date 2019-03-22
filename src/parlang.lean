@@ -631,4 +631,13 @@ lemma exec_memory_seq_left {k₁ k₂ : kernel σ τ} {ac : vector bool n} {s} {
   apply exec_memory.intro hesk₁ hk₁s_h,
 end
 
+inductive program {ι : Type} (σ : Type) (τ : ι → Type)
+| intro (f : memory τ → ℕ) (k : kernel σ τ) : program
+
+def state_initializer := ℕ → σ
+
+inductive exec_prog : state_initializer → program σ τ → memory τ → memory τ → Prop
+| intro (k : kernel σ τ) (f : memory τ → ℕ) (a b : memory τ) (init : state_initializer) (h : exec_memory k (vector.repeat tt (f a)) { threads := (vector.range (f a)).map init} a b) : 
+  exec_prog init (program.intro f k) a b
+
 end parlang
