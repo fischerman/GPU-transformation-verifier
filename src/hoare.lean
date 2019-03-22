@@ -1,5 +1,6 @@
 import parlang
 import aux
+import data.bool
 
 namespace parlang
 
@@ -30,30 +31,46 @@ begin
         apply h_then,
         tactic.swap,
         exact this.right,
-        intros i hh,
+        intros i' hh,
+        have hh' : _ := deactivate_threads_alive hh,
+        have heqst' : vector.nth (s.threads) i' = vector.nth (t'.threads) i' := begin
+            apply exec_state_inactive_threads_untouched this.left,
+            apply deactivate_threads_complement hh,
+        end,
+        rw ← heqst',
         apply and.intro,
         {
-            sorry, -- possible with hp and some lemmas
+            exact hp i' hh',
         }, {
-            sorry, -- possible with hc and this.left. Tlocal does not change if the thread is inactive
+            exact deactivate_threads_condition hh,
         }, {
-            sorry, -- possible with hc and hac
+            apply active_map_deactivate_threads hac (bool.eq_tt_coe.mpr hc),
         },
     }, {
         apply h_else,
         tactic.swap,
         exact he_a_1,
-        intros i hh,
+        intros i' hh,
+        have hh' : _ := deactivate_threads_alive hh,
+        have heqst' : vector.nth (s.threads) i' = vector.nth (he_t.threads) i' := begin
+            apply exec_state_inactive_threads_untouched he_a,
+            apply deactivate_threads_complement,
+            rw bool.bnot_bnot,
+            exact hh,
+        end,
+        rw ← heqst',
         apply and.intro,
         {
-            sorry, -- possible with hp and some lemmas
+            exact hp i' hh',
         }, {
-            sorry, -- possible with hc and he_a, Tlocal does not change if the thread is inactive
+            exact deactivate_threads_condition' hh,
         }, {
-            sorry, -- possible with hc and hac
+            rw ← bool.eq_tt_coe at hc,
+            apply active_map_deactivate_threads' hac hc,
         }
+    }, {
+
     }
-    
 end
 
 example : 
