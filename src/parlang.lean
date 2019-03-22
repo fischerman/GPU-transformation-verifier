@@ -11,8 +11,6 @@ variables {n : ℕ} {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 
 /- TODO:
 
-* add `active` to `thread_state`
-
 * make vars implicit
 
 -/
@@ -23,7 +21,7 @@ We use the following conventions for type variables:
 
  `σ` -- thread internal states
  `ι` -- global memory index
- `τ` -- global memory values
+ `τ` -- global memory type map
 
 -/
 
