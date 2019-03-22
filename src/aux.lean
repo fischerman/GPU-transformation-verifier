@@ -128,4 +128,18 @@ end
 --   vector.map₂ f ⟨ a :: as, h⟩ ⟨b :: bs, h'⟩ = ⟨f a b :: vector.map₂ f as bs, h''⟩ :=
 -- sorry
 
+def range (n : ℕ) : vector ℕ n := ⟨list.range n, sorry⟩
+
 end vector
+
+namespace bool
+
+lemma eq_tt_coe {b : bool} : b ↔ (b = tt) := begin
+  sorry,
+end
+
+lemma bnot_bnot {α : Type} {f : α → bool} : (bnot ∘ bnot ∘ f) = f := begin
+  sorry,
+end
+
+end
