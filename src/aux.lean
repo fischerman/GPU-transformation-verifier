@@ -130,6 +130,8 @@ end
 
 def range (n : ℕ) : vector ℕ n := ⟨list.range n, sorry⟩
 
+lemma range_nth {n : ℕ} {i : fin n} : (range n).nth i = i := sorry
+
 end vector
 
 namespace bool
