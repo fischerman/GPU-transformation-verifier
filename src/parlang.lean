@@ -687,9 +687,20 @@ inductive program {ι : Type} (σ : Type) (τ : ι → Type)
 
 def state_initializer := ℕ → σ
 
+@[reducible]
+def init_state (init : ℕ → σ) (f : memory τ → ℕ) (m : memory τ) : state (f m) σ τ := 
+{ threads := (vector.range (f m)).map (λ n, { tlocal := init n, global := m, loads := ∅, stores := ∅ })}
+
+lemma init_state_syncable {init : ℕ → σ} {f : memory τ → ℕ} {m : memory τ} : (init_state init f m).syncable m := begin
+  unfold state.syncable init_state,
+  simp,
+  intros i t h,
+  sorry
+end
+
 inductive exec_prog : (ℕ → σ) → program σ τ → memory τ → memory τ → Prop
 | intro (k : kernel σ τ) (f : memory τ → ℕ) (a b : memory τ) (init : ℕ → σ) (s' : state (f a) σ τ) (hsync : s'.syncable b)
-  (he : exec_state k (vector.repeat tt (f a)) { threads := (vector.range (f a)).map (λ n, { tlocal := init n, global := a, loads := ∅, stores := ∅ })} s') : 
+  (he : exec_state k (vector.repeat tt (f a)) (init_state init f a) s') : 
   exec_prog init (program.intro f k) a b
 
 end parlang
