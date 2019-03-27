@@ -688,8 +688,8 @@ inductive program {ι : Type} (σ : Type) (τ : ι → Type)
 def state_initializer := ℕ → σ
 
 inductive exec_prog : (ℕ → σ) → program σ τ → memory τ → memory τ → Prop
-| intro (k : kernel σ τ) (f : memory τ → ℕ) (a b : memory τ) (init : ℕ → σ) 
-  (h : exec_memory k (vector.repeat tt (f a)) { threads := (vector.range (f a)).map (λ n, { tlocal := init n, global := a, loads := ∅, stores := ∅ })} a b) : 
+| intro (k : kernel σ τ) (f : memory τ → ℕ) (a b : memory τ) (init : ℕ → σ) (s' : state (f a) σ τ) (hsync : s'.syncable b)
+  (he : exec_state k (vector.repeat tt (f a)) { threads := (vector.range (f a)).map (λ n, { tlocal := init n, global := a, loads := ∅, stores := ∅ })} s') : 
   exec_prog init (program.intro f k) a b
 
 end parlang
