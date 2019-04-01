@@ -29,6 +29,8 @@ We use the following conventions for type variables:
 
 The general idea is to not have explicit expressions, but use Lean functions to compute values. What
 we are explicit global loads and stores.
+
+Σ is constructor where the second argument may depend on the type of the first (in this case i). Can be constructed using ⟨...⟩
 -/
 inductive kernel {ι : Type} (σ : Type) (τ : ι → Type) : Type
 | load       : (σ → (Σi:ι, (τ i → σ))) → kernel
