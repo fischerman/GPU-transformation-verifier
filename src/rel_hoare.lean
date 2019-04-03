@@ -119,4 +119,11 @@ begin
     }
 end
 
+lemma single_step_left {P Q f} {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} (R)
+    (h : {* P *} (kernel.load f) ~ (kernel.compute id) {* R *})
+    (h : {* R *} k₁ ~ k₂ {* Q *}) : 
+    {* P *} (kernel.load f ;; k₁) ~ k₂ {* Q *} := begin
+    sorry
+end
+
 end parlang
