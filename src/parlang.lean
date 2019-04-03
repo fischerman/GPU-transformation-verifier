@@ -203,6 +203,8 @@ lemma map_threads_all_threads_active {s : state n σ τ} {ac : vector bool n} {f
   sorry,
 end
 
+lemma map_active_threads_id (s : state n σ τ) (ac : vector bool n) : s = s.map_active_threads ac (thread_state.map id) := sorry
+
 lemma ac_distinct_cases {ac₁ ac₂ : vector bool n} (h : ac_distinct ac₁ ac₂) (i : fin n) : 
   (ac₁.nth i ∧ ¬ac₂.nth i) ∨ (ac₂.nth i ∧ ¬ac₁.nth i) ∨ (¬ac₁.nth i ∧ ¬ac₂.nth i) := begin
   unfold ac_distinct at h,
