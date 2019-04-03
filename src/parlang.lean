@@ -302,6 +302,10 @@ end
 lemma all_threads_active_nth_zero (ac : vector bool (nat.succ n)) : all_threads_active ac → ac.nth 0
 | h := all_threads_active_nth h 0
 
+lemma all_threads_active_repeat (n : ℕ) : all_threads_active (vector.repeat tt n) := begin
+  sorry
+end
+
 lemma no_threads_active_not_all_threads {ac : vector bool n} (hl : 0 < n) : no_thread_active ac → ¬↥(all_threads_active ac) := begin
   cases n,
   case nat.zero {
