@@ -37,7 +37,8 @@ def rel_hoare_program (init₁ : ℕ → σ₁) (init₂ : ℕ → σ₂) (P : m
 
 lemma rel_kernel_to_program (k₁ : kernel σ₁ τ₁) (k₂ : kernel σ₂ τ₂) (init₁ : ℕ → σ₁) (init₂ : ℕ → σ₂) (P Q : memory τ₁ → memory τ₂ → Prop) (f₁ : memory τ₁ → ℕ) (f₂ : memory τ₂ → ℕ)
  (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ n₁ = f₁ m₁ ∧ n₂ = f₂ m₂ ∧
- (∀ i : fin n₁, (s₁.threads.nth i).tlocal = init₁ i) ∧ (∀ i : fin n₂, (s₂.threads.nth i).tlocal = init₂ i) ∧ 
+ (∀ i : fin n₁, s₁.threads.nth i = { tlocal := init₁ i, global := m₁, stores := ∅, loads := ∅ }) ∧ 
+ (∀ i : fin n₂, s₂.threads.nth i = { tlocal := init₂ i, global := m₂, stores := ∅, loads := ∅ }) ∧
  P m₁ m₂ ∧ all_threads_active ac₁ ∧ all_threads_active ac₂ *} k₁ ~ k₂ 
  {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂ *} ) : -- if I have to proof syncability of s₁, do I really have to assume termination of the left?
  rel_hoare_program init₁ init₂ P (program.intro f₁ k₁) (program.intro f₂ k₂) Q :=

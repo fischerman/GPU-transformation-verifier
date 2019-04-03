@@ -40,8 +40,13 @@ lemma arrcprel : rel_hoare_program init init eq arrcp₁ arrcp₂ eq := begin
            state.syncable s₂ m₂ ∧
              n₁ = m₁ 0 ∧
                n₂ = 10 ∧
-                 (∀ (i : fin n₁), (vector.nth (s₁.threads) i).tlocal = ((init ↑i) & "n" ::= m₁ 0)) ∧
-                   ∀ (i : fin n₂), (vector.nth (s₂.threads) i).tlocal = init ↑i)),
+                (∀ (i : fin n₁),
+                      vector.nth (s₁.threads) i =
+                        {tlocal := (init ↑i) & "n" ::= m₁ 0, global := m₁, loads := insert 0 ((vector.nth (s₁.threads) i).loads), stores := ∅}) ∧
+                (∀ (i : fin n₂),
+                    vector.nth (s₂.threads) i =
+                        {tlocal := init ↑i, global := m₂, loads := ∅, stores := ∅}) ∧
+                    m₁ = m₂ ∧ ↥(all_threads_active ac₁) ∧ ↥(all_threads_active ac₂))),
     {
         intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp hek₁,
         cases hp with m₁ hp,
@@ -61,16 +66,36 @@ lemma arrcprel : rel_hoare_program init init eq arrcp₁ arrcp₂ eq := begin
             cases hek₁,
             apply and.intro,
             {
+                
                 sorry -- memory does not change
             }, {
+                apply exists.intro m₂,
                 apply and.intro,
-                { apply exists.intro, apply hp.right.left, },
+                { apply hp.right.left, },
                 {
                     apply and.intro hp.right.right.left (and.intro hp.right.right.right.left (and.intro _ hp.right.right.right.right.right)),
                     intro i,
-                    rw ← hp.right.right.right.right.left,
+                    -- rw ← hp.right.right.right.right.left,
                     simp,
-                    sorry,
+                    have haa: ↥(vector.nth ac₁ i) := begin
+                        apply all_threads_active_nth,
+                        exact hp.right.right.right.right.right.right.right.left,
+                    end,
+                    simp [haa],
+                    rw thread_state.load,
+                    rw thread_state.load._match_1,
+                    have : m₁ = (vector.nth (s₁.threads) i).global := begin
+                        rw hp.right.right.right.right.left,
+                    end,
+                    subst this,
+                    simp,
+                    have : (vector.nth (s₁.threads) i).tlocal = (init i) := begin
+                        rw hp.right.right.right.right.left,
+                    end,
+                    rw this,
+                    rw memory.get,
+                    simp,
+                    rw hp.right.right.right.right.left,
                 }
             }
         }
