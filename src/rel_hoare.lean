@@ -137,10 +137,24 @@ begin
 end
 
 lemma single_step_left {P Q f} {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} (R)
-    (h : {* P *} (kernel.load f) ~ (kernel.compute id) {* R *})
-    (h : {* R *} k₁ ~ k₂ {* Q *}) : 
+    (h₁ : {* P *} (kernel.load f) ~ (kernel.compute id) {* R *})
+    (h₂ : {* R *} k₁ ~ k₂ {* Q *}) : 
     {* P *} (kernel.load f ;; k₁) ~ k₂ {* Q *} := begin
-    sorry
+    intros n₁ n₂ s₁ s₁'' s₂ ac₁ ac₂ hp hek₁,
+    cases hek₁,
+    specialize h₁ n₁ n₂ s₁ _ s₂ ac₁ ac₂ hp hek₁_a,
+    cases h₁ with s₂' h₁,
+    cases h₁,
+    have : s₂ = s₂' := begin
+        cases h₁_left,
+        cases s₂,
+        simp,
+        sorry, -- trivial
+    end,
+    apply h₂,
+    rw this,
+    exact h₁_right,
+    exact hek₁_a_1,
 end
 
 end parlang
