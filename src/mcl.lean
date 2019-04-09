@@ -86,10 +86,20 @@ def mclk_rel {sig₁ sig₂ : signature}
     (Q : Π n₁:ℕ, parlang.state n₁ (state sig₁) (λ n, type_map (sig₁ n)) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (λ n, type_map (sig₂ n)) → vector bool n₂ → Prop) := 
 rel_hoare_state P (mclk_to_kernel k₁) (mclk_to_kernel k₂) Q
 
-inductive mclp {sig : signature}
+inductive mclp (sig : signature)
 | intro (f : memory (λ n, type_map (sig n)) → ℕ) (k : mclk sig) : mclp
 
+def mclp_to_program {sig : signature} : mclp sig → parlang.program (state sig) (λ n, type_map (sig n))
+| (mclp.intro f k) := parlang.program.intro f (mclk_to_kernel k)
+
+-- we need an assumption on the signature, i.e. tid must be int
+def mcl_init {sig : signature} : ℕ → state sig := λ n : ℕ, λ name, if name = "tid" then n else 0
+
+def mclp_rel {sig₁ sig₂ : signature} (P) (p₁ : mclp sig₁) (p₂ : mclp sig₂) (Q) := rel_hoare_program mcl_init mcl_init P (mclp_to_program p₁) (mclp_to_program p₂) Q
+
 --def eq_assert (sig₁ : signature) : state_assert sig₁ sig₁ := λ n₁ s₁ ac₁ n₂ s₂ ac₂, n₁ = n₂ ∧ s₁ = s₂ ∧ ac₁ = ac₂
+
+example (P) (n) (expr) : mclk_rel P (tlocal_assign n expr)
 
 -- we have to show some sort of non-interference
 example {sig : signature} {n} {k₁} {P Q : state_assert sig sig} (h : sig "i" = int) (hpi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → n₁ = n) : mclk_rel P k₁ (for "i" h 0 (λ s, s.get' h < n) (tlocal_assign "i" (var "i" (by refl) + (const_int 1 h))) k₁) Q := begin
