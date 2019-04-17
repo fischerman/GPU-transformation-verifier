@@ -711,4 +711,7 @@ inductive exec_prog : (ℕ → σ) → program σ τ → memory τ → memory τ
   (he : exec_state k (vector.repeat tt (f a)) (init_state init f a) s') : 
   exec_prog init (program.intro f k) a b
 
+
+def list_to_kernel_seq (ks : list (kernel σ τ)) : kernel σ τ := ks.foldl (λ k₁ k₂, k₁ ;; k₂) (kernel.compute id)
+
 end parlang
