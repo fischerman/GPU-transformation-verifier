@@ -9,6 +9,7 @@ variables {n : ℕ}
 inductive type
 | int
 | float
+| bool
 
 open type
 
@@ -34,6 +35,7 @@ def create_signature : list (string × type) → signature
 def type_map : type → Type
 | int := ℕ
 | float := ℕ
+| bool := bool
 
 def type_of : variable_def → type := λ v, v.type
 def lean_type_of : variable_def → Type := λ v, type_map (type_of v)
@@ -54,11 +56,12 @@ state.update name (by rw [eq]; exact val) s
 def state.get' {sig : signature} {t : type} {name : string} (eq : type_of (sig name) = t) (s : state sig) : type_map t :=
 by rw [← eq]; exact s name
 
-inductive expression (sig : signature) (t : type) : Type
-| tlocal_var (n : string) (h : type_of (sig n) = t) (h₂ : is_tlocal (sig n)) : expression
-| global_var (n : string) (h : type_of (sig n) = t) (h₂ : is_global (sig n)) : expression
-| add : expression → expression → expression
-| const_int {} (n : ℕ) (h : t = int) : expression
+inductive expression (sig : signature) : type → Type
+| tlocal_var {t} (n : string) (h : type_of (sig n) = t) (h₂ : is_tlocal (sig n)) : expression t
+| global_var {t} (n : string) (h : type_of (sig n) = t) (h₂ : is_global (sig n)) : expression t
+| add {t} : expression t → expression t → expression t
+| const_int {} {t} (n : ℕ) (h : t = type.int) : expression t
+| smaller {t} (h : t = type.bool) : expression int → expression int → expression t
 
 open expression
 
@@ -69,19 +72,22 @@ instance : has_one (expression sig int) := ⟨expression.const_int 1 rfl⟩
 def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 | int a b := a + b
 | float a b := a + b
+| bool a b := a ∧ b
 
 
-def eval {sig : signature} {t : type} (s : state sig) : expression sig t → type_map t
-| (tlocal_var n h h₂) := (by rw [←h]; exact s n)
-| (global_var n h h₂) := (by rw[←h]; exact s n) -- requires that the global variable has been loaded into tstate under the same name
-| (add a b) := type_map_add (eval a) (eval b)
-| (const_int n h) := (by rw [h]; exact n)
+def eval {sig : signature} : Π {t : type}, state sig → expression sig t → type_map t
+| t s (tlocal_var n h h₂) := (by rw [←h]; exact s n)
+| t s (global_var n h h₂) := (by rw[←h]; exact s n) -- requires that the global variable has been loaded into tstate under the same name
+| t s (add a b) := type_map_add (eval s a) (eval s b)
+| t s (const_int n h) := (by rw [h]; exact n)
+| t s (smaller h a b) := (by rw h; exact ((eval s a) < (eval s b)))
 
-def load_global_vars_for_expr {sig : signature} {t : type} : expression sig t → list (kernel (state sig) (λ n, sig.lean_type_of n))
-| (global_var n h _) := [kernel.load (λ s, ⟨n, λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) v⟩)]
-| (add a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
-| (tlocal_var _ _ _) := []
-| (const_int _ _) := []
+def load_global_vars_for_expr {sig : signature} : Π {t : type}, expression sig t → list (kernel (state sig) (λ n, sig.lean_type_of n))
+| t (global_var n h _) := [kernel.load (λ s, ⟨n, λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) v⟩)]
+| t (add a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
+| t (tlocal_var _ _ _) := []
+| t (const_int _ _) := []
+| t (smaller _ a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
 
 def prepend_load_expr {sig : signature} {t : type} (expr : expression sig t) (k : kernel (state sig) (λ n, sig.lean_type_of n)) :=
 list_to_kernel_seq (load_global_vars_for_expr expr ++ [k])
@@ -96,11 +102,12 @@ notation `i(` n `)`:= expression.const_int n (by refl)
 
 open expression
 
-def expr_uses {t : type} (n : string) : expression sig t → Prop
-| (tlocal_var m _ _) := m = n
-| (global_var m _ _) := m = n
-| (add expr₁ expr₂) := expr_uses expr₁ ∨ expr_uses expr₂
-| (const_int _ _) := false
+def expr_uses (n : string) : Π {t : type}, expression sig t → Prop
+| t (tlocal_var m _ _) := m = n
+| t (global_var m _ _) := m = n
+| t (add expr₁ expr₂) := expr_uses expr₁ ∨ expr_uses expr₂
+| t (const_int _ _) := false
+| t (smaller _ a b) := expr_uses a ∨ expr_uses b
 
 inductive mclk (sig : signature)
 | tlocal_assign (n : string) : (expression sig (type_of (sig n))) → mclk
