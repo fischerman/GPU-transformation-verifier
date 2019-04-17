@@ -4,6 +4,7 @@ import rel_hoare
 open parlang
 
 namespace mcl
+variables {n : ℕ}
 
 inductive type
 | int
@@ -11,8 +12,18 @@ inductive type
 
 open type
 
+inductive scope
+| tlocal
+| global
+
+structure variable_def :=
+(type : type)
+(scope : scope)
+
 @[reducible]
-def signature := string → type
+def signature := string → variable_def
+
+variables {sig : signature}
 
 @[reducible]
 def create_signature : list (string × type) → signature
@@ -24,45 +35,78 @@ def type_map : type → Type
 | int := ℕ
 | float := ℕ
 
-@[reducible]
-def state (sig : signature) : Type := Π n : string, type_map (sig n)
+def type_of : variable_def → type := λ v, v.type
+def lean_type_of : variable_def → Type := λ v, type_map (type_of v)
+def signature.type_of (n : string) (sig :signature) := type_of (sig n)
+def signature.lean_type_of (n : string) (sig : signature) := lean_type_of (sig n)
+def is_tlocal : variable_def → Prop := λ v, v.scope = scope.tlocal
+def is_global : variable_def → Prop := λ v, v.scope = scope.global
 
-def state.update {sig : signature} (name : string) (val : type_map (sig name)) (s : state sig) : state sig :=
+@[reducible]
+def state (sig : signature) : Type := Π n : string, lean_type_of (sig n)
+
+def state.update {sig : signature} (name : string) (val : lean_type_of (sig name)) (s : state sig) : state sig :=
 λn, if h : n = name then by rw [h]; exact val else (s n)
 
-def state.update' {sig : signature} {t : type} {name : string} (eq : sig name = t) (val : type_map t) (s : state sig) : state sig :=
+def state.update' {sig : signature} {t : type} {name : string} (eq : type_of (sig name) = t) (val : type_map t) (s : state sig) : state sig :=
 state.update name (by rw [eq]; exact val) s
 
-def state.get' {sig : signature} {t : type} {name : string} (eq : sig name = t) (s : state sig) : type_map t :=
+def state.get' {sig : signature} {t : type} {name : string} (eq : type_of (sig name) = t) (s : state sig) : type_map t :=
 by rw [← eq]; exact s name
 
 inductive expression (sig : signature) (t : type) : Type
-| var (n : string) (h : sig n = t) : expression
+| tlocal_var (n : string) (h : type_of (sig n) = t) (h₂ : is_tlocal (sig n)) : expression
+| global_var (n : string) (h : type_of (sig n) = t) (h₂ : is_global (sig n)) : expression
 | add : expression → expression → expression
 | const_int {} (n : ℕ) (h : t = int) : expression
 
-instance (sig : signature) (t : type) : has_add (expression sig t) := ⟨expression.add⟩
-instance (sig : signature) : has_zero (expression sig int) := ⟨expression.const_int 0 rfl⟩
-instance (sig : signature) : has_one (expression sig int) := ⟨expression.const_int 1 rfl⟩
+open expression
 
-def eval {sig : signature} {t : type} (expr : expression sig t) (s : state sig) : type_map t := sorry
+instance (t : type) : has_add (expression sig t) := ⟨expression.add⟩
+instance : has_zero (expression sig int) := ⟨expression.const_int 0 rfl⟩
+instance : has_one (expression sig int) := ⟨expression.const_int 1 rfl⟩
 
-notation `v(` n `)`:= expression.var n (by refl)
+def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
+| int a b := a + b
+| float a b := a + b
+
+
+def eval {sig : signature} {t : type} (s : state sig) : expression sig t → type_map t
+| (tlocal_var n h h₂) := (by rw [←h]; exact s n)
+| (global_var n h h₂) := (by rw[←h]; exact s n) -- requires that the global variable has been loaded into tstate under the same name
+| (add a b) := type_map_add (eval a) (eval b)
+| (const_int n h) := (by rw [h]; exact n)
+
+def load_global_vars_for_expr {sig : signature} {t : type} : expression sig t → list (kernel (state sig) (λ n, sig.lean_type_of n))
+| (global_var n h _) := [kernel.load (λ s, ⟨n, λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) v⟩)]
+| (add a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
+| (tlocal_var _ _ _) := []
+| (const_int _ _) := []
+
+def prepend_load_expr {sig : signature} {t : type} (expr : expression sig t) (k : kernel (state sig) (λ n, sig.lean_type_of n)) :=
+list_to_kernel_seq (load_global_vars_for_expr expr ++ [k])
+
+-- TODO prove lemma
+-- eval expression (specifically the loads only ever )
+-- prove more lemmas to make sure loads are placed correctly
+
+notation `v(` n `)`:= expression.tlocal_var n (by refl)
 infixr ` ~+ `:90 := expression.add
 notation `i(` n `)`:= expression.const_int n (by refl)
 
 open expression
 
-def expr_uses {sig : signature} {t : type} (n : string) : expression sig t → Prop
-| (var m _) := m = n
+def expr_uses {t : type} (n : string) : expression sig t → Prop
+| (tlocal_var m _ _) := m = n
+| (global_var m _ _) := m = n
 | (add expr₁ expr₂) := expr_uses expr₁ ∨ expr_uses expr₂
 | (const_int _ _) := false
 
 inductive mclk (sig : signature)
-| tlocal_assign (n : string) : (expression sig (sig n)) → mclk
-| global_assign (n) : (expression sig (sig n)) → mclk
+| tlocal_assign (n : string) : (expression sig (type_of (sig n))) → mclk
+| global_assign (n) : (expression sig (type_of (sig n))) → mclk
 | seq : mclk → mclk → mclk
-| for (n : string) (h : sig n = int) :
+| for (n : string) (h : sig.type_of n = int) :
   expression sig int → (state sig → bool) → mclk → mclk → mclk
 | skip : mclk
 
@@ -70,24 +114,25 @@ infixr ` ;; `:90 := mclk.seq
 
 open mclk
 
-def mclk_to_kernel {sig : signature} : mclk sig → kernel (state sig) (λ n, type_map (sig n))
+-- split the signature 
+def mclk_to_kernel : mclk sig → kernel (state sig) (λ n, sig.lean_type_of n)
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | (skip _) := kernel.compute id
-| (tlocal_assign n expr) := kernel.compute (λ s, s.update' (by refl) (eval expr s) )
-| (global_assign n expr) := kernel.compute (λ s, s.update' (by refl) (eval expr s)) ;; kernel.store (λ s, ⟨n, s.get' (by refl)⟩)
-| (for n h expr c k_inc k_body) := kernel.compute (λ s, s.update' h (eval expr)) ;; kernel.loop (λ s, c s) (mclk_to_kernel k_body ;; mclk_to_kernel k_inc)
+| (tlocal_assign n expr) := prepend_load_expr expr (kernel.compute (λ s : state sig, s.update' (by refl) (eval s expr)))
+| (global_assign n expr) := prepend_load_expr expr (kernel.compute (λ s, s.update' (by refl) (eval s expr))) ;; kernel.store (λ s, ⟨n, s.get' (by refl)⟩)
+| (for n h expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' h (eval s expr))) ;; kernel.loop (λ s, c s) (mclk_to_kernel k_body ;; mclk_to_kernel k_inc)
 
 @[reducible]
-def state_assert (sig₁ sig₂ : signature) := Π n₁:ℕ, parlang.state n₁ (state sig₁) (λ n, type_map (sig₁ n)) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (λ n, type_map (sig₂ n)) → vector bool n₂ → Prop
+def state_assert (sig₁ sig₂ : signature) := Π n₁:ℕ, parlang.state n₁ (state sig₁) (λ n, type_map (sig₁.type_of n)) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (λ n, type_map (sig₂.type_of n)) → vector bool n₂ → Prop
 
 def mclk_rel {sig₁ sig₂ : signature} 
-    (P : Π n₁:ℕ, parlang.state n₁ (state sig₁) (λ n, type_map (sig₁ n)) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (λ n, type_map (sig₂ n)) → vector bool n₂ → Prop)
+    (P : Π n₁:ℕ, parlang.state n₁ (state sig₁) (λ n, (sig₁.lean_type_of n)) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (λ n, (sig₂.lean_type_of n)) → vector bool n₂ → Prop)
     (k₁ : mclk sig₁) (k₂ : mclk sig₂)
-    (Q : Π n₁:ℕ, parlang.state n₁ (state sig₁) (λ n, type_map (sig₁ n)) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (λ n, type_map (sig₂ n)) → vector bool n₂ → Prop) := 
+    (Q : Π n₁:ℕ, parlang.state n₁ (state sig₁) (λ n, (sig₁.lean_type_of n)) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (λ n, (sig₂.lean_type_of n)) → vector bool n₂ → Prop) := 
 rel_hoare_state P (mclk_to_kernel k₁) (mclk_to_kernel k₂) Q
 
 inductive mclp (sig : signature)
-| intro (f : memory (λ n, type_map (sig n)) → ℕ) (k : mclk sig) : mclp
+| intro (f : memory (λ n, (sig.lean_type_of n)) → ℕ) (k : mclk sig) : mclp
 
 def mclp_to_program {sig : signature} : mclp sig → parlang.program (state sig) (λ n, type_map (sig n))
 | (mclp.intro f k) := parlang.program.intro f (mclk_to_kernel k)
