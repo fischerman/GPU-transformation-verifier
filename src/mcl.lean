@@ -100,8 +100,9 @@ def append_load_expr  {sig : signature} {t : type} (expr : expression sig t) (k 
 list_to_kernel_seq ([k] ++ load_global_vars_for_expr expr)
 
 -- TODO prove lemma
--- eval expression (specifically the loads only ever )
+-- eval expression (specifically the loads only influence the expression)
 -- prove more lemmas to make sure loads are placed correctly
+-- do I need a small step seantic for this?
 
 notation `v(` n `)`:= expression.tlocal_var n (by refl)
 infixr ` ~+ `:90 := expression.add
@@ -109,12 +110,12 @@ notation `i(` n `)`:= expression.const_int n (by refl)
 
 open expression
 
-def expr_uses (n : string) : Π {t : type}, expression sig t → Prop
+def expr_reads (n : string) : Π {t : type}, expression sig t → Prop
 | t (tlocal_var m _ _) := m = n
 | t (global_var m _ _) := m = n
-| t (add expr₁ expr₂) := expr_uses expr₁ ∨ expr_uses expr₂
+| t (add expr₁ expr₂) := expr_reads expr₁ ∨ expr_reads expr₂
 | t (const_int _ _) := false
-| t (smaller _ a b) := expr_uses a ∨ expr_uses b
+| t (smaller _ a b) := expr_reads a ∨ expr_reads b
 
 inductive mclk (sig : signature)
 | tlocal_assign (n : string) : (expression sig (type_of (sig n))) → mclk
@@ -128,6 +129,15 @@ infixr ` ;; `:90 := mclk.seq
 
 open mclk
 
+def mclk_reads (n : string) : mclk sig → Prop
+| (tlocal_assign _ expr) := expr_reads n expr
+| (global_assign _ expr) := expr_reads n expr
+| (seq k₁ k₂) := mclk_reads k₁ ∨ mclk_reads k₂
+| (for _ _ init c inc body) := expr_reads n init ∨ expr_reads n c ∨ mclk_reads inc ∨ mclk_reads body
+| (skip _) := false
+
+--lemma mclk_expr_reads (k) : mclk_reads n k → ∃ expr, (expr_reads n expr ∧ subexpr expr k)
+
 def mclk_to_kernel {sig : signature} : mclk sig → kernel (state sig) (λ n, sig.lean_type_of n)
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | (skip _) := kernel.compute id
@@ -137,6 +147,62 @@ def mclk_to_kernel {sig : signature} : mclk sig → kernel (state sig) (λ n, si
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
     )
+
+-- if a kernel does not contain a global referencce it must not contain any loads
+example (k : mclk sig) (h : ∀ n, is_global (sig n) → ¬mclk_reads n k) : ∀ sk, subkernel sk (mclk_to_kernel k) → ¬∃ f, sk = (kernel.load f) := begin
+    intros sk hsk hl,
+    cases hl with f hl,
+    subst hl,
+    induction k,
+    {
+        rw mclk_to_kernel at hsk,
+        sorry,
+    }, {
+        rw mclk_to_kernel at hsk,
+        sorry,
+    }, {
+        rw mclk_to_kernel at hsk,
+        rw subkernel at hsk,
+        cases hsk,
+        {
+            sorry, -- trivial but cumbersome
+        }, {
+            cases hsk,
+            {
+                sorry,
+            }, {
+                cases hsk,
+                {
+                    apply k_ih_a,
+                    {
+                        intros n hg hr,
+                        apply h n hg,
+                        left,
+                        exact hr,
+                    }, {
+                        assumption,
+                    }
+                }, {
+                    apply k_ih_a_1,
+                    {
+                        intros n hg hr,
+                        apply h n hg,
+                        right,
+                        exact hr,
+                    }, {
+                        assumption,
+                    }
+                }
+            }
+        }
+    }, {
+        sorry,
+    }, {
+        unfold mclk_to_kernel at hsk,
+        rw subkernel at hsk,
+        contradiction,
+    }
+end
 
 @[reducible]
 def state_assert (sig₁ sig₂ : signature) := Π n₁:ℕ, parlang.state n₁ (state sig₁) (λ n, type_map (sig₁.type_of n)) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (λ n, type_map (sig₂.type_of n)) → vector bool n₂ → Prop
@@ -187,7 +253,7 @@ example {sig : signature} {n} {k₁} {P Q : state_assert sig sig} (h : sig "i" =
     sorry
 end
 
-example {t : type} {n : string} {sig₁ sig₂ : signature} {P Q} {expr} {k₂ : mclk sig₂} (hu : ¬expr_uses n expr)
+example {t : type} {n : string} {sig₁ sig₂ : signature} {P Q} {expr} {k₂ : mclk sig₂} (hu : ¬expr_reads n expr)
 (hr : @mclk_rel sig₁ sig₂ P (tlocal_assign n expr ;; tlocal_assign n expr) k₂ Q) : 
 @mclk_rel sig₁ sig₂ P (tlocal_assign n expr) k₂ Q := begin
     unfold mclk_rel,

@@ -388,6 +388,13 @@ lemma deactivate_threads_complement {f : σ → bool} {ac : vector bool n} {s : 
   sorry,
 end
 
+def subkernel (q : kernel σ τ) : kernel σ τ → Prop
+| (seq k₁ k₂) := k₁ = q ∨ k₂ = q ∨ subkernel k₁ ∨ subkernel k₂
+| (ite c th el) := th = q ∨ el = q ∨ subkernel th ∨ subkernel el
+| (loop c body) := body = q ∨ subkernel body
+| k := k = q
+
+
 /-- Execute a kernel on a global state, i.e. a list of threads -/
 inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ τ → state n σ τ → Prop
 | load (f) (s : state n σ τ) (ac : vector bool n) :
