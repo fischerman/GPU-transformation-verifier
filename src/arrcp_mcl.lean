@@ -1,6 +1,7 @@
 import mcl
 import parlang
 open mcl
+open mcl.mclk
 
 namespace arrcp_mcl
 
@@ -11,7 +12,6 @@ def arrcp₁ : mclp sig := mclp.intro (λ m, 10) (mclk.global_assign "b" (expres
 
 def arrcp₂ : mclp sig := mclp.intro (λ m, 10) (mclk.global_assign "c" (expression.const_int 9 (by refl)))
 
-def d {α : Type} {b : α} (a c : α) := a = b ∧ b = c
 
 example (c) : mclp_to_program arrcp₁ = c := begin
     rw arrcp₁,

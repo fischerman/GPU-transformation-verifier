@@ -60,8 +60,10 @@ state.update name (by rw [eq]; exact val) s
 def state.get' {sig : signature} {t : type} {name : string} (eq : type_of (sig name) = t) (s : state sig) : type_map t :=
 by rw [← eq]; exact s name
 
+-- expression is an inductive family over types
+-- type is called an index
 inductive expression (sig : signature) : type → Type
-| tlocal_var {t} (n : string) (h : type_of (sig n) = t) (h₂ : is_tlocal (sig n)) : expression t
+| tlocal_var {t} (n : string) (idx : list (expression int)) (h : type_of (sig n) = t) (h₂ : is_tlocal (sig n)) : expression t
 | global_var {t} (n : string) (h : type_of (sig n) = t) (h₂ : is_global (sig n)) : expression t
 | add {t} : expression t → expression t → expression t
 | const_int {} {t} (n : ℕ) (h : t = type.int) : expression t
@@ -78,13 +80,62 @@ def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 | float a b := a + b
 | bool a b := a ∧ b
 
+#reduce type.sizeof bool
+#reduce type.sizeof int
+#check type.no_confusion_type
+
+#reduce expression.sizeof (λ_, { scope := scope.tlocal, type := type.int}) int (add (const_int 4 (by refl)) (const_int 5 (by refl)))
+#print expression.sizeof
+
+#check @well_founded.fix
+
+def subterm (q : Σ t : type, expression sig t) : (Σ t : type, expression sig t) → Prop
+| ⟨t, add a b⟩ := subterm ⟨t, a⟩ ∨ subterm ⟨t, b⟩
+| ⟨t, smaller _ a b⟩ := subterm ⟨int, a⟩ ∨ subterm ⟨int, b⟩
+| t := t = q
+
+example : well_founded (subterm) := begin
+    apply well_founded.intro,
+end
+
+@[reducible]
+def expression_size {sig : signature} : Π {t : type}, expression sig t → ℕ
+| t (const_int _ _) := 1
+| t (tlocal_var _ _ _ _) := 1
+| t (global_var _ _ _) := 1
+| t (add a b) := 
+    have a.sizeof sig t < (add a b).sizeof sig t := sorry,
+    have b.sizeof sig t < (add a b).sizeof sig t := sorry,
+    expression_size a + expression_size b
+| t (smaller h a b) := 
+    have a.sizeof sig int < (smaller h a b).sizeof sig t := sorry,
+    have b.sizeof sig int < (smaller h a b).sizeof sig t := sorry,
+    expression_size a + expression_size b
+using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, e⟩, expression.sizeof sig t e)⟩]}
+
+@[simp]
+lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
 
 def eval {sig : signature} : Π {t : type}, state sig → expression sig t → type_map t
-| t s (tlocal_var n h h₂) := (by rw [←h]; exact s n)
+| t s (tlocal_var n idx h h₂) := (by rw [←h]; exact s n)
 | t s (global_var n h h₂) := (by rw[←h]; exact s n) -- requires that the global variable has been loaded into tstate under the same name
 | t s (add a b) := type_map_add (eval s a) (eval s b)
 | t s (const_int n h) := (by rw [h]; exact n)
 | t s (smaller h a b) := (by rw h; exact ((eval s a) < (eval s b)))
+using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, a, e⟩, expression_size e)⟩], 
+/- dec_tac := tactic.interactive.simp [eval._match_1, expression_size] -/ }
+
+example (s : state sig) (t) (a b : expression sig int) (h) : eval._match_1 ⟨int, ⟨s, b⟩⟩ < mcl.eval._match_1 ⟨t, ⟨s, smaller h a b⟩⟩
+:= begin
+    unfold eval._match_1,
+    -- rw expression_size,
+    simp [eval._match_1, expression_size],
+end
+
+#print eval
+#print eval._main
+#print eval._main._pack
+#print mcl.eval._match_1 
 
 def load_global_vars_for_expr {sig : signature} : Π {t : type}, expression sig t → list (kernel (state sig) (λ n, sig.lean_type_of n))
 | t (global_var n h _) := [kernel.load (λ s, ⟨n, λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) v⟩)]
