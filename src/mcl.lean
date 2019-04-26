@@ -27,9 +27,9 @@ def signature := string → variable_def
 variables {sig : signature}
 
 @[reducible]
-def create_signature : list (string × type) → signature
-| [] n := int
-| ((m, t) :: xs) n := if m = n then t else create_signature xs n
+def create_signature : list (string × variable_def) → signature
+| [] n := { scope := scope.tlocal, type := int} -- by default all variables are tlocal int's
+| ((m, v) :: xs) n := if m = n then v else create_signature xs n
 
 @[reducible]
 def type_map : type → Type
@@ -55,7 +55,7 @@ def state.update {sig : signature} (name : string) (val : lean_type_of (sig name
 λn, if h : n = name then by rw [h]; exact val else (s n)
 
 def state.update' {sig : signature} {t : type} {name : string} (eq : type_of (sig name) = t) (val : type_map t) (s : state sig) : state sig :=
-state.update name (by rw [eq]; exact val) s
+state.update name (begin unfold lean_type_of, rw [eq], exact val end) s
 
 def state.get' {sig : signature} {t : type} {name : string} (eq : type_of (sig name) = t) (s : state sig) : type_map t :=
 by rw [← eq]; exact s name
@@ -98,7 +98,7 @@ example : well_founded (subterm) := begin
     apply well_founded.intro,
 end
 
-@[reducible]
+@[reducible, simp] 
 def expression_size {sig : signature} : Π {t : type}, expression sig t → ℕ
 | t (const_int _ _) := 1
 | t (tlocal_var _ _ _ _) := 1
@@ -123,13 +123,13 @@ def eval {sig : signature} : Π {t : type}, state sig → expression sig t → t
 | t s (const_int n h) := (by rw [h]; exact n)
 | t s (smaller h a b) := (by rw h; exact ((eval s a) < (eval s b)))
 using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, a, e⟩, expression_size e)⟩], 
-/- dec_tac := tactic.interactive.simp [eval._match_1, expression_size] -/ }
+/- dec_tac := do tactic.interactive.simp -/ }
 
 example (s : state sig) (t) (a b : expression sig int) (h) : eval._match_1 ⟨int, ⟨s, b⟩⟩ < mcl.eval._match_1 ⟨t, ⟨s, smaller h a b⟩⟩
 := begin
-    unfold eval._match_1,
+    --unfold eval._match_1,
     -- rw expression_size,
-    simp [eval._match_1, expression_size],
+    simp [eval._match_1],
 end
 
 #print eval
@@ -140,7 +140,7 @@ end
 def load_global_vars_for_expr {sig : signature} : Π {t : type}, expression sig t → list (kernel (state sig) (λ n, sig.lean_type_of n))
 | t (global_var n h _) := [kernel.load (λ s, ⟨n, λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) v⟩)]
 | t (add a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
-| t (tlocal_var _ _ _) := []
+| t (tlocal_var _ _ _ _) := []
 | t (const_int _ _) := []
 | t (smaller _ a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
 
@@ -162,7 +162,7 @@ notation `i(` n `)`:= expression.const_int n (by refl)
 open expression
 
 def expr_reads (n : string) : Π {t : type}, expression sig t → Prop
-| t (tlocal_var m _ _) := m = n
+| t (tlocal_var m _ _ _) := m = n
 | t (global_var m _ _) := m = n
 | t (add expr₁ expr₂) := expr_reads expr₁ ∨ expr_reads expr₂
 | t (const_int _ _) := false
