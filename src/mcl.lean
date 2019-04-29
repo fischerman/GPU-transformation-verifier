@@ -13,12 +13,17 @@ inductive type
 
 open type
 
+structure array :=
+(dim : ℕ)
+(sizes : vector ℕ dim)
+(type : type)
+
 inductive scope
 | tlocal
 | global
 
 structure variable_def :=
-(type : type)
+(type : array)
 (scope : scope)
 
 @[reducible]
@@ -28,7 +33,7 @@ variables {sig : signature}
 
 @[reducible]
 def create_signature : list (string × variable_def) → signature
-| [] n := { scope := scope.tlocal, type := int} -- by default all variables are tlocal int's
+| [] n := { scope := scope.tlocal, type := ⟨1, 1 :: vector.nil, int⟩} -- by default all variables are tlocal int's
 | ((m, v) :: xs) n := if m = n then v else create_signature xs n
 
 @[reducible]
@@ -49,21 +54,34 @@ def is_tlocal : variable_def → Prop := λ v, v.scope = scope.tlocal
 def is_global : variable_def → Prop := λ v, v.scope = scope.global
 
 @[reducible]
-def state (sig : signature) : Type := Π n : string, lean_type_of (sig n)
+def state (sig : signature) : Type := Π (n : string) (idx : vector ℕ (sig n).type.dim), lean_type_of (sig n)
 
-def state.update {sig : signature} (name : string) (val : lean_type_of (sig name)) (s : state sig) : state sig :=
-λn, if h : n = name then by rw [h]; exact val else (s n)
+-- type safety is proven given an instance of MCLK (mostly by refl)
+-- the same cannot be done for array indices (we would have to reason about programs)
+-- no out of bound checking
+def state.update {sig : signature} (name : string) (idx : vector ℕ (sig name).type.dim) (val : lean_type_of (sig name)) (s : state sig) : state sig :=
+λn idxq, if h : n = name 
+then by 
+    subst h; 
+    exact (
+        if idx = idxq
+        then  val 
+        else (s n idxq))
+else (s n idxq)
 
-def state.update' {sig : signature} {t : type} {name : string} (eq : type_of (sig name) = t) (val : type_map t) (s : state sig) : state sig :=
-state.update name (begin unfold lean_type_of, rw [eq], exact val end) s
+-- update' only requires proofs
+-- we once define the structure of the proofs and use them everywhere (as a substitute for the identifier)
+-- when we define a program must proofs will be refl
+def state.update' {sig : signature} {t : type} {name : string} {dim : ℕ} {idx : vector ℕ dim} (eq : type_of (sig name) = t) (h : (sig name).type.dim = idx.length) (val : type_map t) (s : state sig) : state sig :=
+state.update name (by rw [h]; exact idx) (begin unfold lean_type_of, rw [eq], exact val end) s
 
-def state.get' {sig : signature} {t : type} {name : string} (eq : type_of (sig name) = t) (s : state sig) : type_map t :=
-by rw [← eq]; exact s name
+def state.get' {sig : signature} {t : type} {name : string} {dim : ℕ} {idx : vector ℕ dim} (eq : type_of (sig name) = t) (h : (sig name).type.dim = idx.length) (s : state sig) : type_map t :=
+by rw [← eq]; rw [vector.length] at h; rw [← h] at idx; exact s name idx
 
 -- expression is an inductive family over types
 -- type is called an index
 inductive expression (sig : signature) : type → Type
-| tlocal_var {t} (n : string) (idx : list (expression int)) (h : type_of (sig n) = t) (h₂ : is_tlocal (sig n)) : expression t
+| tlocal_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_tlocal (sig n)) : expression t
 | global_var {t} (n : string) (h : type_of (sig n) = t) (h₂ : is_global (sig n)) : expression t
 | add {t} : expression t → expression t → expression t
 | const_int {} {t} (n : ℕ) (h : t = type.int) : expression t
@@ -89,6 +107,7 @@ def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 
 #check @well_founded.fix
 
+-- idea: convert expression to something untyped, i.e. stripping t
 def subterm (q : Σ t : type, expression sig t) : (Σ t : type, expression sig t) → Prop
 | ⟨t, add a b⟩ := subterm ⟨t, a⟩ ∨ subterm ⟨t, b⟩
 | ⟨t, smaller _ a b⟩ := subterm ⟨int, a⟩ ∨ subterm ⟨int, b⟩
@@ -116,14 +135,25 @@ using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, e⟩, e
 @[simp]
 lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
 
-def eval {sig : signature} : Π {t : type}, state sig → expression sig t → type_map t
-| t s (tlocal_var n idx h h₂) := (by rw [←h]; exact s n)
-| t s (global_var n h h₂) := (by rw[←h]; exact s n) -- requires that the global variable has been loaded into tstate under the same name
-| t s (add a b) := type_map_add (eval s a) (eval s b)
-| t s (const_int n h) := (by rw [h]; exact n)
-| t s (smaller h a b) := (by rw h; exact ((eval s a) < (eval s b)))
-using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, a, e⟩, expression_size e)⟩], 
+-- should we make this an inductive predicate
+-- it would have implications on parlang
+mutual def eval, eval_vct {sig : signature} (s : state sig)
+with eval  : Π {t : type}, expression sig t → type_map t
+| t (tlocal_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = (eval_vct (vector.of_fn idx)).length, from h₂)
+| t (global_var n h h₂) := (by rw[←h]; exact s n) -- requires that the global variable has been loaded into tstate under the same name
+| t (add a b) := type_map_add (eval a) (eval b)
+| t (const_int n h) := (by rw [h]; exact n)
+| t (smaller h a b) := (by rw h; exact ((eval a) < (eval b)))
+with eval_vct : Π {n : ℕ}, vector (expression sig int) n → vector ℕ n
+| _ v := v.map eval
+using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ args : psum (Σ' {t : type}, expression sig t) (list (expression sig int)), match args with
+    | (psum.inl ⟨t, expr⟩) := expression_size expr
+    | (psum.inr exprs) := exprs.length
+    end)⟩], 
 /- dec_tac := do tactic.interactive.simp -/ }
+
+#print eval
+#print eval._main
 
 example (s : state sig) (t) (a b : expression sig int) (h) : eval._match_1 ⟨int, ⟨s, b⟩⟩ < mcl.eval._match_1 ⟨t, ⟨s, smaller h a b⟩⟩
 := begin
