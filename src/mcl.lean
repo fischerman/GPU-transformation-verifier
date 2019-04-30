@@ -82,7 +82,7 @@ by rw [← eq]; rw [vector.length] at h; rw [← h] at idx; exact s name idx
 -- type is called an index
 inductive expression (sig : signature) : type → Type
 | tlocal_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_tlocal (sig n)) : expression t
-| global_var {t} (n : string) (h : type_of (sig n) = t) (h₂ : is_global (sig n)) : expression t
+| global_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_global (sig n)) : expression t
 | add {t} : expression t → expression t → expression t
 | const_int {} {t} (n : ℕ) (h : t = type.int) : expression t
 | smaller {t} (h : t = type.bool) : expression int → expression int → expression t
@@ -117,13 +117,19 @@ example : well_founded (subterm) := begin
     apply well_founded.intro,
 end
 
+#print expression.sizeof
+
 @[reducible, simp] 
 def expression_size {sig : signature} : Π {t : type}, expression sig t → ℕ
 | t (const_int _ _) := 1
 | t (tlocal_var _ _ _ _) := 1
 | t (global_var _ _ _) := 1
 | t (add a b) := 
-    have a.sizeof sig t < (add a b).sizeof sig t := sorry,
+    have a.sizeof sig t < (add a b).sizeof sig t := begin
+        rw expression.sizeof,
+        simp,
+        
+    end,
     have b.sizeof sig t < (add a b).sizeof sig t := sorry,
     expression_size a + expression_size b
 | t (smaller h a b) := 
@@ -137,20 +143,17 @@ lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
 
 -- should we make this an inductive predicate
 -- it would have implications on parlang
-mutual def eval, eval_vct {sig : signature} (s : state sig)
-with eval  : Π {t : type}, expression sig t → type_map t
-| t (tlocal_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = (eval_vct (vector.of_fn idx)).length, from h₂)
-| t (global_var n h h₂) := (by rw[←h]; exact s n) -- requires that the global variable has been loaded into tstate under the same name
+def eval {sig : signature} (s : state sig) : Π {t : type}, expression sig t → type_map t
+| t (tlocal_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = ((vector.of_fn idx).map eval).length, from h₂)
+| t (global_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = ((vector.of_fn idx).map eval).length, from h₂) -- requires that the global variable has been loaded into tstate under the same name
 | t (add a b) := type_map_add (eval a) (eval b)
 | t (const_int n h) := (by rw [h]; exact n)
 | t (smaller h a b) := (by rw h; exact ((eval a) < (eval b)))
-with eval_vct : Π {n : ℕ}, vector (expression sig int) n → vector ℕ n
-| _ v := v.map eval
-using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ args : psum (Σ' {t : type}, expression sig t) (list (expression sig int)), match args with
-    | (psum.inl ⟨t, expr⟩) := expression_size expr
-    | (psum.inr exprs) := exprs.length
-    end)⟩], 
-/- dec_tac := do tactic.interactive.simp -/ }
+-- using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ args : psum (Σ' {t : type}, expression sig t) (list (expression sig int)), match args with
+--     | (psum.inl ⟨t, expr⟩) := expression_size expr
+--     | (psum.inr exprs) := exprs.length
+--     end)⟩], 
+-- /- dec_tac := do tactic.interactive.simp -/ }
 
 #print eval
 #print eval._main
