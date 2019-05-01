@@ -29,6 +29,7 @@ structure variable_def :=
 @[reducible]
 def signature := string → variable_def
 
+-- todo: make sig parameter (instead of variable). That way I don't have to mention signature anywhere (see section 6.2)
 variables {sig : signature}
 
 @[reducible]
@@ -57,7 +58,8 @@ def is_global : variable_def → Prop := λ v, v.scope = scope.global
 def state (sig : signature) : Type := Π (n : string) (idx : vector ℕ (sig n).type.dim), lean_type_of (sig n)
 
 -- type safety is proven given an instance of MCLK (mostly by refl)
--- the same cannot be done for array indices (we would have to reason about programs)
+-- same is done for the number of array indices
+-- the same cannot be done for array indices values (we would have to reason about programs)
 -- no out of bound checking
 def state.update {sig : signature} (name : string) (idx : vector ℕ (sig name).type.dim) (val : lean_type_of (sig name)) (s : state sig) : state sig :=
 λn idxq, if h : n = name 
@@ -168,19 +170,24 @@ end
 #print eval
 #print eval._main
 #print eval._main._pack
-#print mcl.eval._match_1 
 
-def load_global_vars_for_expr {sig : signature} : Π {t : type}, expression sig t → list (kernel (state sig) (λ n, sig.lean_type_of n))
-| t (global_var n h _) := [kernel.load (λ s, ⟨n, λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) v⟩)]
+-- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
+@[reducible]
+def parlang_mcl_global (sig : signature) := (λ i : string × (list ℕ), sig.lean_type_of i.1)
+@[reducible]
+def parlang_mcl_kernel (sig : signature) := kernel (state sig) (parlang_mcl_global sig)
+
+def load_global_vars_for_expr {sig : signature} : Π {t : type}, expression sig t → list (parlang_mcl_kernel sig)
+| t (global_var n idx h₁ h₂ _) := [kernel.load (λ s, ⟨(n, ((vector.of_fn idx).map (eval s)).to_list), λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = ((vector.of_fn idx).map (eval s)).length, from h₂) v⟩)]
 | t (add a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
-| t (tlocal_var _ _ _ _) := []
+| t (tlocal_var _ _ _ _ _) := []
 | t (const_int _ _) := []
 | t (smaller _ a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
 
-def prepend_load_expr {sig : signature} {t : type} (expr : expression sig t) (k : kernel (state sig) (λ n, sig.lean_type_of n)) :=
+def prepend_load_expr {sig : signature} {t : type} (expr : expression sig t) (k : parlang_mcl_kernel sig) :=
 list_to_kernel_seq (load_global_vars_for_expr expr ++ [k])
 
-def append_load_expr  {sig : signature} {t : type} (expr : expression sig t) (k : kernel (state sig) (λ n, sig.lean_type_of n)) :=
+def append_load_expr  {sig : signature} {t : type} (expr : expression sig t) (k : parlang_mcl_kernel sig) :=
 list_to_kernel_seq ([k] ++ load_global_vars_for_expr expr)
 
 -- TODO prove lemma
@@ -202,8 +209,8 @@ def expr_reads (n : string) : Π {t : type}, expression sig t → Prop
 | t (smaller _ a b) := expr_reads a ∨ expr_reads b
 
 inductive mclk (sig : signature)
-| tlocal_assign (n : string) : (expression sig (type_of (sig n))) → mclk
-| global_assign (n) : (expression sig (type_of (sig n))) → mclk
+| tlocal_assign {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h : (sig n).type.dim = idx.length) : (expression sig (type_of (sig n))) → mclk
+| global_assign {dim : ℕ} (n) (idx : vector (expression sig int) dim) (h : (sig n).type.dim = idx.length) : (expression sig (type_of (sig n))) → mclk
 | seq : mclk → mclk → mclk
 | for (n : string) (h : sig.type_of n = int) :
   expression sig int → expression sig bool → mclk → mclk → mclk
@@ -222,11 +229,11 @@ def mclk_reads (n : string) : mclk sig → Prop
 
 --lemma mclk_expr_reads (k) : mclk_reads n k → ∃ expr, (expr_reads n expr ∧ subexpr expr k)
 
-def mclk_to_kernel {sig : signature} : mclk sig → kernel (state sig) (λ n, sig.lean_type_of n)
+def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | (skip _) := kernel.compute id
-| (tlocal_assign n expr) := prepend_load_expr expr (kernel.compute (λ s : state sig, s.update' (by refl) (eval s expr)))
-| (global_assign n expr) := prepend_load_expr expr (kernel.compute (λ s, s.update' (by refl) (eval s expr))) ;; kernel.store (λ s, ⟨n, s.get' (by refl)⟩)
+| (tlocal_assign n idx h expr) := prepend_load_expr expr (kernel.compute (λ s : state sig, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h) (eval s expr)))
+| (global_assign n idx h expr) := prepend_load_expr expr (kernel.compute (λ s, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h) (eval s expr))) ;; kernel.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h)⟩)
 | (for n h expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' h (eval s expr))) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
