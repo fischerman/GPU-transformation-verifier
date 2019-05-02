@@ -3,6 +3,8 @@ import parlang
 import rel_hoare
 open parlang
 
+notation `[` v:(foldr `, ` (h t, vector.cons h t) vector.nil `]`) := v
+
 namespace mcl
 variables {n : ℕ}
 
@@ -44,14 +46,16 @@ def type_map : type → Type
 | bool := bool
 
 @[reducible]
-def type_of : variable_def → type := λ v, v.type
+def type_of : variable_def → type := λ v, v.type.type
 @[reducible]
 def lean_type_of : variable_def → Type := λ v, type_map (type_of v)
 @[reducible]
 def signature.type_of (n : string) (sig :signature) := type_of (sig n)
 @[reducible]
 def signature.lean_type_of (n : string) (sig : signature) := lean_type_of (sig n)
-def is_tlocal : variable_def → Prop := λ v, v.scope = scope.tlocal
+@[reducible]
+def is_tlocal (v : variable_def) := v.scope = scope.tlocal
+@[reducible]
 def is_global : variable_def → Prop := λ v, v.scope = scope.global
 
 @[reducible]
@@ -87,13 +91,14 @@ inductive expression (sig : signature) : type → Type
 | global_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_global (sig n)) : expression t
 | add {t} : expression t → expression t → expression t
 | const_int {} {t} (n : ℕ) (h : t = type.int) : expression t
-| smaller {t} (h : t = type.bool) : expression int → expression int → expression t
+| lt {t} (h : t = type.bool) : expression int → expression int → expression t
 
 open expression
 
 instance (t : type) : has_add (expression sig t) := ⟨expression.add⟩
 instance : has_zero (expression sig int) := ⟨expression.const_int 0 rfl⟩
 instance : has_one (expression sig int) := ⟨expression.const_int 1 rfl⟩
+infix < := expression.lt (show type.bool = type.bool, by refl)
 
 def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 | int a b := a + b
@@ -112,7 +117,7 @@ def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 -- idea: convert expression to something untyped, i.e. stripping t
 def subterm (q : Σ t : type, expression sig t) : (Σ t : type, expression sig t) → Prop
 | ⟨t, add a b⟩ := subterm ⟨t, a⟩ ∨ subterm ⟨t, b⟩
-| ⟨t, smaller _ a b⟩ := subterm ⟨int, a⟩ ∨ subterm ⟨int, b⟩
+| ⟨t, lt _ a b⟩ := subterm ⟨int, a⟩ ∨ subterm ⟨int, b⟩
 | t := t = q
 
 example : well_founded (subterm) := begin
@@ -134,9 +139,9 @@ def expression_size {sig : signature} : Π {t : type}, expression sig t → ℕ
     end,
     have b.sizeof sig t < (add a b).sizeof sig t := sorry,
     expression_size a + expression_size b
-| t (smaller h a b) := 
-    have a.sizeof sig int < (smaller h a b).sizeof sig t := sorry,
-    have b.sizeof sig int < (smaller h a b).sizeof sig t := sorry,
+| t (lt h a b) := 
+    have a.sizeof sig int < (lt h a b).sizeof sig t := sorry,
+    have b.sizeof sig int < (lt h a b).sizeof sig t := sorry,
     expression_size a + expression_size b
 using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, e⟩, expression.sizeof sig t e)⟩]}
 
@@ -150,7 +155,7 @@ def eval {sig : signature} (s : state sig) : Π {t : type}, expression sig t →
 | t (global_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = ((vector.of_fn idx).map eval).length, from h₂) -- requires that the global variable has been loaded into tstate under the same name
 | t (add a b) := type_map_add (eval a) (eval b)
 | t (const_int n h) := (by rw [h]; exact n)
-| t (smaller h a b) := (by rw h; exact ((eval a) < (eval b)))
+| t (lt h a b) := (by rw h; exact ((eval a) < (eval b)))
 -- using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ args : psum (Σ' {t : type}, expression sig t) (list (expression sig int)), match args with
 --     | (psum.inl ⟨t, expr⟩) := expression_size expr
 --     | (psum.inr exprs) := exprs.length
@@ -160,7 +165,7 @@ def eval {sig : signature} (s : state sig) : Π {t : type}, expression sig t →
 #print eval
 #print eval._main
 
-example (s : state sig) (t) (a b : expression sig int) (h) : eval._match_1 ⟨int, ⟨s, b⟩⟩ < mcl.eval._match_1 ⟨t, ⟨s, smaller h a b⟩⟩
+example (s : state sig) (t) (a b : expression sig int) (h) : eval._match_1 ⟨int, ⟨s, b⟩⟩ < mcl.eval._match_1 ⟨t, ⟨s, lt h a b⟩⟩
 := begin
     --unfold eval._match_1,
     -- rw expression_size,
@@ -182,7 +187,7 @@ def load_global_vars_for_expr {sig : signature} : Π {t : type}, expression sig 
 | t (add a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
 | t (tlocal_var _ _ _ _ _) := []
 | t (const_int _ _) := []
-| t (smaller _ a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
+| t (lt _ a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
 
 def prepend_load_expr {sig : signature} {t : type} (expr : expression sig t) (k : parlang_mcl_kernel sig) :=
 list_to_kernel_seq (load_global_vars_for_expr expr ++ [k])
@@ -206,7 +211,7 @@ def expr_reads (n : string) : Π {t : type}, expression sig t → Prop
 | t (global_var m _ _) := m = n
 | t (add expr₁ expr₂) := expr_reads expr₁ ∨ expr_reads expr₂
 | t (const_int _ _) := false
-| t (smaller _ a b) := expr_reads a ∨ expr_reads b
+| t (lt _ a b) := expr_reads a ∨ expr_reads b
 
 inductive mclk (sig : signature)
 | tlocal_assign {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h : (sig n).type.dim = idx.length) : (expression sig (type_of (sig n))) → mclk
@@ -214,7 +219,7 @@ inductive mclk (sig : signature)
 | seq : mclk → mclk → mclk
 | for (n : string) (h : sig.type_of n = int) :
   expression sig int → expression sig bool → mclk → mclk → mclk
-| skip : mclk
+| skip {} : mclk
 
 infixr ` ;; `:90 := mclk.seq
 
@@ -330,8 +335,10 @@ end tactic.interactive
 
 namespace mcl
 
+def empty_state {sig : signature} : state sig := λ name idx, 0
+
 -- we need an assumption on the signature, i.e. tid must be int
-def mcl_init {sig : signature} : ℕ → state sig := λ n : ℕ, λ name, if name = "tid" then n else 0
+def mcl_init {sig : signature} : ℕ → state sig := λ n : ℕ, empty_state.update' (show type_of (sig "tid") = type.int, by sorry) (show (sig "tid").type.dim = ([1] : vector ℕ 1).length, by sorry) n
 
 def mclp_rel {sig₁ sig₂ : signature} (P) (p₁ : mclp sig₁) (p₂ : mclp sig₂) (Q) := rel_hoare_program mcl_init mcl_init P (mclp_to_program p₁) (mclp_to_program p₂) Q
 
