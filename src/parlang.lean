@@ -746,7 +746,7 @@ meta def kernel.repr : kernel σ τ → string
 | (a ;; b) := kernel.repr a ++ " ;;\n" ++ kernel.repr b
 | (sync) := "sync"
 | (ite _ th el) := "if () {\n" ++ kernel.repr th ++ "\n} else {\n" ++ kernel.repr el ++ "\n}"
-| (loop c body) := "loop (...) {" ++ kernel.repr body ++ "\n}"
+| (loop c body) := "loop (...) {\n" ++ kernel.repr body ++ "\n}"
 
 -- instance kernel_repr_class : has_repr (kernel σ τ) := ⟨kernel.repr⟩
 
