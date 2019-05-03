@@ -387,4 +387,30 @@ example {t : type} {n : string} {sig₁ sig₂ : signature} {P Q} {expr} {k₂ :
     }
 end
 
+lemma rel_mclk_to_mclp {sig₁ sig₂ : signature} (f₁ : memory (parlang_mcl_global sig₁) → ℕ) (f₂ : memory (parlang_mcl_global sig₂) → ℕ)
+(P Q : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop)
+(k₁ : mclk sig₁) (k₂ : mclk sig₂) (h : mclk_rel 
+(λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ n₁ = f₁ m₁ ∧ n₂ = f₂ m₂ ∧
+ (∀ i : fin n₁, s₁.threads.nth i = { tlocal := mcl_init i, global := m₁, stores := ∅, loads := ∅ }) ∧ 
+ (∀ i : fin n₂, s₂.threads.nth i = { tlocal := mcl_init i, global := m₂, stores := ∅, loads := ∅ }) ∧
+ P m₁ m₂ ∧ all_threads_active ac₁ ∧ all_threads_active ac₂) 
+    k₁ k₂ 
+(λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂)) : 
+mclp_rel P (mclp.intro f₁ k₁) (mclp.intro f₂ k₂) Q := begin
+    unfold mclp_rel,
+    apply rel_kernel_to_program,
+    unfold mclk_rel at h,
+    assumption,
+end
+
+lemma assign_swap {sig : signature} {t : type} (n₁ n₂) (dim₁ dim₂) (idx₁ : vector (expression sig type.int) dim₁) (idx₂ : vector (expression sig type.int) dim₂) (h₁ h₂) (expr₁ : expression sig (type_of (sig n₁))) (expr₂ : expression sig (type_of (sig n₂))) (q) (ac : vector _ q) (s u) : 
+exec_state (mclk_to_kernel ((global_assign n₁ idx₁ h₁ expr₁) ;; global_assign n₂ idx₂ h₂ expr₂)) ac s u →
+exec_state (mclk_to_kernel ((global_assign n₂ idx₂ h₂ expr₂) ;; (global_assign n₁ idx₁ h₁ expr₁))) ac s u := begin
+    intro h,
+    cases h,
+    apply exec_state.seq,
+end
+
+--lemma rel_assign_swap {sig₁ sig₂ : signature} 
+
 end mcl

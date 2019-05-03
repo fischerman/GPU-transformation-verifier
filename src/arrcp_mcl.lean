@@ -62,7 +62,7 @@ meta def num_args : expr → nat
 #eval parlang.expr.repr `(X)
 
 example : mclp_rel eq arrcp₁ arrcp₂ eq := begin
-    
+    apply rel_mclk_to_mclp,
 end
 
 end arrcp_mcl
