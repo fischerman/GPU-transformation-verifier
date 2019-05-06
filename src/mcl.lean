@@ -120,11 +120,19 @@ with expression : type → Type
 with type_safe_access : type → Type
 | mk {dim : ℕ} {t} {s : scope} (n : string) (idx : fin dim → (expression int)) (h : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : (sig n).scope = s) : type_safe_access t
 
+open type_safe_access
+
 def a : type_safe_access sig type.int := (type_safe_access.mk "n" (λ i : fin 0, sorry) sorry sorry sorry)
 
 -- use list to avoid dependent types
 -- maybe we have to use state.get' in eval to avoid the use of pi in type_safe_access
 -- or do mutual definition manually
+
+def type_safe_access.dim {t sig} : type_safe_access sig t → ℕ
+| (@type_safe_access.mk _ dim _ _ _ _ _ _ _) := dim
+
+def type_safe_access.name {t sig} : type_safe_access sig t → string
+| (type_safe_access.mk name _ _ _ _) := name
 
 def type_safe_access.h {t s sig n dim} : type_safe_access sig t → (type_of (sig n) = t)
 | (type_safe_access.mk _ _ h _ _) := h
@@ -132,8 +140,8 @@ def type_safe_access.h {t s sig n dim} : type_safe_access sig t → (type_of (si
 def type_safe_access.h₂ {t s sig n dim} : type_safe_access sig n t s dim → ((sig n).type.dim = dim)
 | (type_safe_access.mk _ _ _ h₂ _) := h₂
 
-def type_safe_access.idx {t s sig n dim} : type_safe_access sig n t s dim → (fin dim → (expression sig int))
-| (type_safe_access.mk _ idx _ _ _) := idx
+def type_safe_access.idx {t sig} : type_safe_access sig t → Σ dim, (fin dim → (expression sig int))
+| (@type_safe_access.mk _ dim _ _ _ idx _ _ _) := ⟨dim, idx⟩
 
 structure tr :=
 (x : ℕ)
@@ -217,8 +225,9 @@ with state.get'' : Π {t : type}, type_safe_access sig t → type_map t
 -- /- dec_tac := do tactic.interactive.simp -/ }
 
 -- this function evaluates expressions to indices
-def state.update'' {sig : signature} {t : type} {s} {name : string} {dim : ℕ} (v : type_safe_access sig name t s dim) (val : type_map t) (s : state sig) : state sig :=
-state.update' ((vector.of_fn (v.idx)).map (eval s)) v.h v.h₂ val s
+def state.update'' {sig : signature} {t : type} (v : type_safe_access sig t) (val : type_map t) (s : state sig) : state sig := match v with
+| (mk n idx h h₂ h₃) := state.update' ((vector.of_fn (idx)).map (eval s)) h h₂ val s
+end
 
 -- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
 @[reducible]
@@ -263,16 +272,15 @@ end
 -- do I need a small step seantic for this?
 
 def expr_reads (n : string) : Π {t : type}, expression sig t → Prop
-| t (tlocal_var m _ _ _ _) := m = n
-| t (global_var m _ _ _ _) := m = n
+| t (var (mk m _ _ _ _)) := m = n
 | t (add expr₁ expr₂) := expr_reads expr₁ ∨ expr_reads expr₂
 | t (const_int _ _) := false
 | t (lt _ a b) := expr_reads a ∨ expr_reads b
 
 inductive mclk (sig : signature)
-| assign {dim : ℕ} {t s} (v : type_safe_access sig t s dim) : (expression sig t) → mclk
+| assign {t} (v : type_safe_access sig t) : (expression sig t) → mclk
 | seq : mclk → mclk → mclk
-| for {t s dim} (v : type_safe_access sig t s dim) (h₂ : dim = 1) :
+| for {t} (v : type_safe_access sig t) (h₂ : v.dim = 1) :
   expression sig int → expression sig bool → mclk → mclk → mclk
 | skip {} : mclk
 
@@ -281,10 +289,9 @@ infixr ` ;; `:90 := mclk.seq
 open mclk
 
 def mclk_reads (n : string) : mclk sig → Prop
-| (tlocal_assign _ idx _ expr) := expr_reads n expr -- todo add idx in usages
-| (global_assign _ idx _ expr) := expr_reads n expr
+| (assign (mk _ _ _ _ _) expr) := expr_reads n expr -- todo add idx in usages
 | (seq k₁ k₂) := mclk_reads k₁ ∨ mclk_reads k₂
-| (for _ _ _ init c inc body) := expr_reads n init ∨ expr_reads n c ∨ mclk_reads inc ∨ mclk_reads body
+| (for (mk _ _ _ _ _) h init c inc body) := expr_reads n init ∨ expr_reads n c ∨ mclk_reads inc ∨ mclk_reads body
 | (skip) := false
 
 --lemma mclk_expr_reads (k) : mclk_reads n k → ∃ expr, (expr_reads n expr ∧ subexpr expr k)
@@ -292,8 +299,8 @@ def mclk_reads (n : string) : mclk sig → Prop
 def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | (skip) := kernel.compute id
-| (assign a) := prepend_load_expr expr (kernel.compute (λ s, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h) (eval s expr))) ;; kernel.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h)⟩)
-| (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' h (show (sig n).type.dim = (([0] : vector (expression sig int) _).map (eval s)).length, from h₂) (eval s expr))) ;; 
+| (assign v expr) := prepend_load_expr expr (kernel.compute (λ s, s.update'' v (eval s expr))) ;; kernel.store (λ s, ⟨(n, ((vector.of_fn v.idx.snd).map (eval s)).to_list), s.get' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h)⟩)
+| (for (mk _ _ _ _ _) h expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' h (show (sig n).type.dim = (([0] : vector (expression sig int) _).map (eval s)).length, from h₂) (eval s expr))) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
     )
