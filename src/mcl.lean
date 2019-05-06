@@ -299,7 +299,7 @@ def mclk_reads (n : string) : mclk sig → Prop
 def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | (skip) := kernel.compute id
-| (assign v expr) := prepend_load_expr expr (kernel.compute (λ s, s.update'' v (eval s expr))) ;; kernel.store (λ s, ⟨(n, ((vector.of_fn v.idx.snd).map (eval s)).to_list), s.get' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h)⟩)
+| (assign v expr) := prepend_load_expr expr (kernel.compute (λ s, s.update'' v (eval s expr))) ;; kernel.store (λ s, ⟨(v.name, ((vector.of_fn v.idx.snd).map (eval s)).to_list), s.get'' v⟩)
 | (for (mk _ _ _ _ _) h expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' h (show (sig n).type.dim = (([0] : vector (expression sig int) _).map (eval s)).length, from h₂) (eval s expr))) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
