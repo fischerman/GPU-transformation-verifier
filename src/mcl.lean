@@ -88,20 +88,58 @@ else (s n idxq)
 -- update' only requires proofs
 -- we once define the structure of the proofs and use them everywhere (as a substitute for the identifier)
 -- when we define a program must proofs will be refl
-def state.update' {sig : signature} {t : type} {name : string} {dim : ℕ} {idx : vector ℕ dim} (eq : type_of (sig name) = t) (h : (sig name).type.dim = idx.length) (val : type_map t) (s : state sig) : state sig :=
+def state.update' {sig : signature} {t : type} {name : string} {dim : ℕ} (idx : vector ℕ dim) (eq : type_of (sig name) = t) (h : (sig name).type.dim = idx.length) (val : type_map t) (s : state sig) : state sig :=
 state.update name (by rw [h]; exact idx) (begin unfold lean_type_of, rw [eq], exact val end) s
 
-def state.get' {sig : signature} {t : type} {name : string} {dim : ℕ} {idx : vector ℕ dim} (eq : type_of (sig name) = t) (h : (sig name).type.dim = idx.length) (s : state sig) : type_map t :=
+def state.get' {sig : signature} {t : type} {name : string} {dim : ℕ} (idx : vector ℕ dim) (eq : type_of (sig name) = t) (h : (sig name).type.dim = idx.length) (s : state sig) : type_map t :=
 by rw [← eq]; rw [vector.length] at h; rw [← h] at idx; exact s name idx
+
+-- can the structure contain both global and local refernces?
+-- include array indices,and if so expresssion or ℕ?
+-- n
+-- t
+-- dim
+-- idx: fim dim → (expression int)
+-- type_of (sig n) = t
+-- (sig n).type.dim = dim
+
+-- structure type_safe_access :=
+-- {dim : ℕ}
+-- (n : string)
+-- (idx : fin dim → (expression int))
+-- (t : type)
 
 -- expression is an inductive family over types
 -- type is called an index
-inductive expression (sig : signature) : type → Type
-| tlocal_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_tlocal (sig n)) : expression t
-| global_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_global (sig n)) : expression t
+mutual inductive expression, type_safe_access (sig : signature) 
+with expression : type → Type
+| var {t} (a : type_safe_access t) : expression t
 | add {t} : expression t → expression t → expression t
 | const_int {} {t} (n : ℕ) (h : t = type.int) : expression t
 | lt {t} (h : t = type.bool) : expression int → expression int → expression t
+with type_safe_access : type → Type
+| mk {dim : ℕ} {t} {s : scope} (n : string) (idx : fin dim → (expression int)) (h : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : (sig n).scope = s) : type_safe_access t
+
+def a : type_safe_access sig type.int := (type_safe_access.mk "n" (λ i : fin 0, sorry) sorry sorry sorry)
+
+-- use list to avoid dependent types
+-- maybe we have to use state.get' in eval to avoid the use of pi in type_safe_access
+-- or do mutual definition manually
+
+def type_safe_access.h {t s sig n dim} : type_safe_access sig t → (type_of (sig n) = t)
+| (type_safe_access.mk _ _ h _ _) := h
+
+def type_safe_access.h₂ {t s sig n dim} : type_safe_access sig n t s dim → ((sig n).type.dim = dim)
+| (type_safe_access.mk _ _ _ h₂ _) := h₂
+
+def type_safe_access.idx {t s sig n dim} : type_safe_access sig n t s dim → (fin dim → (expression sig int))
+| (type_safe_access.mk _ idx _ _ _) := idx
+
+structure tr :=
+(x : ℕ)
+
+#print tr
+#print tr.x
 
 open expression
 
@@ -163,18 +201,24 @@ lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
 
 -- should we make this an inductive predicate
 -- it would have implications on parlang
-def eval {sig : signature} (s : state sig) : Π {t : type}, expression sig t → type_map t
-| t (tlocal_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = ((vector.of_fn idx).map eval).length, from h₂)
-| t (global_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = ((vector.of_fn idx).map eval).length, from h₂) -- requires that the global variable has been loaded into tstate under the same name
+mutual def eval, state.get'' {sig : signature} (s : state sig) 
+with eval : Π {t : type}, expression sig t → type_map t
+| t (var a) := state.get'' a
+--| t (global_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = ((vector.of_fn idx).map eval).length, from h₂) -- requires that the global variable has been loaded into tstate under the same name
 | t (add a b) := type_map_add (eval a) (eval b)
 | t (const_int n h) := (by rw [h]; exact n)
 | t (lt h a b) := (by rw h; exact ((eval a) < (eval b)))
+with state.get'' : Π {t : type}, type_safe_access sig t → type_map t 
+| t (type_safe_access.mk n idx h h₂ h₃) := state.get' ((vector.of_fn (idx)).map eval) h h₂ s
 -- using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ args : psum (Σ' {t : type}, expression sig t) (list (expression sig int)), match args with
 --     | (psum.inl ⟨t, expr⟩) := expression_size expr
 --     | (psum.inr exprs) := exprs.length
 --     end)⟩], 
 -- /- dec_tac := do tactic.interactive.simp -/ }
 
+-- this function evaluates expressions to indices
+def state.update'' {sig : signature} {t : type} {s} {name : string} {dim : ℕ} (v : type_safe_access sig name t s dim) (val : type_map t) (s : state sig) : state sig :=
+state.update' ((vector.of_fn (v.idx)).map (eval s)) v.h v.h₂ val s
 
 -- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
 @[reducible]
@@ -226,10 +270,9 @@ def expr_reads (n : string) : Π {t : type}, expression sig t → Prop
 | t (lt _ a b) := expr_reads a ∨ expr_reads b
 
 inductive mclk (sig : signature)
-| tlocal_assign {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h : (sig n).type.dim = idx.length) : (expression sig (type_of (sig n))) → mclk
-| global_assign {dim : ℕ} (n) (idx : vector (expression sig int) dim) (h : (sig n).type.dim = idx.length) : (expression sig (type_of (sig n))) → mclk
+| assign {dim : ℕ} {t s} (v : type_safe_access sig t s dim) : (expression sig t) → mclk
 | seq : mclk → mclk → mclk
-| for (n : string) (h : sig.type_of n = int) (h₂ : (sig n).type.dim = 1) :
+| for {t s dim} (v : type_safe_access sig t s dim) (h₂ : dim = 1) :
   expression sig int → expression sig bool → mclk → mclk → mclk
 | skip {} : mclk
 
@@ -249,8 +292,7 @@ def mclk_reads (n : string) : mclk sig → Prop
 def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | (skip) := kernel.compute id
-| (tlocal_assign n idx h expr) := prepend_load_expr expr (kernel.compute (λ s : state sig, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h) (eval s expr)))
-| (global_assign n idx h expr) := prepend_load_expr expr (kernel.compute (λ s, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h) (eval s expr))) ;; kernel.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h)⟩)
+| (assign a) := prepend_load_expr expr (kernel.compute (λ s, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h) (eval s expr))) ;; kernel.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h)⟩)
 | (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' h (show (sig n).type.dim = (([0] : vector (expression sig int) _).map (eval s)).length, from h₂) (eval s expr))) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
