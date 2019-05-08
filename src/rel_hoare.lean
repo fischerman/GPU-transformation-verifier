@@ -157,4 +157,26 @@ lemma single_step_left {P Q f} {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ 
     exact hek₁_a_1,
 end
 
+
+-- intuition of the proof (to be repurposed by further proofs):
+-- we get the intermediate state of after k₁ by cases
+-- from h₁ we get state after k₂
+-- from h₂ we get state after k₂'
+lemma seq {P R} {k₁ k₁' : kernel σ₁ τ₁} {k₂ k₂' : kernel σ₂ τ₂} (Q)
+    (h₁ : {* P *} k₁ ~ k₂ {* Q *})
+    (h₂ : {* Q *} k₁' ~ k₂' {* R *}) :
+    {* P *} (k₁ ;; k₁') ~ (k₂ ;; k₂') {* R *} := begin
+        intros _ _ _ _ _ _ _ hp hek₁k₁',
+        cases hek₁k₁',
+        specialize h₁ n₁ n₂ s₁ hek₁k₁'_t s₂ ac₁ ac₂ hp hek₁k₁'_a,
+        cases h₁ with t₂,
+        cases h₁_h with hek₂ hq,
+        specialize h₂ n₁ n₂ hek₁k₁'_t _ t₂ ac₁ ac₂ hq hek₁k₁'_a_1,
+        cases h₂ with s₂',
+        apply exists.intro s₂',
+        apply and.intro,
+        apply exec_state.seq _ _ _ _ _ _ hek₂ (h₂_h.left),
+        exact h₂_h.right,
+end
+
 end parlang
