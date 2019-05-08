@@ -225,9 +225,11 @@ def expr_reads (n : string) : Π {t : type}, expression sig t → Prop
 | t (const_int _ _) := false
 | t (lt _ a b) := expr_reads a ∨ expr_reads b
 
+-- TODO variable assign constructors should include global and local proof
+-- expression sig (type_of (sig n)) is not definitionally equal if sig is not computable
 inductive mclk (sig : signature)
-| tlocal_assign {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h : (sig n).type.dim = idx.length) : (expression sig (type_of (sig n))) → mclk
-| global_assign {dim : ℕ} (n) (idx : vector (expression sig int) dim) (h : (sig n).type.dim = idx.length) : (expression sig (type_of (sig n))) → mclk
+| tlocal_assign {t : type} {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = idx.length) : (expression sig t) → mclk
+| global_assign {t : type} {dim : ℕ} (n) (idx : vector (expression sig int) dim) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = idx.length) : (expression sig t) → mclk
 | seq : mclk → mclk → mclk
 | for (n : string) (h : sig.type_of n = int) (h₂ : (sig n).type.dim = 1) :
   expression sig int → expression sig bool → mclk → mclk → mclk
@@ -249,8 +251,8 @@ def mclk_reads (n : string) : mclk sig → Prop
 def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | (skip) := kernel.compute id
-| (tlocal_assign n idx h expr) := prepend_load_expr expr (kernel.compute (λ s : state sig, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h) (eval s expr)))
-| (global_assign n idx h expr) := prepend_load_expr expr (kernel.compute (λ s, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h) (eval s expr))) ;; kernel.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = (idx.map (eval s)).length, from h)⟩)
+| (tlocal_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s : state sig, s.update' h₁ (show (sig n).type.dim = (idx.map (eval s)).length, from h₂) (eval s expr)))
+| (global_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update' h₁ (show (sig n).type.dim = (idx.map (eval s)).length, from h₂) (eval s expr))) ;; kernel.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig n).type.dim = (idx.map (eval s)).length, from h₂)⟩)
 | (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' h (show (sig n).type.dim = (([0] : vector (expression sig int) _).map (eval s)).length, from h₂) (eval s expr))) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
@@ -403,14 +405,75 @@ mclp_rel P (mclp.intro f₁ k₁) (mclp.intro f₂ k₂) Q := begin
     assumption,
 end
 
+set_option trace.check true
+
 lemma assign_swap {sig : signature} {t : type} (n₁ n₂) (dim₁ dim₂) (idx₁ : vector (expression sig type.int) dim₁) (idx₂ : vector (expression sig type.int) dim₂) (h₁ h₂) (expr₁ : expression sig (type_of (sig n₁))) (expr₂ : expression sig (type_of (sig n₂))) (q) (ac : vector _ q) (s u) : 
-exec_state (mclk_to_kernel ((global_assign n₁ idx₁ h₁ expr₁) ;; global_assign n₂ idx₂ h₂ expr₂)) ac s u →
-exec_state (mclk_to_kernel ((global_assign n₂ idx₂ h₂ expr₂) ;; (global_assign n₁ idx₁ h₁ expr₁))) ac s u := begin
+exec_state (mclk_to_kernel ((tlocal_assign n₁ idx₁ h₁ expr₁) ;; tlocal_assign n₂ idx₂ h₂ expr₂)) ac s u →
+exec_state (mclk_to_kernel ((tlocal_assign n₂ idx₂ h₂ expr₂) ;; (tlocal_assign n₁ idx₁ h₁ expr₁))) ac s u := begin
     intro h,
     cases h,
+    rename h_t t,
+    rename h_a hl,
+    rename h_a_1 hr,
+    -- break out the compute and replace it with skip
     apply exec_state.seq,
+    {
+
+    }
 end
 
+--todo define interference (maybe choose another name) and define swap on non-interference
 --lemma rel_assign_swap {sig₁ sig₂ : signature} 
+
+lemma add_skip_left {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q → mclk_rel P (skip ;; k₁) (k₂) Q := begin
+    unfold mclk_rel,
+    intro h,
+    intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
+    apply h,
+    exact hp,
+    cases he₁,
+    cases he₁_a,
+    sorry --trivial
+end
+
+lemma add_skip_right {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q → mclk_rel P ( k₁) ( skip ;; k₂) Q := sorry
+
+variables {sig₁ sig₂ : signature} {k₁ : mclk sig₁} {k₂ : mclk sig₂} {P Q : Π n₁:ℕ, parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂) → vector bool n₂ → Prop}
+
+@[irreducible]
+def exprs_to_indices {sig : signature} {n dim} {idx : vector (expression sig type.int) dim} (h : ((sig n).type).dim = vector.length idx) (s : state sig) : 
+(sig n).type.dim = (idx.map (eval s)).length := h
+
+-- to make use of this rule neither the pre- nor the post-condition should reason with the ghost variables
+lemma assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
+(hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ (s₁.map_active_threads ac₁ (λ ts, ts.map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₁ n₂ s₂ ac₂) : 
+mclk_rel P (tlocal_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
+    unfold mclk_rel,
+    intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
+    apply exists.intro s₂,
+    apply and.intro,
+    {
+        sorry,
+    },
+    {
+        rw mclk_to_kernel at he₁,
+        induction (expr),
+        case mcl.expression.tlocal_var {
+            cases he₁,
+            apply hi,
+            exact hp,
+        },
+        case mcl.expression.global_var {
+            cases he₁,
+            cases he₁_a_1,
+            apply hi,
+            -- problem here: if Q reasons about ghost variables
+            sorry
+        },
+        case mcl.expression.add {
+            apply expr_ih_a,
+        }
+    }
+end
 
 end mcl
