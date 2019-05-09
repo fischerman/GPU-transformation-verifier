@@ -436,15 +436,23 @@ lemma add_skip_left {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂
     sorry --trivial
 end
 
-lemma add_skip_right {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q → mclk_rel P ( k₁) ( skip ;; k₂) Q := sorry
+lemma skip_right {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q ↔ mclk_rel P ( k₁) ( skip ;; k₂) Q := sorry
 
-variables {sig₁ sig₂ : signature} {k₁ : mclk sig₁} {k₂ : mclk sig₂} {P Q : Π n₁:ℕ, parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂) → vector bool n₂ → Prop}
+variables {sig₁ sig₂ : signature} {k₁ k₁' : mclk sig₁} {k₂ k₂' : mclk sig₂} {P Q R : Π n₁:ℕ, parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂) → vector bool n₂ → Prop}
 
 @[irreducible]
 def exprs_to_indices {sig : signature} {n dim} {idx : vector (expression sig type.int) dim} (h : ((sig n).type).dim = vector.length idx) (s : state sig) : 
 (sig n).type.dim = (idx.map (eval s)).length := h
 
 open expression
+
+example : (k₁ ;; k₁ ;; k₁) = (k₁ ;; (k₁ ;; k₁)) := by refl
+
+lemma seq {P R} (Q) (h₁ : mclk_rel P k₁ k₂ Q) (h₂ : mclk_rel Q k₁' k₂' R) :
+mclk_rel P (k₁ ;; k₁') (k₂ ;; k₂') R := parlang.seq Q h₁ h₂
+
+lemma seq_left {P R} (Q) (h₁ : mclk_rel P k₁ skip Q) (h₂ : mclk_rel Q k₁' k₂' R) :
+mclk_rel P (k₁ ;; k₁') k₂' R := skip_right.mpr (seq Q h₁ h₂)
 
 -- this modification can be jumped over if you are querying a local variable
 -- todo relate to load_global_vars_for_expr
@@ -514,7 +522,7 @@ def g := λ(n : nat), n + 1
 #eval (f ∘ g) 4
 
 -- to make use of this rule neither the pre- nor the post-condition should reason with the ghost variables
-lemma assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
+lemma tlocal_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
 (hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ (s₁.map_active_threads ac₁ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₁ n₂ s₂ ac₂) : 
 mclk_rel P (tlocal_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
     unfold mclk_rel,
@@ -539,10 +547,36 @@ mclk_rel P (tlocal_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
 end
 
 -- we require a symmetric rule
-lemma assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} 
+lemma tlocal_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} 
 (hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ s₁ ac₁ n₂ (s₂.map_active_threads ac₂ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₂) : 
 mclk_rel P (skip : mclk sig₁) (tlocal_assign n idx h₁ h₂ expr) Q := begin
 
+end
+
+-- todo: can the local proof be repurposed
+lemma global_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
+(hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ (s₁.map_active_threads ac₁ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₁ n₂ s₂ ac₂) : 
+mclk_rel P (global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
+    unfold mclk_rel,
+    intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
+    apply exists.intro s₂,
+    apply and.intro,
+    {
+        sorry, -- trivial
+    }, {
+        rw mclk_to_kernel at he₁,
+        suffices : s₁' = _,
+        subst this,
+        exact hi n₁ s₁ ac₁ n₂ s₂ ac₂ hp,
+        rw prepend_load_expr at he₁,
+        cases he₁,
+        rw kernel_foldr_skip at he₁_a,
+        cases he₁_a,
+        cases he₁_a_1,
+        cases he₁_a_a_1,
+        rw update_load_global_vars_for_expr he₁_a_a,
+        repeat { rw parlang.state.map_map_active_threads' },
+    }
 end
 
 end mcl
