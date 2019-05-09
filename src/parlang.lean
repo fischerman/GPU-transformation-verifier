@@ -105,6 +105,9 @@ namespace state
 def map_threads (f : thread_state σ τ → thread_state σ τ) (s : state n σ τ) : state n σ τ :=
 { threads := s.threads.map f, ..s }
 
+-- we generally don't want to unfold this if possible
+-- this would for example happen when you do cases in (exec_state (compute f) ...) 
+@[irreducible]
 def map_active_threads (ac : vector bool n) (f : thread_state σ τ → thread_state σ τ) (s : state n σ τ) : state n σ τ :=
 { threads := (s.threads.map₂ (λ t (a : bool), if a then f t else t) ac), ..s }
 
@@ -196,7 +199,9 @@ lemma map_active_threads_nth {s : state n σ τ} {ac : vector bool n} {f i} : ¬
   simp [hnac],
 end
 
-lemma map_map_active_threads {s : state n σ τ} {ac : vector bool n} {f g} : (s.map_active_threads ac f).map_active_threads ac g  = s.map_active_threads ac (f ∘ g) := sorry
+lemma map_map_active_threads {s : state n σ τ} {ac : vector bool n} {f g} : (s.map_active_threads ac f).map_active_threads ac g  = s.map_active_threads ac (g ∘ f) := sorry
+
+lemma map_map_active_threads' {s : state n σ τ} {ac : vector bool n} {f g} : (s.map_active_threads ac f).map_active_threads ac g  = s.map_active_threads ac (λ ts, g (f ts)) := sorry
 
 lemma map_threads_all_threads_active {s : state n σ τ} {ac : vector bool n} {f} (h : all_threads_active ac) : s.map_threads f = s.map_active_threads ac f := begin
   unfold map_active_threads,
@@ -754,5 +759,7 @@ meta def program.repr : program σ τ → string
 | (program.intro f k) := "foreach (...) {\n" ++ ((to_fmt (kernel.repr k)).nest 4).to_string ++ "\n}"
 
 meta instance program_repr_class : has_repr (program σ τ) := ⟨program.repr⟩
+
+lemma kernel_foldr_skip {k : kernel σ τ} {n} {ks s u} {ac : vector bool n} : exec_state (list.foldr kernel.seq k ks) ac s u = exec_state (list.foldr kernel.seq (kernel.compute id) ks ;; k) ac s u := sorry
 
 end parlang
