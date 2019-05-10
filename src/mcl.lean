@@ -425,7 +425,8 @@ end
 --todo define interference (maybe choose another name) and define swap on non-interference
 --lemma rel_assign_swap {sig₁ sig₂ : signature} 
 
-lemma add_skip_left {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q → mclk_rel P (skip ;; k₁) (k₂) Q := begin
+lemma add_skip_left {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q ↔ mclk_rel P (skip ;; k₁) (k₂) Q := begin
+    -- this only solves ltr
     unfold mclk_rel,
     intro h,
     intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
@@ -436,7 +437,10 @@ lemma add_skip_left {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂
     sorry --trivial
 end
 
+lemma skip_left_after {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q ↔ mclk_rel P (k₁ ;; skip) (k₂) Q := sorry
+
 lemma skip_right {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q ↔ mclk_rel P ( k₁) ( skip ;; k₂) Q := sorry
+lemma skip_right_after {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q ↔ mclk_rel P ( k₁) ( k₂ ;; skip) Q := sorry
 
 variables {sig₁ sig₂ : signature} {k₁ k₁' : mclk sig₁} {k₂ k₂' : mclk sig₂} {P Q R : Π n₁:ℕ, parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂) → vector bool n₂ → Prop}
 
@@ -554,7 +558,30 @@ mclk_rel P (skip : mclk sig₁) (tlocal_assign n idx h₁ h₂ expr) Q := begin
 end
 
 -- todo: can the local proof be repurposed
-lemma global_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
+lemma global_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} : 
+mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ ((s₁ : parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁)).map_active_threads ac₁ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₁ n₂ s₂ ac₂) 
+(global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) P := begin
+    intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
+    use s₂,
+    split,
+    {
+        sorry, --trivial
+    }, {
+        suffices : s₁' = _,
+        subst this,
+        exact hp,
+        cases he₁,
+        rw kernel_foldr_skip at he₁_a,
+        cases he₁_a,
+        cases he₁_a_1,
+        cases he₁_a_a_1,
+        rw update_load_global_vars_for_expr he₁_a_a,
+        repeat { rw parlang.state.map_map_active_threads' },
+    }
+end
+
+-- todo: base this global_assign_intro together with consequence
+lemma global_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
 (hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ (s₁.map_active_threads ac₁ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₁ n₂ s₂ ac₂) : 
 mclk_rel P (global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
     unfold mclk_rel,
@@ -577,6 +604,13 @@ mclk_rel P (global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
         rw update_load_global_vars_for_expr he₁_a_a,
         repeat { rw parlang.state.map_map_active_threads' },
     }
+end
+
+-- todo: derive from left using symmetry
+lemma global_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} : 
+mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ ((s₂ : parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₂, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₂ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₂) 
+(skip : mclk sig₁) (global_assign n idx h₁ h₂ expr) P := begin
+    sorry,
 end
 
 end mcl

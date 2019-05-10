@@ -34,15 +34,39 @@ def p₂ : mclp sig := mclp.intro (λ m, 100) (
     mclk.global_assign "a" [read_tid] (by refl) (by refl) read_tid
 )
 
--- expressing the intermediate states is quiet cumbersome
--- furthermore applying the rules with skip doesn't work if we approach the end
+-- this approach is like computing both programs and comparing their output
+-- this is a fairly naive approach, another approach would be to show that their behavior is equal (based on the fact that we have to show equality)
 example : mclp_rel eq p₁ p₂ eq := begin
     apply rel_mclk_to_mclp,
-    apply seq_left,
+
+    apply mcl.skip_right.mpr,
+    apply mcl.seq,
+    swap,
+
+    apply mcl.skip_left_after.mpr,
+    apply mcl.skip_right.mpr,
+    apply mcl.seq,
+    tactic.swap,
+
+    -- break it down into individual proofs
+    apply add_skip_left.mpr,
+    apply mcl.seq,
+    tactic.swap,
     {
+        apply mcl.global_assign_right,
+    },{
+        apply mcl.global_assign_right,
+    }, {
         apply mcl.global_assign_left,
-        sorry,
     },
+    apply mcl.global_assign_left',
+    intros _ _ _ _ _ _ h,
+    cases h with m₁ h,
+    cases h with m₂ h,
+    simp,
+    -- todo: we need ways to reason about ranges of memory
+    -- e.g. using foldr
+    apply exists.intro (m₁.update ("a", [0]) (7 : ℕ)),
 end
 
 end assign_mcl
