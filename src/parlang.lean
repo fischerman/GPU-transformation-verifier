@@ -201,7 +201,7 @@ end
 
 lemma map_map_active_threads {s : state n σ τ} {ac : vector bool n} {f g} : (s.map_active_threads ac f).map_active_threads ac g  = s.map_active_threads ac (g ∘ f) := sorry
 
-lemma map_map_active_threads' {s : state n σ τ} {ac : vector bool n} {f g} : (s.map_active_threads ac f).map_active_threads ac g  = s.map_active_threads ac (λ ts, g (f ts)) := sorry
+lemma map_map_active_threads' {s : state n σ τ} {ac : vector bool n} (f g) : (s.map_active_threads ac f).map_active_threads ac g  = s.map_active_threads ac (λ ts, g (f ts)) := sorry
 
 lemma map_threads_all_threads_active {s : state n σ τ} {ac : vector bool n} {f} (h : all_threads_active ac) : s.map_threads f = s.map_active_threads ac f := begin
   unfold map_active_threads,

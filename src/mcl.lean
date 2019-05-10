@@ -481,15 +481,14 @@ def update_global_vars_for_expr {sig : signature} : Π {t : type}, thread_state 
 
 -- TODO: change to double implication
 lemma update_load_global_vars_for_expr {sig t} {expr : expression sig t} {n} {ac : vector bool n} {s u} : 
-exec_state (list.foldr kernel.seq (kernel.compute id) (load_global_vars_for_expr expr)) ac s u → u = s.map_active_threads ac (λ ts, update_global_vars_for_expr ts expr) := begin
-    intro h,
+exec_state (list.foldr kernel.seq (kernel.compute id) (load_global_vars_for_expr expr)) ac s u ↔ u = s.map_active_threads ac (λ ts, update_global_vars_for_expr ts expr) := begin
     induction expr generalizing s u,
     case mcl.expression.tlocal_var {
+        unfold update_global_vars_for_expr,
         cases h,
         have : (λ (a : state sig), a) = id := by refl,
         rw this,
         rw ← parlang.state.map_active_threads_id s ac,
-        unfold update_global_vars_for_expr,
         simp [state.map_active_threads],
         sorry,
     },
@@ -536,66 +535,47 @@ def g := λ(n : nat), n + 1
 #check g
 #eval (f ∘ g) 4
 
--- to make use of this rule neither the pre- nor the post-condition should reason with the ghost variables
-lemma tlocal_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
-(hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ (s₁.map_active_threads ac₁ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₁ n₂ s₂ ac₂) : 
-mclk_rel P (tlocal_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
-    unfold mclk_rel,
-    intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
-    apply exists.intro s₂,
-    apply and.intro,
-    {
-        sorry, -- trivial
-    },
-    {
-        rw mclk_to_kernel at he₁,
-        suffices : s₁' = (state.map_active_threads ac₁ (λ (ts : thread_state (state sig₁) (parlang_mcl_global sig₁)), thread_state.map (λ (s : state sig₁), state.update' h₁ _ (eval s expr) s) (update_global_vars_for_expr ts expr)) s₁),
-        subst this,
-        exact hi n₁ s₁ ac₁ n₂ s₂ ac₂ hp,
-        rw prepend_load_expr at he₁,
-        rw kernel_foldr_skip at he₁,
-        cases he₁,
-        cases he₁_a_1,
-        rw update_load_global_vars_for_expr he₁_a,
-        rw parlang.state.map_map_active_threads',
-    },
-end
-
 -- we require a symmetric rule
-lemma tlocal_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} 
-(hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ s₁ ac₁ n₂ (s₂.map_active_threads ac₂ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₂) : 
-mclk_rel P (skip : mclk sig₁) (tlocal_assign n idx h₁ h₂ expr) Q := begin
-    
-end
-
--- todo: can the local proof be repurposed
-lemma global_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} : 
-mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ ((s₁ : parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁)).map_active_threads ac₁ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₁ n₂ s₂ ac₂) 
-(global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) P := begin
+lemma tlocal_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} : 
+mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ (s₂.map_active_threads ac₂ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₂) (skip : mclk sig₁) (tlocal_assign n idx h₁ h₂ expr) P := begin
     intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
-    use s₂,
-    split,
-    {
-        sorry, --trivial
+    use (s₂.map_active_threads ac₂ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))),
+    split, {
+        unfold mclk_to_kernel,
+        unfold prepend_load_expr,
+        rw kernel_foldr_skip,
+        apply exec_state.seq,
+        {
+            rw update_load_global_vars_for_expr,
+        }, {
+            rw [← parlang.state.map_map_active_threads'],
+            apply exec_state.compute,
+        }
     }, {
-        suffices : s₁' = _,
+        have : s₁ = s₁' := sorry, -- trivial skip
         subst this,
         exact hp,
-        cases he₁,
-        rw kernel_foldr_skip at he₁_a,
-        cases he₁_a,
-        cases he₁_a_1,
-        cases he₁_a_a_1,
-        rw update_load_global_vars_for_expr he₁_a_a,
-        repeat { rw parlang.state.map_map_active_threads' },
     }
 end
 
--- todo: base this global_assign_intro together with consequence
-lemma global_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
-(hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ (s₁.map_active_threads ac₁ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₁ n₂ s₂ ac₂) : 
-mclk_rel P (global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
-    apply consequence global_assign_left hi,
+lemma tlocal_assign_right' {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} 
+(hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ s₁ ac₁ n₂ (s₂.map_active_threads ac₂ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₂) : 
+mclk_rel P (skip : mclk sig₁) (tlocal_assign n idx h₁ h₂ expr) Q := begin
+    apply consequence tlocal_assign_right hi,
+    intros _ _ _ _ _ _ _,
+    assumption,
+end
+
+lemma tlocal_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} : 
+mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ (s₁.map_active_threads ac₁ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₁ n₂ s₂ ac₂) 
+(tlocal_assign n idx h₁ h₂ expr) (skip : mclk sig₂) P := begin
+    apply swap_skip tlocal_assign_right,
+end
+
+lemma tlocal_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
+(hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ (s₁.map_active_threads ac₁ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₁ n₂ s₂ ac₂) : 
+mclk_rel P (tlocal_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
+    apply consequence tlocal_assign_left hi,
     intros _ _ _ _ _ _ _,
     assumption,
 end
@@ -612,25 +592,36 @@ mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ ((s₂ : pa
         apply exec_state.seq,
         {
             rw kernel_foldr_skip,
-            sorry,
+            apply exec_state.seq,
+            {
+                rw update_load_global_vars_for_expr,
+            }, {
+                apply exec_state.compute,
+            }
         }, {
+            rw parlang.state.map_map_active_threads',
+            rw [← parlang.state.map_map_active_threads' _ (thread_state.store _)],
             apply exec_state.store,
         }
-    },
-    {
-        suffices : s₁' = _,
+    }, {
+        have : s₁ = s₁' := sorry, -- trivial skip
         subst this,
         exact hp,
-        cases he₁,
-        rw kernel_foldr_skip at he₁_a,
-        cases he₁_a,
-        cases he₁_a_1,
-        cases he₁_a_a_1,
-        rw update_load_global_vars_for_expr he₁_a_a,
-        repeat { rw parlang.state.map_map_active_threads' },
-    }, {
-        sorry, --trivial
     },
+end
+
+lemma global_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} : 
+mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ ((s₁ : parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁)).map_active_threads ac₁ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₁ n₂ s₂ ac₂) 
+(global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) P := begin
+    apply swap_skip global_assign_right,
+end
+
+lemma global_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
+(hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ (s₁.map_active_threads ac₁ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₁ n₂ s₂ ac₂) : 
+mclk_rel P (global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
+    apply consequence global_assign_left hi,
+    intros _ _ _ _ _ _ _,
+    assumption,
 end
 
 end mcl
