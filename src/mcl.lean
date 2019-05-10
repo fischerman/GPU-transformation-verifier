@@ -442,7 +442,7 @@ lemma skip_left_after {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k�
 lemma skip_right {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q ↔ mclk_rel P ( k₁) ( skip ;; k₂) Q := sorry
 lemma skip_right_after {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k₂ : mclk sig₂} : mclk_rel P k₁ k₂ Q ↔ mclk_rel P ( k₁) ( k₂ ;; skip) Q := sorry
 
-variables {sig₁ sig₂ : signature} {k₁ k₁' : mclk sig₁} {k₂ k₂' : mclk sig₂} {P Q R : Π n₁:ℕ, parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂) → vector bool n₂ → Prop}
+variables {sig₁ sig₂ : signature} {k₁ k₁' : mclk sig₁} {k₂ k₂' : mclk sig₂} {P P' Q Q' R : Π n₁:ℕ, parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂) → vector bool n₂ → Prop}
 
 @[irreducible]
 def exprs_to_indices {sig : signature} {n dim} {idx : vector (expression sig type.int) dim} (h : ((sig n).type).dim = vector.length idx) (s : state sig) : 
@@ -457,6 +457,17 @@ mclk_rel P (k₁ ;; k₁') (k₂ ;; k₂') R := parlang.seq Q h₁ h₂
 
 lemma seq_left {P R} (Q) (h₁ : mclk_rel P k₁ skip Q) (h₂ : mclk_rel Q k₁' k₂' R) :
 mclk_rel P (k₁ ;; k₁') k₂' R := skip_right.mpr (seq Q h₁ h₂)
+
+lemma consequence (h : mclk_rel P k₁ k₂ Q)
+(hp : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P' n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ ac₂)
+(hq : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q' n₁ s₁ ac₁ n₂ s₂ ac₂) : mclk_rel P' k₁ k₂ Q' := consequence h hp hq
+
+lemma swap_skip (h : mclk_rel (parlang.assertion_swap_side P) skip k₁ (parlang.assertion_swap_side Q)) : mclk_rel P k₁ skip Q := begin
+    apply parlang.swap h,
+    intros,
+    use s₁,
+    apply exec_skip,
+end
 
 -- this modification can be jumped over if you are querying a local variable
 -- todo relate to load_global_vars_for_expr
@@ -554,7 +565,7 @@ end
 lemma tlocal_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} 
 (hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ s₁ ac₁ n₂ (s₂.map_active_threads ac₂ (λ ts, (update_global_vars_for_expr ts expr).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₂) : 
 mclk_rel P (skip : mclk sig₁) (tlocal_assign n idx h₁ h₂ expr) Q := begin
-
+    
 end
 
 -- todo: can the local proof be repurposed
@@ -584,18 +595,32 @@ end
 lemma global_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
 (hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ (s₁.map_active_threads ac₁ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₁ n₂ s₂ ac₂) : 
 mclk_rel P (global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
-    unfold mclk_rel,
+    apply consequence global_assign_left hi,
+    intros _ _ _ _ _ _ _,
+    assumption,
+end
+
+-- todo: derive from left using symmetry
+lemma global_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} : 
+mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ ((s₂ : parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₂, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₂ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₂) 
+(skip : mclk sig₁) (global_assign n idx h₁ h₂ expr) P := begin
     intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
-    apply exists.intro s₂,
-    apply and.intro,
+    use ((s₂ : parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₂, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₂ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))),
+    split, {
+        unfold mclk_to_kernel,
+        unfold prepend_load_expr,
+        apply exec_state.seq,
+        {
+            rw kernel_foldr_skip,
+            sorry,
+        }, {
+            apply exec_state.store,
+        }
+    },
     {
-        sorry, -- trivial
-    }, {
-        rw mclk_to_kernel at he₁,
         suffices : s₁' = _,
         subst this,
-        exact hi n₁ s₁ ac₁ n₂ s₂ ac₂ hp,
-        rw prepend_load_expr at he₁,
+        exact hp,
         cases he₁,
         rw kernel_foldr_skip at he₁_a,
         cases he₁_a,
@@ -603,14 +628,9 @@ mclk_rel P (global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
         cases he₁_a_a_1,
         rw update_load_global_vars_for_expr he₁_a_a,
         repeat { rw parlang.state.map_map_active_threads' },
-    }
-end
-
--- todo: derive from left using symmetry
-lemma global_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} : 
-mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ ((s₂ : parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (λ ts, ((update_global_vars_for_expr ts expr).map (λ s : state sig₂, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr))).store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₂ n).type.dim = (idx.map (eval s)).length, from h₂)⟩))) ac₂) 
-(skip : mclk sig₁) (global_assign n idx h₁ h₂ expr) P := begin
-    sorry,
+    }, {
+        sorry, --trivial
+    },
 end
 
 end mcl

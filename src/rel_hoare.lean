@@ -157,12 +157,13 @@ lemma single_step_left {P Q f} {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ 
     exact hek₁_a_1,
 end
 
+variables {P Q R P' Q' : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop} {k₁ k₁' : kernel σ₁ τ₁} {k₂ k₂' : kernel σ₂ τ₂}
 
 -- intuition of the proof (to be repurposed by further proofs):
 -- we get the intermediate state of after k₁ by cases
 -- from h₁ we get state after k₂
 -- from h₂ we get state after k₂'
-lemma seq {P R} {k₁ k₁' : kernel σ₁ τ₁} {k₂ k₂' : kernel σ₂ τ₂} (Q)
+lemma seq (Q)
     (h₁ : {* P *} k₁ ~ k₂ {* Q *})
     (h₂ : {* Q *} k₁' ~ k₂' {* R *}) :
     {* P *} (k₁ ;; k₁') ~ (k₂ ;; k₂') {* R *} := begin
@@ -177,6 +178,43 @@ lemma seq {P R} {k₁ k₁' : kernel σ₁ τ₁} {k₂ k₂' : kernel σ₂ τ�
         apply and.intro,
         apply exec_state.seq _ _ _ _ _ _ hek₂ (h₂_h.left),
         exact h₂_h.right,
+end
+
+-- sometimes called sub
+lemma consequence (h : {* P *} k₁ ~ k₂ {* Q *}) 
+(hp : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P' n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ ac₂)
+(hq : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q' n₁ s₁ ac₁ n₂ s₂ ac₂) : {* P' *} k₁ ~ k₂ {* Q' *} := begin
+    intros _ _ _ _ _ _ _ hp' he₁,
+    specialize h n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ _ he₁,
+    cases h with s₂ h,
+    use s₂,cases h,
+    apply and.intro,
+    assumption,
+    apply hq,
+    assumption,
+    apply hp,
+    assumption,
+end
+
+def assertion_swap_side (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop) := λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₂ s₂ ac₂ n₁ s₁ ac₁
+
+#print assertion_swap_side
+
+-- k₁ must terminate
+lemma swap (h : {* P *} k₁ ~ k₂ {* Q *}) (he₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → ∃ s₁', exec_state k₁ ac₁ s₁ s₁') : 
+{* assertion_swap_side P *} k₂ ~ k₁ {* assertion_swap_side Q *} := begin
+    intros n₂ n₁ s₂ s₂' s₁ ac₂ ac₁ hp he₂,
+    simp,
+    have : ∃ s₁', exec_state k₁ ac₁ s₁ s₁' := he₁ hp,
+    cases this with s₁' he₂,
+    use s₁',
+    split,
+    assumption,
+    specialize h n₁ n₂ s₁ _ s₂ ac₁ ac₂ hp he₂,
+    cases h,
+    have : h_w = s₂' := sorry, -- by uniqueness
+    subst this,
+    exact h_h.right,
 end
 
 end parlang

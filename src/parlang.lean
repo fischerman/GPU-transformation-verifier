@@ -762,4 +762,10 @@ meta instance program_repr_class : has_repr (program σ τ) := ⟨program.repr�
 
 lemma kernel_foldr_skip {k : kernel σ τ} {n} {ks s u} {ac : vector bool n} : exec_state (list.foldr kernel.seq k ks) ac s u = exec_state (list.foldr kernel.seq (kernel.compute id) ks ;; k) ac s u := sorry
 
+@[simp]
+lemma exec_skip {n} {ac : vector bool n} {s} : exec_state ((kernel.compute id) : kernel σ τ) ac s s := begin
+  rw [state.map_active_threads_id s ac] { occs := occurrences.pos [2] },
+  apply exec_state.compute,
+end
+
 end parlang
