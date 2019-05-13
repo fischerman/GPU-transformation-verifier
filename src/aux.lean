@@ -12,7 +12,14 @@ lemma list_length_neq_zero {α} : ∀{l : list α}, l.length ≠ 0 → ∃ x xs,
 
 lemma list_length_tail {α β : Type} {x : α} {y : β} {xs ys : list _}
   (h : (x :: xs).length = (y :: ys).length) : xs.length = ys.length :=
-by simpa using h
+by simpa using h 
+
+def range_fin_core (dim : ℕ) : Π n : ℕ, n <= dim → list (fin dim) → list (fin dim)
+| 0 h l := l
+| (nat.succ n) hs l := have h : n < dim := begin sorry end, range_fin_core n h (⟨n, h⟩ :: l)
+
+def range_fin (n : ℕ) : list (fin n) :=
+range_fin_core n n (begin  end) []
 
 end list
 

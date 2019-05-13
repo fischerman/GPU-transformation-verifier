@@ -15,6 +15,13 @@ inductive type
 
 open type
 
+instance : has_sizeof type :=
+⟨λt, match t with
+| type.int := 1
+| type.float := 1
+| type.bool := 2
+end⟩
+
 structure array :=
 (dim : ℕ)
 (sizes : vector ℕ dim)
@@ -139,27 +146,72 @@ end
 
 #print expression.sizeof
 
-@[reducible, simp] 
-def expression_size {sig : signature} : Π {t : type}, expression sig t → ℕ
-| t (const_int _ _) := 1
-| t (tlocal_var _ _ _ _ _) := 1
-| t (global_var _ _ _ _ _) := 1
-| t (add a b) := 
-    have a.sizeof sig t < (add a b).sizeof sig t := begin
-        rw expression.sizeof,
-        simp,
-        sorry,
-    end,
-    have b.sizeof sig t < (add a b).sizeof sig t := sorry,
-    expression_size a + expression_size b
-| t (lt h a b) := 
-    have a.sizeof sig int < (lt h a b).sizeof sig t := sorry,
-    have b.sizeof sig int < (lt h a b).sizeof sig t := sorry,
-    expression_size a + expression_size b
-using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, e⟩, expression.sizeof sig t e)⟩]}
+inductive untyped_expr 
+| leaf
+| nested : untyped_expr → untyped_expr → untyped_expr
+| list_nested : list (expression sig int) → untyped_expr -- maybe list argument a type int expressions
+
+def to_untyped_expr {sig : signature} : Π {t : type}, expression sig t → @untyped_expr sig
+| _ (const_int _ _) := untyped_expr.leaf
+| _ (tlocal_var _ idx _ _ _) := untyped_expr.list_nested (list.of_fn idx)
+| _ (lt h a b) := untyped_expr.nested (to_untyped_expr a) (to_untyped_expr b)
+| _ _ := untyped_expr.leaf
+
+#print to_untyped_expr._main
+
+def expr_size_untyped : @untyped_expr sig → ℕ
+| untyped_expr.leaf := 1
+| (untyped_expr.nested a b) := expr_size_untyped a + expr_size_untyped b + 1
+| (untyped_expr.list_nested l) := ((l.map to_untyped_expr).map expr_size_untyped).sum
+
+-- we have C on idx
+-- use recursor directly
+#print expression.rec_on
+#print expression.brec_on
+#print nat.rec_on
+#check ((λ n, nat.rec_on n _ _) : ℕ → ℕ)
+
+-- implicit argument C of recursor is filled in by the special elaborator "eliminator"
+-- arguments sig t and expr must be named, otherwise the eliminator elaborator fails
+def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ := expression.rec_on expr 
+    -- tlocal
+    (λ t dim n idx h₁ h₂ h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
+    -- global
+    (λ t dim n idx h₁ h₂ h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
+    -- add
+    (λ t a b ih_a ih_b, (1 : ℕ) + ih_a + ih_b)
+    -- const_int
+    (λ t n h, (n : ℕ))
+    -- lt
+    (λ t h a b ih_a ih_b, ih_a + ih_b + 1)
+
+def s₁ : signature
+| _ := { scope := scope.global, type := ⟨_, [100], type.int⟩ }
+def idx₁ : fin 1 → expression s₁ int
+| _ := 7
+#eval expression_size (tlocal_var "n" idx₁ sorry sorry sorry  : expression s₁ int)
+#eval expression_size (7 : expression s₁ int)
+
+-- @[reducible, simp] 
+-- def expression_size {sig : signature} : Π {t : type}, expression sig t → ℕ
+-- | ._ (const_int _ _) := 1
+-- | t (tlocal_var _ idx _ _ _) := 1 + ((list.of_fn idx).map expression_size).sum
+-- | ._ (global_var _ _ _ _ _) := 1
+-- | ._ (add a b) := expression_size a + expression_size b
+-- | t (lt h a b) := have p : has_sizeof._match_1 int < has_sizeof._match_1 t := begin subst h, rw has_sizeof._match_1, rw has_sizeof._match_1, sorry /- trivial -/ end, 
+--     expression_size a + expression_size b
+--using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, e⟩, expression.sizeof sig t e)⟩]}
+
+#print expression_size
+#print expression_size._main
 
 @[simp]
 lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
+
+#print psigma.has_well_founded
+#print psigma.lex
+#print has_well_founded_of_has_sizeof 
+#print expression.sizeof
 
 -- should we make this an inductive predicate
 -- it would have implications on parlang
@@ -168,13 +220,8 @@ def eval {sig : signature} (s : state sig) : Π {t : type}, expression sig t →
 | t (global_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = ((vector.of_fn idx).map eval).length, from h₂) -- requires that the global variable has been loaded into tstate under the same name
 | t (add a b) := type_map_add (eval a) (eval b)
 | t (const_int n h) := (by rw [h]; exact n)
-| t (lt h a b) := (by rw h; exact ((eval a) < (eval b)))
--- using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ args : psum (Σ' {t : type}, expression sig t) (list (expression sig int)), match args with
---     | (psum.inl ⟨t, expr⟩) := expression_size expr
---     | (psum.inr exprs) := exprs.length
---     end)⟩], 
--- /- dec_tac := do tactic.interactive.simp -/ }
-
+| t (lt h a b) := have p : has_sizeof._match_1 int < has_sizeof._match_1 t := begin subst h, rw has_sizeof._match_1, rw has_sizeof._match_1, sorry /- trivial -/ end, (by rw h; exact ((eval a) < (eval b)))
+using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, e⟩, expression_size e)⟩]}
 
 -- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
 @[reducible]
