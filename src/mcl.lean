@@ -222,9 +222,11 @@ def parlang_mcl_global (sig : signature) := (λ i : string × (list ℕ), sig.le
 def parlang_mcl_kernel (sig : signature) := kernel (state sig) (parlang_mcl_global sig)
 
 def load_global_vars_for_expr {sig : signature} : Π {t : type}, expression sig t → list (parlang_mcl_kernel sig)
-| t (global_var n idx h₁ h₂ _) := [kernel.load (λ s, ⟨(n, ((vector.of_fn idx).map (eval s)).to_list), λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = ((vector.of_fn idx).map (eval s)).length, from h₂) v⟩)]
+| t (global_var n idx h₁ h₂ _) := 
+    ((list.of_fn idx).map load_global_vars_for_expr).foldl list.append [] ++ 
+    [kernel.load (λ s, ⟨(n, ((vector.of_fn idx).map (eval s)).to_list), λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = ((vector.of_fn idx).map (eval s)).length, from h₂) v⟩)]
 | t (add a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
-| t (tlocal_var _ _ _ _ _) := []
+| t (tlocal_var _ idx _ _ _) := ((list.of_fn idx).map load_global_vars_for_expr).foldl list.append [] -- idx might be global
 | t (const_int _ _) := []
 | t (lt _ a b) := load_global_vars_for_expr a ++ load_global_vars_for_expr b
 
@@ -257,12 +259,12 @@ end
 -- prove more lemmas to make sure loads are placed correctly
 -- do I need a small step seantic for this?
 
-def expr_reads (n : string) : Π {t : type}, expression sig t → Prop
-| t (tlocal_var m _ _ _ _) := m = n
-| t (global_var m _ _ _ _) := m = n
-| t (add expr₁ expr₂) := expr_reads expr₁ ∨ expr_reads expr₂
-| t (const_int _ _) := false
-| t (lt _ a b) := expr_reads a ∨ expr_reads b
+def expr_reads (n : string) : Π {t : type}, expression sig t → _root_.bool
+| t (tlocal_var m idx _ _ _) := (m = n) || (list.of_fn idx).any expr_reads
+| t (global_var m idx _ _ _) := (m = n) || (list.of_fn idx).any expr_reads
+| t (add expr₁ expr₂) := expr_reads expr₁ || expr_reads expr₂
+| t (const_int _ _) := ff
+| t (lt _ a b) := expr_reads a || expr_reads b
 
 -- TODO variable assign constructors should include global and local proof
 -- expression sig (type_of (sig n)) is not definitionally equal if sig is not computable
@@ -278,11 +280,11 @@ infixr ` ;; `:90 := mclk.seq
 
 open mclk
 
-def mclk_reads (n : string) : mclk sig → Prop
-| (tlocal_assign _ idx _ expr) := expr_reads n expr -- todo add idx in usages
-| (global_assign _ idx _ expr) := expr_reads n expr
-| (seq k₁ k₂) := mclk_reads k₁ ∨ mclk_reads k₂
-| (for _ _ _ init c inc body) := expr_reads n init ∨ expr_reads n c ∨ mclk_reads inc ∨ mclk_reads body
+def mclk_reads (n : string) : mclk sig → _root_.bool
+| (tlocal_assign _ idx _ _ expr) := expr_reads n expr || (idx.to_list.any (λ e, expr_reads n e))
+| (global_assign _ idx _ _ expr) := expr_reads n expr || (idx.to_list.any (λ e, expr_reads n e))
+| (seq k₁ k₂) := mclk_reads k₁ || mclk_reads k₂
+| (for _ _ _ init c inc body) := expr_reads n init || expr_reads n c || mclk_reads inc || mclk_reads body
 | (skip) := false
 
 --lemma mclk_expr_reads (k) : mclk_reads n k → ∃ expr, (expr_reads n expr ∧ subexpr expr k)
@@ -512,7 +514,9 @@ end
 -- todo relate to load_global_vars_for_expr
 def update_global_vars_for_expr {sig : signature} : Π {t : type}, thread_state (state sig) (parlang_mcl_global sig) → expression sig t → thread_state (state sig) (parlang_mcl_global sig)
 --| t s (global_var n idx h₁ h₂ _) := [kernel.load (λ s, ⟨(n, ((vector.of_fn idx).map (eval s)).to_list), λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = ((vector.of_fn idx).map (eval s)).length, from h₂) v⟩)]
-| t ts (global_var n idx h₁ h₂ _) := ts.load (λ s, ⟨(n, ((vector.of_fn idx).map (eval s)).to_list), λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = ((vector.of_fn idx).map (eval s)).length, from h₂) v⟩)
+| t ts (global_var n idx h₁ h₂ _) := 
+    ((list.of_fn idx).foldl (λ ts e, update_global_vars_for_expr ts e) ts
+    ).load (λ s, ⟨(n, ((vector.of_fn idx).map (eval s)).to_list), λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = ((vector.of_fn idx).map (eval s)).length, from h₂) v⟩)
 | t s (add a b) := update_global_vars_for_expr (update_global_vars_for_expr s a) b
 | t s (tlocal_var _ _ _ _ _) := s
 | t s (const_int _ _) := s
