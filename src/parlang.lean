@@ -185,6 +185,13 @@ lemma syncable_unique {s : state n σ τ} {m m'} (h₁ : syncable s m) (h₂ : s
   }
 end
 
+@[simp]
+lemma syncable_remove_map {s : state n σ τ} (ac : vector bool n) (f m g) : syncable (map_active_threads ac (thread_state.map g ∘ f) s) m ↔ syncable (map_active_threads ac f s) m := by sorry
+
+lemma thread_state_map {f : thread_state σ τ → thread_state σ τ} {g h} : f ∘ thread_state.store g ∘ thread_state.map h = f ∘ thread_state.map h ∘ thread_state.store (λ s, g (h s)) := by sorry
+
+lemma thread_state_map' {g : σ → Σ (i : ι), τ i} {h} : thread_state.store g ∘ thread_state.map h = thread_state.map h ∘ thread_state.store (λ s, g (h s)) := by sorry
+
 lemma state_eq_per_thread {s u : state n σ τ} : (∀ i, s.threads.nth i = u.threads.nth i) → s = u := begin
   intros hieq,
   cases s,
@@ -199,6 +206,7 @@ lemma map_active_threads_nth {s : state n σ τ} {ac : vector bool n} {f i} : ¬
   simp [hnac],
 end
 
+@[simp]
 lemma map_map_active_threads {s : state n σ τ} {ac : vector bool n} {f g} : (s.map_active_threads ac f).map_active_threads ac g  = s.map_active_threads ac (g ∘ f) := sorry
 
 lemma map_map_active_threads' {s : state n σ τ} {ac : vector bool n} (f g) : (s.map_active_threads ac f).map_active_threads ac g  = s.map_active_threads ac (λ ts, g (f ts)) := sorry
