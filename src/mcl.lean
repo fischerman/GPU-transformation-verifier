@@ -101,8 +101,12 @@ state.update name (by rw [h]; exact idx) (begin unfold lean_type_of, rw [eq], ex
 def state.get' {sig : signature} {t : type} {name : string} {dim : ℕ} {idx : vector ℕ dim} (eq : type_of (sig name) = t) (h : (sig name).type.dim = idx.length) (s : state sig) : type_map t :=
 by rw [← eq]; rw [vector.length] at h; rw [← h] at idx; exact s name idx
 
-lemma state_get_update_ignore {sig n₁ n₂ dim₁ dim₂ t₁ t₂ idx₁ idx₂} {s h₁ h₁' h₂ h₂' v} (h : n₁ ≠ n₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = s.get' h₁ h₁' := begin
+lemma state_get_update_ignore (n₁ n₂) {sig dim₁ dim₂ t₁ t₂ idx₁ idx₂} {s h₁ h₁' h₂ h₂' v} (h : n₁ ≠ n₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = s.get' h₁ h₁' := begin
     sorry
+end
+
+lemma state_get_update_success (n₁ n₂) {sig dim₁ dim₂ t₁ t₂} {idx₁ : vector ℕ dim₁} {idx₂ : vector ℕ dim₂} {s h₁ h₁' h₂ h₂' v} (hn : n₁ = n₂) (hidx : idx₁.to_list = idx₂.to_list) (ht : type_map t₁ = type_map t₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = eq.mpr ht v := begin
+
 end
 
 -- expression is an inductive family over types
@@ -263,12 +267,22 @@ end
 -- prove more lemmas to make sure loads are placed correctly
 -- do I need a small step seantic for this?
 
-def expr_reads (n : string) : Π {t : type}, expression sig t → _root_.bool
-| t (tlocal_var m idx _ _ _) := (m = n) || (list.of_fn idx).any expr_reads
-| t (global_var m idx _ _ _) := (m = n) || (list.of_fn idx).any expr_reads
-| t (add expr₁ expr₂) := expr_reads expr₁ || expr_reads expr₂
-| t (const_int _ _) := ff
-| t (lt _ a b) := expr_reads a || expr_reads b
+def expr_reads (n : string) {t : type} (expr : expression sig t) : _root_.bool := expression.rec_on expr
+    -- tlocal
+    (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || ((list.range_fin dim).map ih).any id)
+    -- global
+    (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || ((list.range_fin dim).map ih).any id)
+    -- add
+    (λ t a b ih_a ih_b, ih_a || ih_b)
+    -- literal_int
+    (λ t n h, ff)
+    -- lt
+    (λ t h a b ih_a ih_b, ih_a || ih_b)
+
+-- can we make use of functor abstraction
+lemma eval_update_ignore {sig : signature} {t t₂ : type} {dim dim₂ n} {idx₂ : vector ℕ dim₂} {v} {h₁ h₂} {idx : vector (expression sig t) dim} {s} (h : (idx.to_list.all $ bnot ∘ expr_reads n) = tt) : 
+vector.map (eval (@state.update' sig t₂ n dim₂ idx₂ h₁ h₂ v s)) idx = vector.map (eval s) idx := begin
+end
 
 -- TODO variable assign constructors should include global and local proof
 -- expression sig (type_of (sig n)) is not definitionally equal if sig is not computable

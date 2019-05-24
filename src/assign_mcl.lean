@@ -38,7 +38,30 @@ open parlang
 open parlang.state
 open parlang.thread_state
 
-#reduce update_global_vars_for_expr (read_tid + 1)
+--#reduce update_global_vars_for_expr (read_tid + 1)
+
+--set_option pp.implicit true
+
+#print p₁._proof_1
+
+lemma store_get_update (n) {idx : list ℕ} {sig : signature} {dim} {idx₁ : vector ℕ dim} {idx₂ : vector ℕ dim} {h : type_of (sig n) = signature.type_of n sig} {h' v} (hidx : idx₁.to_list = idx₂.to_list) : 
+    @store _ _ (parlang_mcl_global sig) _ (λ (s : mcl.state sig), ⟨(n, idx), @state.get' sig (sig.type_of n) n dim idx₁ h h' (@state.update' sig (sig.type_of n) n dim idx₂ h h' v s)⟩) = 
+    store (λ (s : mcl.state sig), ⟨(n, idx), v⟩) := begin
+    sorry
+end
+
+lemma store_get_update' (n₁ n₂) {sig : signature} {dim₁ dim₂} {idx} {idx₁ : vector ℕ dim₁} {idx₂ : vector ℕ dim₂} {h₁ h₁' h₂ h₂' v} 
+    (hn : n₁ = n₂) (hidx : idx₁.to_list = idx₂.to_list) (ht : type_map (sig.type_of n₁) = type_map (sig.type_of n₂)) : 
+    @store _ _ (parlang_mcl_global sig) _ (λ (s : mcl.state sig), ⟨(n₁, idx), @state.get' sig (sig.type_of n₁) n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig (sig.type_of n₂) n₂ dim₂ idx₂ h₂ h₂' v s)⟩) = 
+    store (λ (s : mcl.state sig), ⟨(n₁, idx), (show (type_map $ sig.type_of n₁), begin rw ht, exact v end)⟩) := begin
+end
+
+--list.all (vector.to_list ?m_4) (bnot ∘ expr_reads ?m_5)
+
+lemma g : ∀ (i : expression sig type.int), i ∈ vector.to_list [read_tid] → (bnot (expr_reads "b" i)) := begin
+    intros,
+    trivial,
+end
 
 -- this approach is like computing both programs and comparing their output
 -- this is a fairly naive approach, another approach would be to show that their behavior is equal (based on the fact that we have to show equality)
@@ -93,6 +116,10 @@ example : mclp_rel eq p₁ p₂ eq := begin
         simp,
 
         -- put maps in store
+        -- todo we could distinct cases
+           -- store stores the same value as update
+           -- update changes the value of a index of store
+           -- update can be ignored
         rw ← function.comp.assoc,
         rw ← function.comp.assoc,
         rw thread_state_map,
@@ -106,9 +133,24 @@ example : mclp_rel eq p₁ p₂ eq := begin
         rw thread_state_map',
         rw function.comp.assoc,
         rw syncable_remove_map,
+
+        have hbni : list.all (vector.to_list [read_tid]) (bnot ∘ expr_reads "b") = tt := by refl,
         
-        simp,
         -- resolve get and update (the result should only be mcl_init, literals and memory (in case of loads))
+        --simp only [state_get_update_success],
+        conv begin
+            congr,
+            congr,
+            skip,
+            congr,
+            congr,
+            funext,
+            rw state_get_update_success _ _ (show _, from rfl) _ (show _, from rfl),
+            tactic.swap,
+            rw eval_update_ignore hbni,
+        end,
+        --rw @state_get_update_success "a" "a" sig 1 2 _ (type_of (sig "a")) _ _ _,
+
         -- only stores left
         -- find a way to resolve the stores all together
     }
