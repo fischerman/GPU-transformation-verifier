@@ -58,10 +58,23 @@ end
 
 --list.all (vector.to_list ?m_4) (bnot ∘ expr_reads ?m_5)
 
-lemma g : ∀ (i : expression sig type.int), i ∈ vector.to_list [read_tid] → (bnot (expr_reads "b" i)) := begin
-    intros,
-    trivial,
+lemma vector_map_single {s : state sig} {t} {expr : expression sig t} : vector.map (eval s) [expr] = [eval s expr] := begin
+    sorry
 end
+
+lemma lt_zero_one : 0 < 1 := by sorry
+
+lemma store_access_elim {sig : signature} {n} {s : state n (state sig) (parlang_mcl_global sig)} {var} {expr : expression sig type.int} {val : lean_type_of (sig var)} {f} {t : fin n} {i} {ac₁ : vector bool n} 
+(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ f s).threads) t)) 
+(h₂ : i.1 ≠ var) :
+i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ store (λ (s : state sig), ⟨(var, ([eval s expr] : vector _ _).val), val⟩)) s).threads) t) := begin
+    sorry,
+end
+
+def store_expr {sig : signature} {t} (var : string) (idx : list (expression sig type.int)) (val : expression sig t) (h : type_of (sig var) = t) := 
+@store _ _ (parlang_mcl_global sig) _ (λ (s : state sig), ⟨(var, idx.map (eval s)), begin unfold parlang_mcl_global, simp, dunfold signature.lean_type_of, dunfold lean_type_of, rw h, exact eval s val end⟩)
+
+set_option trace.simplify.rewrite true 
 
 -- this approach is like computing both programs and comparing their output
 -- this is a fairly naive approach, another approach would be to show that their behavior is equal (based on the fact that we have to show equality)
@@ -118,7 +131,7 @@ example : mclp_rel eq p₁ p₂ eq := begin
         -- put maps in store
         -- todo we could distinct cases
            -- store stores the same value as update
-           -- update changes the value of a index of store
+           -- update changes the value of an index of store
            -- update can be ignored
         rw ← function.comp.assoc,
         rw ← function.comp.assoc,
@@ -135,24 +148,57 @@ example : mclp_rel eq p₁ p₂ eq := begin
         rw syncable_remove_map,
 
         have hbni : list.all (vector.to_list [read_tid]) (bnot ∘ expr_reads "b") = tt := by refl,
-        
+        have hani : list.all (vector.to_list [read_tid]) (bnot ∘ expr_reads "a") = tt := by refl,
+        have hani' : expr_reads "a" read_tid = ff := by refl,
+        have hbni' : expr_reads "b" read_tid = ff := by refl,
+        have hbni'' : expr_reads "b" (read_tid + expression.const_int 1 p₁._proof_5) = ff := by refl,
+        have hani'' : expr_reads "a" (read_tid + expression.const_int 1 p₁._proof_5) = ff := by refl,
+
         -- resolve get and update (the result should only be mcl_init, literals and memory (in case of loads))
-        --simp only [state_get_update_success],
-        conv begin
+        
+        simp [state_get_update_success _ _ _ _ _, eval_update_ignore' hbni, eval_update_ignore' hani, eval_update_ignore hani'', eval_update_ignore hbni''],
+        conv {
             congr,
             congr,
             skip,
             congr,
             congr,
             funext,
-            rw state_get_update_success _ _ (show _, from rfl) _ (show _, from rfl),
-            tactic.swap,
-            rw eval_update_ignore hbni,
-        end,
-        --rw @state_get_update_success "a" "a" sig 1 2 _ (type_of (sig "a")) _ _ _,
-
+            rw vector_map_single,
+            rw vector.to_list,
+            rw eval_update_ignore hbni',
+            rw eval_update_ignore hani',
+            skip,
+            congr,
+            funext,
+            rw vector_map_single,
+            rw vector.to_list,
+            rw eval_update_ignore hani',
+        },
+        intro,
+        by_cases ha : i.1 = "a" ∧ i.2.length = 1,
         -- only stores left
         -- find a way to resolve the stores all together
+        {
+            right,
+            use (i.2.nth_le 0 begin
+                rw ha.right,
+                apply lt_zero_one,
+            end),
+            apply exists.intro,
+            split,
+            {
+                sorry, -- find the correct store instruction which performs the write
+            }, {
+                split,
+                {
+                    sorry, -- proof that the value is the same
+                }, {
+                    intros t' ht'n hneqtt',
+                    apply store_access_elim,
+                }
+            }
+        }
     }
 
 end

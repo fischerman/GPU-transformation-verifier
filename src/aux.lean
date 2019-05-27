@@ -21,6 +21,10 @@ def range_fin_core (dim : ℕ) : Π n : ℕ, n <= dim → list (fin dim) → lis
 def range_fin (n : ℕ) : list (fin n) :=
 range_fin_core n n (by refl) []
 
+@[simp] lemma length_range_nth : length (range_fin n) = n := begin
+  admit
+end
+
 end list
 
 namespace nat
@@ -138,6 +142,12 @@ end
 def range (n : ℕ) : vector ℕ n := ⟨list.range n, sorry⟩
 
 lemma range_nth {n : ℕ} {i : fin n} : (range n).nth i = i := sorry
+
+def range_fin (n : ℕ) : vector (fin n) n := ⟨list.range_fin n, sorry⟩
+
+@[simp] lemma length_map {α n} (f : α → β) (l : vector α n) : length (map f l) = length l := sorry
+
+@[simp] lemma length_range_nth : length (range_fin n) = n := sorry
 
 end vector
 

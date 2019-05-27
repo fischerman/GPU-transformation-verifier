@@ -198,30 +198,26 @@ lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
 -- should we make this an inductive predicate
 -- it would have implications on parlang
 -- might have to change this to rec_on
-def eval {sig : signature} (s : state sig) : Π {t : type}, expression sig t → type_map t
-| t (@tlocal_var _ _ dim n idx h h₂ h₃) := 
-    have p : ∀ t (e : expression sig t), expression_size e < expression_size (tlocal_var n idx h h₂ h₃) := begin
-        sorry,
-    end,
-    s.get' h (show (sig n).type.dim = ((vector.of_fn idx).map eval).length, from h₂)
-| t (global_var n idx h h₂ h₃) := s.get' h (show (sig n).type.dim = ((vector.of_fn idx).map eval).length, from h₂) -- requires that the global variable has been loaded into tstate under the same name
-| t (add a b) := 
-    have p : expression_size a < expression_size (add a b) := begin
-        rw [expression_size],
-        rw [expression_size],
-        simp,
-        sorry -- trivial
-    end,
-    have p : expression_size b < expression_size (add a b) := sorry,
-    type_map_add (eval a) (eval b)
-| t (const_int n h) := (by rw [h]; exact n)
-| t (lt h a b) :=
-    have p : expression_size a < expression_size (lt h a b) := sorry,
-    have p : expression_size b < expression_size (lt h a b) := sorry,
-    (by rw h; exact ((eval a) < (eval b)))
-using_well_founded {rel_tac := λ_ _, `[exact ⟨_, measure_wf (λ ⟨t, e⟩, expression_size e)⟩] }
-
-#print eval._main._pack
+def eval {sig : signature} (s : state sig) {t : type} (expr : expression sig t) : type_map t := expression.rec_on expr 
+    -- tlocal
+    (λ t dim n idx h₁ h₂ h₃ ih, s.get' h₁ (show (sig n).type.dim = ((vector.range_fin dim).map ih).length, begin
+        rw vector.length_map,
+        rw vector.length_range_nth,
+        exact h₂,
+    end))
+    -- global
+    -- requires that the global variable has been loaded into tstate under the same name
+    (λ t dim n idx h₁ h₂ h₃ ih, s.get' h₁ (show (sig n).type.dim = ((vector.range_fin dim).map ih).length, begin
+        rw vector.length_map,
+        rw vector.length_range_nth,
+        exact h₂,
+    end))
+    -- add
+    (λ t a b ih_a ih_b, type_map_add ih_a ih_b)
+    -- literal_int
+    (λ t n h, (by rw [h]; exact n))
+    -- lt
+    (λ t h a b ih_a ih_b, (by rw h; exact (ih_a < ih_b)))
 
 -- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
 @[reducible]
@@ -279,9 +275,15 @@ def expr_reads (n : string) {t : type} (expr : expression sig t) : _root_.bool :
     -- lt
     (λ t h a b ih_a ih_b, ih_a || ih_b)
 
+lemma eval_update_ignore {sig : signature} {t t₂ : type} {dim₂ n} {idx₂ : vector ℕ dim₂} {v} {h₁ h₂} {expr : expression sig t} {s} (h : expr_reads n expr = ff) : 
+eval (@state.update' sig t₂ n dim₂ idx₂ h₁ h₂ v s) expr  = eval s expr := begin
+    admit
+end
+
 -- can we make use of functor abstraction
-lemma eval_update_ignore {sig : signature} {t t₂ : type} {dim dim₂ n} {idx₂ : vector ℕ dim₂} {v} {h₁ h₂} {idx : vector (expression sig t) dim} {s} (h : (idx.to_list.all $ bnot ∘ expr_reads n) = tt) : 
+lemma eval_update_ignore' {sig : signature} {t t₂ : type} {dim dim₂ n} {idx₂ : vector ℕ dim₂} {v} {h₁ h₂} {idx : vector (expression sig t) dim} {s} (h : (idx.to_list.all $ bnot ∘ expr_reads n) = tt) : 
 vector.map (eval (@state.update' sig t₂ n dim₂ idx₂ h₁ h₂ v s)) idx = vector.map (eval s) idx := begin
+    admit
 end
 
 -- TODO variable assign constructors should include global and local proof
