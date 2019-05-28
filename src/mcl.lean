@@ -648,7 +648,10 @@ mclk_rel P (tlocal_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
     assumption,
 end
 
--- todo: derive from left using symmetry
+
+def store_expr {sig : signature} {t} (var : string) (idx : list (expression sig type.int)) (val : expression sig t) (h : type_of (sig var) = t) := 
+@thread_state.store _ _ (parlang_mcl_global sig) _ (λ (s : state sig), ⟨(var, idx.map (eval s)), begin unfold parlang_mcl_global, simp, dunfold signature.lean_type_of, dunfold lean_type_of, rw h, exact eval s val end⟩)
+
 lemma global_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} : 
 mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
     ((s₂ : parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (

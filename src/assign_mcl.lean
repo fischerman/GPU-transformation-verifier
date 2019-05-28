@@ -64,15 +64,15 @@ end
 
 lemma lt_zero_one : 0 < 1 := by sorry
 
-lemma store_access_elim {sig : signature} {n} {s : state n (state sig) (parlang_mcl_global sig)} {var} {expr : expression sig type.int} {val : lean_type_of (sig var)} {f} {t : fin n} {i} {ac₁ : vector bool n} 
-(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ f s).threads) t)) 
+def updates {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (updates : list (σ → σ)) := 
+@map σ ι τ _ id
+
+lemma store_access_elim {sig : signature} {n} {s : state n (state sig) (parlang_mcl_global sig)} {var} {expr : expression sig type.int} {val : expression sig (type_of $ sig var)} {f} {t : fin n} {i} {ac₁ : vector bool n} 
+(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ updates []) s).threads) t)) 
 (h₂ : i.1 ≠ var) :
-i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ store (λ (s : state sig), ⟨(var, ([eval s expr] : vector _ _).val), val⟩)) s).threads) t) := begin
+i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (store_expr var [expr] val (by refl)) ∘ updates []) s).threads) t) := begin
     sorry,
 end
-
-def store_expr {sig : signature} {t} (var : string) (idx : list (expression sig type.int)) (val : expression sig t) (h : type_of (sig var) = t) := 
-@store _ _ (parlang_mcl_global sig) _ (λ (s : state sig), ⟨(var, idx.map (eval s)), begin unfold parlang_mcl_global, simp, dunfold signature.lean_type_of, dunfold lean_type_of, rw h, exact eval s val end⟩)
 
 set_option trace.simplify.rewrite true 
 
@@ -155,7 +155,7 @@ example : mclp_rel eq p₁ p₂ eq := begin
         have hani'' : expr_reads "a" (read_tid + expression.const_int 1 p₁._proof_5) = ff := by refl,
 
         -- resolve get and update (the result should only be mcl_init, literals and memory (in case of loads))
-        
+
         simp [state_get_update_success _ _ _ _ _, eval_update_ignore' hbni, eval_update_ignore' hani, eval_update_ignore hani'', eval_update_ignore hbni''],
         conv {
             congr,
