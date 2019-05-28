@@ -64,17 +64,48 @@ end
 
 lemma lt_zero_one : 0 < 1 := by sorry
 
-def updates {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (updates : list (σ → σ)) := 
-@map σ ι τ _ id
+def map_list {σ ι : Type} {τ : ι → Type} [decidable_eq ι] : list (σ → σ) → (thread_state σ τ → thread_state σ τ)
+| (f :: tl) := map_list tl ∘ @map σ ι τ _ f
+| [] := id
 
-lemma store_access_elim {sig : signature} {n} {s : state n (state sig) (parlang_mcl_global sig)} {var} {expr : expression sig type.int} {val : expression sig (type_of $ sig var)} {f} {t : fin n} {i} {ac₁ : vector bool n} 
-(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ updates []) s).threads) t)) 
+lemma map_to_map_list {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (f : σ → σ) : @map σ ι τ _ f = map_list [f] := by refl
+
+lemma map_active_threads_nth_active {σ ι : Type} {τ : ι → Type} [decidable_eq ι] {n} {s : state n σ τ} {ac : vector bool n} {f i} : 
+ac.nth i → (s.map_active_threads ac (map_list f)).threads.nth i = map_list f (s.threads.nth i) := begin
+  sorry
+end
+
+lemma store_access_elim_name {sig : signature} {n n_idx} {s : state n (state sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
+{t h₄} {h₃ : type_of (sig var) = t } {f} {t : fin n} {i} {ac₁ : vector bool n} {updates}
+(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ map_list updates) s).threads) t)) 
 (h₂ : i.1 ≠ var) :
-i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (store_expr var [expr] val (by refl)) ∘ updates []) s).threads) t) := begin
+i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx h₃ h₄) ∘ map_list updates) s).threads) t) := begin
     sorry,
 end
 
+
+lemma store_access_elim_idx {sig : signature} {n n_idx} {s : state n (state sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
+{t h₄} {h₃ : type_of (sig var) = t } {f} {t : fin n} {i : string × list ℕ} {ac₁ : vector bool n} {updates}
+(h₂ : ∀ t : fin n, i.2 ≠ (idx.map ((eval (((map_active_threads ac₁ (map_list updates) s).threads).nth t).tlocal ))).to_list) 
+(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ map_list updates) s).threads) t)) :
+i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx h₃ h₄) ∘ map_list updates) s).threads) t) := begin
+    sorry,
+end
+
+lemma list_neq_elem {α : Type} {l l' : list α} (n : ℕ) (h : n < l.length) (h' : n < l'.length) : l.nth_le n h ≠ l'.nth_le n h' → l ≠ l' := by sorry
+
+lemma list_nth_vector {α l} {v : vector α l} {n h} : list.nth_le (vector.to_list v) n h = v.nth ⟨n, (by sorry)⟩ := by sorry
+
 set_option trace.simplify.rewrite true 
+
+
+variable (m''' : memory (parlang_mcl_global sig))
+
+#eval vector.nth [7] ⟨0, lt_zero_one⟩
+#eval vector.nth [read_tid] ⟨0, lt_zero_one⟩
+#reduce @mcl_init sig 9
+#reduce (map_list [] {tlocal := @mcl_init sig 9, global := m''', loads := ∅, stores := ∅}).tlocal
+#reduce eval ((map_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
 
 -- this approach is like computing both programs and comparing their output
 -- this is a fairly naive approach, another approach would be to show that their behavior is equal (based on the fact that we have to show equality)
@@ -133,19 +164,19 @@ example : mclp_rel eq p₁ p₂ eq := begin
            -- store stores the same value as update
            -- update changes the value of an index of store
            -- update can be ignored
-        rw ← function.comp.assoc,
-        rw ← function.comp.assoc,
-        rw thread_state_map,
-        rw ← function.comp.assoc,
-        rw thread_state_map',
-        rw function.comp.assoc,
-        rw function.comp.assoc,
-        rw syncable_remove_map,
+        -- rw ← function.comp.assoc,
+        -- rw ← function.comp.assoc,
+        -- rw thread_state_map,
+        -- rw ← function.comp.assoc,
+        -- rw thread_state_map',
+        -- rw function.comp.assoc,
+        -- rw function.comp.assoc,
+        -- rw syncable_remove_map,
         
-        rw ← function.comp.assoc,
-        rw thread_state_map',
-        rw function.comp.assoc,
-        rw syncable_remove_map,
+        -- rw ← function.comp.assoc,
+        -- rw thread_state_map',
+        -- rw function.comp.assoc,
+        -- rw syncable_remove_map,
 
         have hbni : list.all (vector.to_list [read_tid]) (bnot ∘ expr_reads "b") = tt := by refl,
         have hani : list.all (vector.to_list [read_tid]) (bnot ∘ expr_reads "a") = tt := by refl,
@@ -156,25 +187,25 @@ example : mclp_rel eq p₁ p₂ eq := begin
 
         -- resolve get and update (the result should only be mcl_init, literals and memory (in case of loads))
 
-        simp [state_get_update_success _ _ _ _ _, eval_update_ignore' hbni, eval_update_ignore' hani, eval_update_ignore hani'', eval_update_ignore hbni''],
-        conv {
-            congr,
-            congr,
-            skip,
-            congr,
-            congr,
-            funext,
-            rw vector_map_single,
-            rw vector.to_list,
-            rw eval_update_ignore hbni',
-            rw eval_update_ignore hani',
-            skip,
-            congr,
-            funext,
-            rw vector_map_single,
-            rw vector.to_list,
-            rw eval_update_ignore hani',
-        },
+        -- simp [state_get_update_success _ _ _ _ _, eval_update_ignore' hbni, eval_update_ignore' hani, eval_update_ignore hani'', eval_update_ignore hbni''],
+        -- conv {
+        --     congr,
+        --     congr,
+        --     skip,
+        --     congr,
+        --     congr,
+        --     funext,
+        --     rw vector_map_single,
+        --     rw vector.to_list,
+        --     rw eval_update_ignore hbni',
+        --     rw eval_update_ignore hani',
+        --     skip,
+        --     congr,
+        --     funext,
+        --     rw vector_map_single,
+        --     rw vector.to_list,
+        --     rw eval_update_ignore hani',
+        -- },
         intro,
         by_cases ha : i.1 = "a" ∧ i.2.length = 1,
         -- only stores left
@@ -195,7 +226,20 @@ example : mclp_rel eq p₁ p₂ eq := begin
                     sorry, -- proof that the value is the same
                 }, {
                     intros t' ht'n hneqtt',
-                    apply store_access_elim,
+                    repeat { rw map_to_map_list },
+                    apply store_access_elim_idx, {
+                        intro t,
+                        apply list_neq_elem 0, {
+                            rw list_nth_vector,
+                            rw vector.nth_map,
+                            rw map_active_threads_nth_active,
+                            rw initial_kernel_assertion_left_thread_state h,
+                            by_cases heqtt' : t' = t.val, {
+                                subst heqtt',
+                                exact hneqtt',
+                            }
+                        }
+                    }
                 }
             }
         }

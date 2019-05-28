@@ -453,10 +453,7 @@ end
 lemma rel_mclk_to_mclp {sig₁ sig₂ : signature} (f₁ : memory (parlang_mcl_global sig₁) → ℕ) (f₂ : memory (parlang_mcl_global sig₂) → ℕ)
 (P Q : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop)
 (k₁ : mclk sig₁) (k₂ : mclk sig₂) (h : mclk_rel 
-(λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ n₁ = f₁ m₁ ∧ n₂ = f₂ m₂ ∧
- (∀ i : fin n₁, s₁.threads.nth i = { tlocal := mcl_init i, global := m₁, stores := ∅, loads := ∅ }) ∧ 
- (∀ i : fin n₂, s₂.threads.nth i = { tlocal := mcl_init i, global := m₂, stores := ∅, loads := ∅ }) ∧
- P m₁ m₂ ∧ all_threads_active ac₁ ∧ all_threads_active ac₂) 
+(λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, initial_kernel_assertion mcl_init mcl_init P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂)
     k₁ k₂ 
 (λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂)) : 
 mclp_rel P (mclp.intro f₁ k₁) (mclp.intro f₂ k₂) Q := begin
@@ -648,21 +645,22 @@ mclk_rel P (tlocal_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
     assumption,
 end
 
-
-def store_expr {sig : signature} {t} (var : string) (idx : list (expression sig type.int)) (val : expression sig t) (h : type_of (sig var) = t) := 
-@thread_state.store _ _ (parlang_mcl_global sig) _ (λ (s : state sig), ⟨(var, idx.map (eval s)), begin unfold parlang_mcl_global, simp, dunfold signature.lean_type_of, dunfold lean_type_of, rw h, exact eval s val end⟩)
+-- store the locally computed value in the shadow global
+@[irreducible]
+def mcl_store {sig : signature} {t} {n} (var : string) (idx : vector (expression sig type.int) n) (h₁ : type_of (sig var) = t) (h₂ : ((sig var).type).dim = vector.length idx) := 
+@thread_state.store _ _ (parlang_mcl_global sig) _ (λ (s : state sig), ⟨(var, (vector.map (eval s) idx).to_list), s.get' (begin simp, end) (show (sig var).type.dim = (idx.map (eval s)).length, from h₂)⟩)
 
 lemma global_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} : 
 mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
     ((s₂ : parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (
-        thread_state.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₂ n).type.dim = (idx.map (eval s)).length, from h₂)⟩) ∘ 
+        mcl_store n idx h₁ h₂ ∘
         thread_state.map (λ s : state sig₂, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)) ∘ 
         (update_global_vars_for_expr expr)
     )) ac₂)
 (skip : mclk sig₁) (global_assign n idx h₁ h₂ expr) P := begin
     intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
     use ((s₂ : parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (
-        thread_state.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₂ n).type.dim = (idx.map (eval s)).length, from h₂)⟩) ∘ 
+        mcl_store n idx h₁ h₂ ∘
         thread_state.map (λ s : state sig₂, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)) ∘ 
         (update_global_vars_for_expr expr)
     )),
@@ -680,6 +678,7 @@ mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂
             }
         }, {
             rw parlang.state.map_map_active_threads',
+            unfold mcl_store,
             rw [← parlang.state.map_map_active_threads' _ (thread_state.store _)],
             apply exec_state.store,
         }
@@ -693,7 +692,7 @@ end
 lemma global_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} : 
 mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ 
     ((s₁ : parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁)).map_active_threads ac₁ (
-        thread_state.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩) ∘ 
+        mcl_store n idx h₁ h₂ ∘
         thread_state.map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)) ∘ 
         (update_global_vars_for_expr expr)
     )) ac₁ n₂ s₂ ac₂) 
@@ -704,7 +703,7 @@ end
 lemma global_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
 (hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ 
     (s₁.map_active_threads ac₁ (
-        thread_state.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig₁ n).type.dim = (idx.map (eval s)).length, from h₂)⟩) ∘ 
+        mcl_store n idx h₁ h₂ ∘
         thread_state.map (λ s : state sig₁, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)) ∘ 
         (update_global_vars_for_expr expr)
     )) ac₁ n₂ s₂ ac₂) : 

@@ -35,11 +35,24 @@ def rel_hoare_program (init₁ : ℕ → σ₁) (init₂ : ℕ → σ₂) (P : m
 
 -- notation `{* ` P : 1 ` *} ` p₁ : 1 ` ~ ` p₂ : 1 ` {* ` Q : 1 ` *}` := rel_hoare_state P p₁ p₂ Q
 
+def initial_kernel_assertion (init₁ : ℕ → σ₁) (init₂ : ℕ → σ₂) (P : memory τ₁ → memory τ₂ → Prop) 
+(f₁ : memory τ₁ → ℕ) (f₂ : memory τ₂ → ℕ) (m₁ : memory τ₁) (m₂ : memory τ₂) 
+(n₁) (s₁ : state n₁ σ₁ τ₁) (ac₁ : vector bool n₁) (n₂) (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂) := 
+s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ n₁ = f₁ m₁ ∧ n₂ = f₂ m₂ ∧
+(∀ i : fin n₁, s₁.threads.nth i = { tlocal := init₁ i, global := m₁, stores := ∅, loads := ∅ }) ∧ 
+(∀ i : fin n₂, s₂.threads.nth i = { tlocal := init₂ i, global := m₂, stores := ∅, loads := ∅ }) ∧
+P m₁ m₂ ∧ all_threads_active ac₁ ∧ all_threads_active ac₂
+
+def initial_kernel_assertion_left_thread_state {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
+{f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
+{n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
+(i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.left
+
+#check initial_kernel_assertion_left_thread_state
+
+
 lemma rel_kernel_to_program (k₁ : kernel σ₁ τ₁) (k₂ : kernel σ₂ τ₂) (init₁ : ℕ → σ₁) (init₂ : ℕ → σ₂) (P Q : memory τ₁ → memory τ₂ → Prop) (f₁ : memory τ₁ → ℕ) (f₂ : memory τ₂ → ℕ)
- (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ n₁ = f₁ m₁ ∧ n₂ = f₂ m₂ ∧
- (∀ i : fin n₁, s₁.threads.nth i = { tlocal := init₁ i, global := m₁, stores := ∅, loads := ∅ }) ∧ 
- (∀ i : fin n₂, s₂.threads.nth i = { tlocal := init₂ i, global := m₂, stores := ∅, loads := ∅ }) ∧
- P m₁ m₂ ∧ all_threads_active ac₁ ∧ all_threads_active ac₂ *} k₁ ~ k₂ 
+ (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ *} k₁ ~ k₂ 
  {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂ *} ) : -- if I have to proof syncability of s₁, do I really have to assume termination of the left?
  rel_hoare_program init₁ init₂ P (program.intro f₁ k₁) (program.intro f₂ k₂) Q :=
 begin
