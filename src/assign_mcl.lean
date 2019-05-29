@@ -70,6 +70,17 @@ def map_list {σ ι : Type} {τ : ι → Type} [decidable_eq ι] : list (σ → 
 
 lemma map_to_map_list {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (f : σ → σ) : @map σ ι τ _ f = map_list [f] := by refl
 
+lemma map_list_merge {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (f g : list (σ → σ)) : 
+(@map_list σ ι τ _ g) ∘ map_list f = map_list (f ++ g) := begin
+    induction f,
+    case list.nil {
+        simp [map_list],
+    }, {
+        simp [map_list],
+        rw ← f_ih,
+    }
+end
+
 lemma map_active_threads_nth_active {σ ι : Type} {τ : ι → Type} [decidable_eq ι] {n} {s : state n σ τ} {ac : vector bool n} {f i} : 
 ac.nth i → (s.map_active_threads ac (map_list f)).threads.nth i = map_list f (s.threads.nth i) := begin
   sorry
@@ -86,10 +97,25 @@ end
 
 lemma store_access_elim_idx {sig : signature} {n n_idx} {s : state n (state sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
 {t h₄} {h₃ : type_of (sig var) = t } {f} {t : fin n} {i : string × list ℕ} {ac₁ : vector bool n} {updates}
-(h₂ : ∀ t : fin n, i.2 ≠ (idx.map ((eval (((map_active_threads ac₁ (map_list updates) s).threads).nth t).tlocal ))).to_list) 
+(h₂ : i.2 ≠ (idx.map ((eval (((map_active_threads ac₁ (map_list updates) s).threads).nth t).tlocal ))).to_list) 
 (h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ map_list updates) s).threads) t)) :
 i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx h₃ h₄) ∘ map_list updates) s).threads) t) := begin
     sorry,
+end
+
+lemma store_access_elim_idx' {sig : signature} {n n_idx} {s : state n (state sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
+{t h₄} {h₃ : type_of (sig var) = t } {t : fin n} {i : string × list ℕ} {ac₁ : vector bool n} {updates}
+(h₂ : i.2 ≠ (idx.map ((eval (((map_active_threads ac₁ (map_list updates) s).threads).nth t).tlocal ))).to_list) 
+(h₁ : i ∉ accesses (vector.nth (s.threads) t)) :
+i ∉ accesses (vector.nth ((map_active_threads ac₁ ((mcl_store var idx h₃ h₄) ∘ map_list updates) s).threads) t) := begin
+    sorry,
+end
+
+lemma access_init  {sig₁ sig₂ : signature} {P : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop} 
+{f₁ : memory (parlang_mcl_global sig₁) → ℕ} {f₂ : memory (parlang_mcl_global sig₂) → ℕ} {m₁ : memory (parlang_mcl_global sig₁)} {m₂ : memory (parlang_mcl_global sig₂)} 
+{n₁} {s₁ : state n₁ (state sig₁) (parlang_mcl_global sig₁)} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ (state sig₂) (parlang_mcl_global sig₂)} {ac₂ : vector bool n₂} {t} {i} : 
+initial_kernel_assertion mcl_init mcl_init P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ → i ∉ accesses (vector.nth (s₁.threads) t) := begin
+    sorry
 end
 
 lemma list_neq_elem {α : Type} {l l' : list α} (n : ℕ) (h : n < l.length) (h' : n < l'.length) : l.nth_le n h ≠ l'.nth_le n h' → l ≠ l' := by sorry
@@ -101,11 +127,7 @@ set_option trace.simplify.rewrite true
 
 variable (m''' : memory (parlang_mcl_global sig))
 
-#eval vector.nth [7] ⟨0, lt_zero_one⟩
-#eval vector.nth [read_tid] ⟨0, lt_zero_one⟩
-#reduce @mcl_init sig 9
-#reduce (map_list [] {tlocal := @mcl_init sig 9, global := m''', loads := ∅, stores := ∅}).tlocal
-#reduce eval ((map_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
+-- #reduce eval ((map_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
 
 -- this approach is like computing both programs and comparing their output
 -- this is a fairly naive approach, another approach would be to show that their behavior is equal (based on the fact that we have to show equality)
@@ -207,9 +229,8 @@ example : mclp_rel eq p₁ p₂ eq := begin
         --     rw eval_update_ignore hani',
         -- },
         intro,
+        -- todo: wrap this case into a array access definition
         by_cases ha : i.1 = "a" ∧ i.2.length = 1,
-        -- only stores left
-        -- find a way to resolve the stores all together
         {
             right,
             use (i.2.nth_le 0 begin
@@ -217,6 +238,9 @@ example : mclp_rel eq p₁ p₂ eq := begin
                 apply lt_zero_one,
             end),
             apply exists.intro,
+            swap, {
+                sorry, -- we need an extra clause in by_cases which limits 
+            },
             split,
             {
                 sorry, -- find the correct store instruction which performs the write
@@ -228,20 +252,45 @@ example : mclp_rel eq p₁ p₂ eq := begin
                     intros t' ht'n hneqtt',
                     repeat { rw map_to_map_list },
                     apply store_access_elim_idx, {
-                        intro t,
-                        apply list_neq_elem 0, {
+                        apply list_neq_elem 0, 
+                        swap, { 
+                            rw ha.right,
+                            exact lt_zero_one,
+                        }, {
                             rw list_nth_vector,
                             rw vector.nth_map,
                             rw map_active_threads_nth_active,
                             rw initial_kernel_assertion_left_thread_state h,
-                            by_cases heqtt' : t' = t.val, {
-                                subst heqtt',
+                            exact hneqtt',
+                            sorry, -- todo thread is actives
+                        }, {
+                            sorry, -- todo prove length through map and stuff
+                        }
+                    }, {
+                        rw function.comp.assoc,
+                        rw map_list_merge,
+                        apply store_access_elim_idx', {
+                            apply list_neq_elem 0, 
+                            swap, { 
+                                rw ha.right,
+                                exact lt_zero_one,
+                            }, {
+                                rw list_nth_vector,
+                                rw vector.nth_map,
+                                rw map_active_threads_nth_active,
+                                rw initial_kernel_assertion_left_thread_state h,
                                 exact hneqtt',
+                                sorry, -- todo thread is actives
+                            }, {
+                                sorry, -- todo prove length through map and stuff
                             }
+                        }, {
+                            -- initial state does not access any i
+                            apply access_init h,
                         }
                     }
                 }
-            }
+            },
         }
     }
 

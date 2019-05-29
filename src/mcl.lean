@@ -75,6 +75,9 @@ def is_tlocal (v : variable_def) := v.scope = scope.tlocal
 @[reducible]
 def is_global : variable_def → Prop := λ v, v.scope = scope.global
 
+--(show type_of (sig "tid") = type.int, by sorry) (show (sig "tid").type.dim = ([1] : vector ℕ 1).length, by sorry)
+def mcl_signature := { sig : signature // type_of (sig "tid") = type.int ∧ (sig "tid").type.dim = ([0] : vector ℕ 1).length}
+
 @[reducible]
 def state (sig : signature) : Type := Π (n : string) (idx : vector ℕ (sig n).type.dim), lean_type_of (sig n)
 
@@ -415,7 +418,7 @@ open mclk
 def empty_state {sig : signature} : state sig := λ name idx, default (type_map (type_of (sig name)))
 
 -- we need an assumption on the signature, i.e. tid must be int
-def mcl_init {sig : signature} : ℕ → state sig := λ n : ℕ, empty_state.update' (show type_of (sig "tid") = type.int, by sorry) (show (sig "tid").type.dim = ([1] : vector ℕ 1).length, by sorry) n
+def mcl_init {sig : signature} : ℕ → state sig := λ n : ℕ, empty_state.update' (show type_of (sig "tid") = type.int, by sorry) (show (sig "tid").type.dim = ([0] : vector ℕ 1).length, by sorry) n
 
 def mclp_rel {sig₁ sig₂ : signature} (P) (p₁ : mclp sig₁) (p₂ : mclp sig₂) (Q) := rel_hoare_program mcl_init mcl_init P (mclp_to_program p₁) (mclp_to_program p₂) Q
 
