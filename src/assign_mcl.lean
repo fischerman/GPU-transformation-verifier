@@ -82,7 +82,7 @@ lemma map_list_merge {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (f g : 
 end
 
 lemma map_active_threads_nth_active {σ ι : Type} {τ : ι → Type} [decidable_eq ι] {n} {s : state n σ τ} {ac : vector bool n} {f i} : 
-ac.nth i → (s.map_active_threads ac (map_list f)).threads.nth i = map_list f (s.threads.nth i) := begin
+ac.nth i → (s.map_active_threads ac f).threads.nth i = f (s.threads.nth i) := begin
   sorry
 end
 
@@ -111,6 +111,11 @@ i ∉ accesses (vector.nth ((map_active_threads ac₁ ((mcl_store var idx h₃ h
     sorry,
 end
 
+lemma store_store_success {sig : signature} {i : string × (list ℕ)} {updates} {ts : thread_state (state sig) (parlang_mcl_global sig)} 
+{dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig var) = t} {h₂} 
+{f : thread_state (state sig) (parlang_mcl_global sig) → thread_state (state sig) (parlang_mcl_global sig)} : 
+i = (var, (idx.map (eval (map_list updates ts).tlocal)).to_list) → i ∈ ((f ∘ mcl_store var idx h₁ h₂ ∘ map_list updates) ts).stores := by sorry
+
 lemma access_init  {sig₁ sig₂ : signature} {P : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop} 
 {f₁ : memory (parlang_mcl_global sig₁) → ℕ} {f₂ : memory (parlang_mcl_global sig₂) → ℕ} {m₁ : memory (parlang_mcl_global sig₁)} {m₂ : memory (parlang_mcl_global sig₂)} 
 {n₁} {s₁ : state n₁ (state sig₁) (parlang_mcl_global sig₁)} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ (state sig₂) (parlang_mcl_global sig₂)} {ac₂ : vector bool n₂} {t} {i} : 
@@ -127,11 +132,16 @@ set_option trace.simplify.rewrite true
 
 variable (m''' : memory (parlang_mcl_global sig))
 
+set_option trace.check true
+
+def memory_array_update_tid {sig : signature} {n} (var) (s : state n (state sig) (parlang_mcl_global sig)) (expr : expression sig (type_of (sig var))) (m : memory (parlang_mcl_global sig)) := 
+((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) i, m.update (var, [i]) (eval (s.threads.nth i).tlocal expr))) m
+
 -- #reduce eval ((map_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
 
 -- this approach is like computing both programs and comparing their output
 -- this is a fairly naive approach, another approach would be to show that their behavior is equal (based on the fact that we have to show equality)
-example : mclp_rel eq p₁ p₂ eq := begin
+lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
     apply rel_mclk_to_mclp,
 
     apply mcl.skip_right.mpr,
@@ -169,11 +179,10 @@ example : mclp_rel eq p₁ p₂ eq := begin
 
     -- the proof obligation in the form of a map thread on syncable is the simple version because we never consider threads to change active state (here all threads are always active)
 
-    -- h expresses the initial state (we might want to compress this information)
-    -- todo: we need ways to reason about ranges of memory (dependent on tid, ergo n₁)
-    -- e.g. using foldr
-    apply exists.intro ((list.range n₁).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) i, ((memory.update ("b", [i]) (i + 1 : ℕ) ∘ (memory.update ("a", [i]) i))) m) m₁),
-    
+    -- the two updates store indepedently because "a" ≠ "b"
+    -- the two updates read indepedently because they both depend on the same state (AFAIK they could still be swaped because the state is fixed)
+    apply exists.intro (memory_array_update_tid "b" s₁ (read_tid + (expression.const_int 1 (by refl))) (memory_array_update_tid "a" s₁ read_tid m₁)),
+
     split, {
         have : update_global_vars_for_expr read_tid = id := by refl,
         rw this,
@@ -239,18 +248,39 @@ example : mclp_rel eq p₁ p₂ eq := begin
             end),
             apply exists.intro,
             swap, {
-                sorry, -- we need an extra clause in by_cases which limits 
+                sorry, -- we need an extra clause in by_cases which limits the bound, because 
             },
+            repeat { rw map_to_map_list },
             split,
             {
-                sorry, -- find the correct store instruction which performs the write
+                -- find the correct store instruction which performs the write
+                rw map_active_threads_nth_active, {
+                    rw initial_kernel_assertion_left_thread_state h,
+                    apply store_store_success,
+                    cases i,
+                    cases ha,
+                    simp at ha_left,
+                    simp,
+                    dedup,
+                    split, {
+                        rw ha_left_1,
+                    }, {
+                        sorry,
+                        -- some operations on vector and list
+                        -- i.e. a list is the composition of it's element denoted by nth
+                    }
+                }, {
+                    -- thread is active
+                    admit,
+                }
             }, {
                 split,
                 {
+                    rw map_active_threads_nth_active,
                     sorry, -- proof that the value is the same
+                    admit,
                 }, {
                     intros t' ht'n hneqtt',
-                    repeat { rw map_to_map_list },
                     apply store_access_elim_idx, {
                         apply list_neq_elem 0, 
                         swap, { 
