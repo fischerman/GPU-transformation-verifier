@@ -127,6 +127,8 @@ lemma list_neq_elem {α : Type} {l l' : list α} (n : ℕ) (h : n < l.length) (h
 
 lemma list_nth_vector {α l} {v : vector α l} {n h} : list.nth_le (vector.to_list v) n h = v.nth ⟨n, (by sorry)⟩ := by sorry
 
+lemma list_one_eq {α : Type} {l₁ l₂ : list α} (h : l₁.length = 1) : ([l₁.nth_le 0 (by rw h; exact lt_zero_one)] : list α) = l₂ → l₁ = l₂ := sorry
+
 set_option trace.simplify.rewrite true 
 
 
@@ -136,6 +138,68 @@ set_option trace.check true
 
 def memory_array_update_tid {sig : signature} {n} (var) (s : state n (state sig) (parlang_mcl_global sig)) (expr : expression sig (type_of (sig var))) (m : memory (parlang_mcl_global sig)) := 
 ((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) i, m.update (var, [i]) (eval (s.threads.nth i).tlocal expr))) m
+
+#check @psigma
+
+-- question: should we limit ourselfs to global scope here?
+structure array_access (sig : signature) (var : string) (i : (string × (list ℕ))) : Prop :=
+(var_eq : i.1 = var)
+(idx_len : i.2.length = (sig var).type.dim)
+(bound : list.forall₂ eq i.2 (sig var).type.sizes.to_list)
+
+structure array_access_tid_to_idx (sig : signature) (var : string) (i : (string × (list ℕ))) (n : ℕ) extends array_access sig var i : Prop :=
+(one_dim : i.2.length = 1)
+(field_per_thread : i.2.nth_le 0 (by rw one_dim; exact lt_zero_one) < n)
+
+def array_access_tid_to_idx.tid_to_idx {sig : signature} {var : string} {i : (string × (list ℕ))} {n} (a : array_access_tid_to_idx sig var i n) : 
+(Σ' t : ℕ, t < n) := ⟨i.2.nth_le 0 (by rw a.one_dim; exact lt_zero_one), a.field_per_thread⟩
+
+instance forall₂_decidable {α : Type} [decidable_eq α] (l₁ : list α) (l₂ : list α) : decidable (list.forall₂ eq l₁ l₂) := begin
+    induction l₁ generalizing l₂,
+    case list.nil {
+        cases l₂,
+        case list.nil {
+            exact is_true (list.forall₂.nil)
+        },
+        case list.cons {
+            exact is_false (begin
+                intro h,
+                cases h,
+            end)
+        }
+    },
+    case list.cons {
+        cases l₂,
+        case list.nil {
+            exact is_false (begin
+                intro h,
+                cases h,
+            end)
+        },
+        case list.cons {
+            specialize l₁_ih l₂_tl,
+            admit,
+            -- by_cases h : l₁_hd = l₂_hd ∧ list.forall₂ eq l₁_tl l₂_tl,
+            -- {
+            --     exact is_true (begin
+            --         apply list.forall₂.cons,
+            --         exact h,
+            --         apply l₁_ih,
+            --     end)
+            -- }
+        }
+    }
+end
+
+instance {sig var i} : decidable (array_access sig var i) :=
+  if var_eq : i.1 = var then
+    if idx_len : i.2.length = (sig var).type.dim then 
+      if bound : list.forall₂ eq i.2 (sig var).type.sizes.to_list then is_true ⟨var_eq, idx_len, bound⟩
+      else is_false (assume h : array_access sig var i, bound (array_access.bound h))
+    else is_false (assume h : array_access sig var i, idx_len (array_access.idx_len h))
+  else is_false (assume h : array_access sig var i, var_eq (array_access.var_eq h))
+
+instance ll {sig var i n} : decidable (array_access_tid_to_idx sig var i n) := sorry
 
 -- #reduce eval ((map_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
 
@@ -238,18 +302,11 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
         --     rw eval_update_ignore hani',
         -- },
         intro,
-        -- todo: wrap this case into a array access definition
-        by_cases ha : i.1 = "a" ∧ i.2.length = 1,
+        by_cases ha : array_access_tid_to_idx sig "a" i n₁,
         {
             right,
-            use (i.2.nth_le 0 begin
-                rw ha.right,
-                apply lt_zero_one,
-            end),
-            apply exists.intro,
-            swap, {
-                sorry, -- we need an extra clause in by_cases which limits the bound, because 
-            },
+            use ha.tid_to_idx.1,
+            apply exists.intro (ha.tid_to_idx.2),
             repeat { rw map_to_map_list },
             split,
             {
@@ -258,16 +315,12 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                     rw initial_kernel_assertion_left_thread_state h,
                     apply store_store_success,
                     cases i,
-                    cases ha,
-                    simp at ha_left,
                     simp,
-                    dedup,
                     split, {
-                        rw ha_left_1,
+                        apply ha.var_eq,
                     }, {
-                        sorry,
-                        -- some operations on vector and list
-                        -- i.e. a list is the composition of it's element denoted by nth
+                        apply list_one_eq ha.one_dim,
+                        refl,
                     }
                 }, {
                     -- thread is active
