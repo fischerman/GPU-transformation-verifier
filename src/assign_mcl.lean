@@ -131,7 +131,6 @@ lemma list_one_eq {α : Type} {l₁ l₂ : list α} (h : l₁.length = 1) : ([l�
 
 set_option trace.simplify.rewrite true 
 
-
 variable (m''' : memory (parlang_mcl_global sig))
 
 set_option trace.check true
@@ -267,11 +266,6 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
         -- rw function.comp.assoc,
         -- rw function.comp.assoc,
         -- rw syncable_remove_map,
-        
-        -- rw ← function.comp.assoc,
-        -- rw thread_state_map',
-        -- rw function.comp.assoc,
-        -- rw syncable_remove_map,
 
         have hbni : list.all (vector.to_list [read_tid]) (bnot ∘ expr_reads "b") = tt := by refl,
         have hani : list.all (vector.to_list [read_tid]) (bnot ∘ expr_reads "a") = tt := by refl,
@@ -324,7 +318,8 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                     }
                 }, {
                     -- thread is active
-                    admit,
+                    apply all_threads_active_nth,
+                    exact h.left_all_threads_active,
                 }
             }, {
                 split,
