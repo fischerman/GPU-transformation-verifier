@@ -135,11 +135,6 @@ variable (m''' : memory (parlang_mcl_global sig))
 
 set_option trace.check true
 
-def memory_array_update_tid {sig : signature} {n} (var) (s : state n (state sig) (parlang_mcl_global sig)) (expr : expression sig (type_of (sig var))) (m : memory (parlang_mcl_global sig)) := 
-((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) i, m.update (var, [i]) (eval (s.threads.nth i).tlocal expr))) m
-
-#check @psigma
-
 -- question: should we limit ourselfs to global scope here?
 structure array_access (sig : signature) (var : string) (i : (string × (list ℕ))) : Prop :=
 (var_eq : i.1 = var)
@@ -200,7 +195,41 @@ instance {sig var i} : decidable (array_access sig var i) :=
 
 instance ll {sig var i n} : decidable (array_access_tid_to_idx sig var i n) := sorry
 
+lemma store_global_success {sig : signature} {i : string × (list ℕ)} {updates} 
+{dim} {idx : vector (expression sig type.int) dim} {var₁ var₂ t} {h₁ : type_of (sig var₂) = t} {h₂}
+{ts : thread_state (state sig) (parlang_mcl_global sig)}
+{f : thread_state (state sig) (parlang_mcl_global sig) → thread_state (state sig) (parlang_mcl_global sig)} (a : array_access sig var₁ i) (h : var₁ = var₂) : ((
+        f ∘
+        mcl_store var₂ idx h₁ h₂ ∘
+        map_list updates)
+    ts
+).global i = (begin simp [parlang_mcl_global, signature.lean_type_of, lean_type_of], rw a.var_eq, rw h, exact @state.get' sig _ var₂ _ _ (by refl) ((show (sig var₂).type.dim = (idx.map (eval (map_list updates ts).tlocal)).length, from h₂)) (map_list updates ts).tlocal end) := sorry
+
+def memory_array_update_tid {sig : signature} {n} (var) (s : state n (state sig) (parlang_mcl_global sig)) (expr : expression sig (type_of (sig var))) (m : memory (parlang_mcl_global sig)) := 
+((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) i, m.update (var, [i]) (eval (s.threads.nth i).tlocal expr))) m
+
+lemma memory_array_update_tid_skip {sig : signature} {n} {var₁ var₂} {s : state n (state sig) (parlang_mcl_global sig)} 
+{expr : expression sig (type_of (sig var₂))} {m : memory (parlang_mcl_global sig)} {i} (a : array_access sig var₁ i) (h : var₁ ≠ var₂) : 
+(memory_array_update_tid var₂ s expr m) i = m i := begin
+    cases i,
+    have : i_fst = var₁ := a.var_eq,
+    rw this,
+    unfold memory_array_update_tid,
+    -- induction on n
+    -- show non-interference on memory.update
+    admit,
+end
+
+lemma memory_array_update_tid_success {sig : signature} {n} {var₁ var₂} {s : state n (state sig) (parlang_mcl_global sig)} 
+{expr : expression sig (type_of (sig var₂))} {m : memory (parlang_mcl_global sig)} {i} (a : array_access_tid_to_idx sig var₁ i n) (h : var₁ = var₂) : 
+(memory_array_update_tid var₂ s expr m) i = eval (s.threads.nth ⟨_, a.field_per_thread⟩).tlocal (by rw a.to_array_access.var_eq; rw h; exact expr) := begin
+    admit,
+end
+
 -- #reduce eval ((map_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
+
+-- todo change the definition of syncable to take a fin
+-- todo extend array_access_tid to contain the value as an expression
 
 -- this approach is like computing both programs and comparing their output
 -- this is a fairly naive approach, another approach would be to show that their behavior is equal (based on the fact that we have to show equality)
@@ -324,9 +353,23 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
             }, {
                 split,
                 {
-                    rw map_active_threads_nth_active,
+                    rw map_active_threads_nth_active (all_threads_active_nth h.left_all_threads_active _),
+                    rw memory_array_update_tid_skip ha.to_array_access,
+                    swap, {
+                        intro heq,
+                        cases heq,
+                    },
+                    rw memory_array_update_tid_success ha,
+                    swap, {
+                        refl,
+                    },
+                    rw store_global_success ha.to_array_access,
+                    swap, {
+                        refl
+                    },
+                    rw initial_kernel_assertion_left_thread_state h,
+                    refl,
                     sorry, -- proof that the value is the same
-                    admit,
                 }, {
                     intros t' ht'n hneqtt',
                     apply store_access_elim_idx, {
