@@ -75,7 +75,7 @@ lemma contains_nth {α : Type} : ∀{n : ℕ} {v : vector α n} {i : fin n}, (v.
 
 lemma eq_element_wise {α : Type} : ∀{a b : vector α n}, (∀ i, a.nth i = b.nth i) → a = b := begin
   -- TODO needs fixing
-  intros a b i hieq,
+  intros a b hieq,
   apply vector.eq,
   cases a,
   cases b,
@@ -161,4 +161,4 @@ lemma bnot_bnot {α : Type} {f : α → bool} : (bnot ∘ bnot ∘ f) = f := beg
   sorry,
 end
 
-end
+end bool
