@@ -167,7 +167,6 @@ lemma single_step_left {P Q f} {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ 
     have : s₂ = s₂' := begin
         cases h₁_left,
         cases s₂,
-        simp,
         sorry, -- trivial
     end,
     apply h₂,
