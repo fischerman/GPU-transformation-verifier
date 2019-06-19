@@ -172,7 +172,8 @@ lemma syncable_unique {s : state n σ τ} {m m'} (h₁ : syncable s m) (h₂ : s
         by_contra hlneq,
         have : x ∉ thread_state.accesses (vector.nth (s.threads) ⟨h₁l, h₁_hl⟩) := begin
           specialize h₁_3 h₂l,
-          apply h₁_3 h₂_hl hlneq,
+          sorry,
+          --apply h₁_3 h₂_hl hlneq,
         end,
         unfold thread_state.accesses at this,
         have : x ∉ (vector.nth (s.threads) ⟨h₁l, h₁_hl⟩).stores := begin
@@ -476,7 +477,10 @@ lemma exec_state_unique {s u t : state n σ τ} {ac : vector bool n} {k} (h₁ :
   case exec_state.sync_none {
     cases h₂,
     case parlang.exec_state.sync_all {
+      by_cases hl : 0 < n,
+      -- contradiction
       apply false.elim (no_threads_active_not_all_threads hl h₁_h h₂_ha),
+      sorry, -- trivial
     },
     case parlang.exec_state.sync_none {
       refl,
@@ -530,24 +534,24 @@ lemma exec_state_precedes {s u : state n σ τ} {ac : vector bool n} {k} : exec_
     case nat.zero {
       exact match ac with
       | ⟨[], h⟩ := begin
-          rw vector.map₂_nil',
-          rw vector.map₂_nil,
-          intro,
-          have : (a, b) ∉ (@vector.nil (thread_state σ τ × thread_state σ τ)) := by apply vector.mem_nil,
-          contradiction,
+          sorry,
+          -- rw vector.map₂_nil',
+          -- rw vector.map₂_nil,
+          -- intro,
+          -- have : (a, b) ∉ (@vector.nil (thread_state σ τ × thread_state σ τ)) := by apply vector.mem_nil,
+          -- contradiction,
         end
       end,
     },
     case nat.succ {
       exact match ac, s.threads with
       | ⟨list.cons a ac_tl, h ⟩ := begin
-
+          sorry
         end
       end,
     },
-
-    unfold thread_state.load,
-  }
+  },
+  repeat { admit }
 end
 
 lemma exec_state_seq_left {s u : state n σ τ} {ac : vector bool n} {k₁ k₂} : exec_state (k₁ ;; k₂) ac s u → ∃t, exec_state k₁ ac s t ∧ t.precedes u := begin
@@ -638,7 +642,7 @@ lemma kernel_transform_inhab {k : kernel σ τ} {n} {ac} {s u} : exec_state k ac
     specialize k_ih_a_1 h2 h_a_1,
     cases k_ih_a with f,
     cases k_ih_a_1 with g,
-    apply exists.intro (f ∘ g),
+    apply exists.intro (g ∘ f),
     intros s' u',
     apply iff.intro,
     {
@@ -647,14 +651,16 @@ lemma kernel_transform_inhab {k : kernel σ τ} {n} {ac} {s u} : exec_state k ac
       have h3 : he_t = state.map_active_threads ac f s' := (k_ih_a_h _ _).mp he_a,
       have h4 : u' = state.map_active_threads ac g he_t := (k_ih_a_1_h _ _).mp he_a_1,
       rw ← state.map_map_active_threads,
-      rw ← h3,
+      rw h3 at h4,
       exact h4,
     }, {
       intro hmac,
       subst hmac,
       apply exec_state.seq,
+      repeat { sorry }
     }
-  }
+  },
+  repeat { sorry }
 end
 
 lemma exec_state_comm_distinct_ac {s t u : state n σ τ} {ac₁ ac₂ : vector bool n} {k₁ k₂} :
@@ -664,8 +670,8 @@ lemma exec_state_comm_distinct_ac {s t u : state n σ τ} {ac₁ ac₂ : vector 
   ∃ t', exec_state k₂ ac₂ s t' ∧ exec_state k₁ ac₁ t' u :=
 begin
   intros hd hk₁ hk₂,
-  have hf₁ : _ := kernel_transform_inhab hk₁,
-  have hf₂ : _ := kernel_transform_inhab hk₂,
+  have hf₁ : _ := kernel_transform_inhab hk₁ sorry,
+  have hf₂ : _ := kernel_transform_inhab hk₂ sorry,
   cases hf₁ with f₁ hf₁,
   cases hf₂ with f₂ hf₂,
   have h : u = state.map_active_threads ac₂ f₂ (state.map_active_threads ac₁ f₁ s) := begin
@@ -692,7 +698,7 @@ inductive exec_memory (k : kernel σ τ) (ac : vector bool n) (s : state n σ τ
 lemma exec_memory_unique {s : state n σ τ} {m o o': memory τ} {ac : vector bool n} {k} (h₁ : exec_memory k ac s m o) (h₂ : exec_memory k ac s m o') (hl : 0 < n) : o = o' := begin
   cases h₁,
   cases h₂,
-  have : h₂_u = h₁_u := by apply exec_state_unique h₁_hk h₂_hk hl,
+  have : h₂_u = h₁_u := by apply (exec_state_unique h₁_hk h₂_hk),
   subst this,
   apply state.syncable_unique h₁_syncable h₂_syncable hl,
 end
@@ -703,11 +709,11 @@ lemma exec_memory_seq_left {k₁ k₂ : kernel σ τ} {ac : vector bool n} {s} {
   have hesk₁ : _ := by apply exec_state_seq_left he_hk,
   cases hesk₁ with t hesk₁,
   have hk₁s : ∃r, t.syncable r := begin
-
+    sorry,
   end,
   cases hk₁s with r,
   apply Exists.intro r,
-  apply exec_memory.intro hesk₁ hk₁s_h,
+  apply exec_memory.intro hesk₁.left hk₁s_h,
 end
 
 inductive program {ι : Type} (σ : Type) (τ : ι → Type)
