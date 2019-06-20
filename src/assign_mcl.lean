@@ -54,6 +54,7 @@ lemma store_get_update' (n₁ n₂) {sig : signature} {dim₁ dim₂} {idx} {idx
     (hn : n₁ = n₂) (hidx : idx₁.to_list = idx₂.to_list) (ht : type_map (sig.type_of n₁) = type_map (sig.type_of n₂)) : 
     @store _ _ (parlang_mcl_global sig) _ (λ (s : mcl.state sig), ⟨(n₁, idx), @state.get' sig (sig.type_of n₁) n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig (sig.type_of n₂) n₂ dim₂ idx₂ h₂ h₂' v s)⟩) = 
     store (λ (s : mcl.state sig), ⟨(n₁, idx), (show (type_map $ sig.type_of n₁), begin rw ht, exact v end)⟩) := begin
+    sorry
 end
 
 --list.all (vector.to_list ?m_4) (bnot ∘ expr_reads ?m_5)
@@ -368,14 +369,13 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                         refl
                     },
                     rw initial_kernel_assertion_left_thread_state h,
-                    refl,
                     sorry, -- proof that the value is the same
                 }, {
                     intros t' ht'n hneqtt',
                     apply store_access_elim_idx, {
                         apply list_neq_elem 0, 
                         swap, { 
-                            rw ha.right,
+                            rw ha.one_dim,
                             exact lt_zero_one,
                         }, {
                             rw list_nth_vector,
@@ -393,7 +393,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                         apply store_access_elim_idx', {
                             apply list_neq_elem 0, 
                             swap, { 
-                                rw ha.right,
+                                rw ha.one_dim,
                                 exact lt_zero_one,
                             }, {
                                 rw list_nth_vector,
@@ -412,9 +412,12 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                     }
                 }
             },
+        }, {
+            sorry,
         }
+    }, {
+        sorry,
     }
-
 end
 
 end assign_mcl
