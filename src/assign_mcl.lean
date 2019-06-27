@@ -234,6 +234,9 @@ end
 
 -- this approach is like computing both programs and comparing their output
 -- this is a fairly naive approach, another approach would be to show that their behavior is equal (based on the fact that we have to show equality)
+/--
+Show 
+-/
 lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
     apply rel_mclk_to_mclp,
 

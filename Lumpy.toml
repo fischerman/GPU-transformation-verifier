@@ -1,0 +1,8 @@
+[[documents]]
+title = "MCL"
+file_name = "assign_mcl"
+authors = ["bjorn fischer"]
+src_dirs = ["src/."]
+output_dir = "docs_out/"
+output_formats = ["pdf"]
+comment_format = "cmark"
