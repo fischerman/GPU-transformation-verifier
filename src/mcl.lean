@@ -118,17 +118,17 @@ inductive expression (sig : signature) : type → Type
 | tlocal_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_tlocal (sig n)) : expression t
 | global_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_global (sig n)) : expression t
 | add {t} : expression t → expression t → expression t
-| const_int {} {t} (n : ℕ) (h : t = type.int) : expression t
+| literal_int {} {t} (n : ℕ) (h : t = type.int) : expression t
 | lt {t} (h : t = type.bool) : expression int → expression int → expression t
 
 open expression
 
 instance (t : type) : has_add (expression sig t) := ⟨expression.add⟩
-instance : has_zero (expression sig int) := ⟨expression.const_int 0 rfl⟩
-instance : has_one (expression sig int) := ⟨expression.const_int 1 rfl⟩
+instance : has_zero (expression sig int) := ⟨expression.literal_int 0 rfl⟩
+instance : has_one (expression sig int) := ⟨expression.literal_int 1 rfl⟩
 infix < := expression.lt (show type.bool = type.bool, by refl)
 notation `v(` n `)`:= expression.tlocal_var n (by refl)
-notation `i(` n `)`:= expression.const_int n (by refl)
+notation `i(` n `)`:= expression.literal_int n (by refl)
 
 def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 | int a b := a + b
@@ -160,13 +160,13 @@ def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ
 def s₁ : signature
 | _ := { scope := scope.global, type := ⟨_, [100], type.int⟩ }
 -- appearently not true
-def test : (7 : expression s₁ int) = (const_int 7 (by refl)) := begin
+def test : (7 : expression s₁ int) = (literal_int 7 (by refl)) := begin
     sorry, -- not by refl
 end
 def idx₁ : fin 1 → expression s₁ int
 | _ := 7
 #eval expression_size (tlocal_var "n" idx₁ sorry sorry sorry  : expression s₁ int)
-#eval expression_size (expression.add (const_int 123 (by refl)) (const_int 123 (by refl)) : expression s₁ int)
+#eval expression_size (expression.add (literal_int 123 (by refl)) (literal_int 123 (by refl)) : expression s₁ int)
 
 #print expression_size
 
@@ -409,7 +409,7 @@ def mclp_rel {sig₁ sig₂ : signature} (P) (p₁ : mclp sig₁) (p₂ : mclp s
 
 -- we have to show some sort of non-interference
 -- example {sig : signature} {n} {k₁} {P Q : state_assert sig sig} (h : sig "i" = { scope := scope.global, type := ⟨_, [0], type.int⟩}) (hpi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → n₁ = n ∧ n₂ = 1) : 
--- mclk_rel P k₁ (for "i" h _ 0 (λ s, s.get' h < n) (tlocal_assign "i" (var "i" (by refl) + (const_int 1 h))) k₁) Q := begin
+-- mclk_rel P k₁ (for "i" h _ 0 (λ s, s.get' h < n) (tlocal_assign "i" (var "i" (by refl) + (literal_int 1 h))) k₁) Q := begin
 --     sorry
 -- end
 
@@ -573,7 +573,7 @@ exec_state (list.foldr kernel.seq (kernel.compute id) (load_global_vars_for_expr
     --         rw parlang.state.map_map_active_threads',
     --         refl,
     --     },
-    --     case mcl.expression.const_int {
+    --     case mcl.expression.literal_int {
     --         cases h,
     --         sorry,
     --     },

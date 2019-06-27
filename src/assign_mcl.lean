@@ -26,11 +26,11 @@ end
 
 def p₁ : mclp sig := mclp.intro (λ m, 100) (
     mclk.global_assign "a" [read_tid] (by refl) (by refl) read_tid ;;
-    mclk.global_assign "b" [read_tid] (by refl) (by refl) (read_tid + (expression.const_int 1 (by refl)))
+    mclk.global_assign "b" [read_tid] (by refl) (by refl) (read_tid + (expression.literal_int 1 (by refl)))
 )
 
 def p₂ : mclp sig := mclp.intro (λ m, 100) (
-    mclk.global_assign "b" [read_tid] (by refl) (by refl) (read_tid + (expression.const_int 1 (by refl))) ;;
+    mclk.global_assign "b" [read_tid] (by refl) (by refl) (read_tid + (expression.literal_int 1 (by refl))) ;;
     mclk.global_assign "a" [read_tid] (by refl) (by refl) read_tid
 )
 
@@ -277,12 +277,12 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
 
     -- the two updates store indepedently because "a" ≠ "b"
     -- the two updates read indepedently because they both depend on the same state (AFAIK they could still be swaped because the state is fixed)
-    apply exists.intro (memory_array_update_tid "b" s₁ (read_tid + (expression.const_int 1 (by refl))) (memory_array_update_tid "a" s₁ read_tid m₁)),
+    apply exists.intro (memory_array_update_tid "b" s₁ (read_tid + (expression.literal_int 1 (by refl))) (memory_array_update_tid "a" s₁ read_tid m₁)),
 
     split, {
         have : update_global_vars_for_expr read_tid = id := by refl,
         rw this,
-        have : update_global_vars_for_expr (read_tid + (expression.const_int 1 (show type_of (sig "b") = type_of (sig "b"), by refl))) = id := by refl,
+        have : update_global_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig "b") = type_of (sig "b"), by refl))) = id := by refl,
         rw this,
         simp,
 
@@ -304,8 +304,8 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
         have hani : list.all (vector.to_list [read_tid]) (bnot ∘ expr_reads "a") = tt := by refl,
         have hani' : expr_reads "a" read_tid = ff := by refl,
         have hbni' : expr_reads "b" read_tid = ff := by refl,
-        have hbni'' : expr_reads "b" (read_tid + expression.const_int 1 p₁._proof_5) = ff := by refl,
-        have hani'' : expr_reads "a" (read_tid + expression.const_int 1 p₁._proof_5) = ff := by refl,
+        have hbni'' : expr_reads "b" (read_tid + expression.literal_int 1 p₁._proof_5) = ff := by refl,
+        have hani'' : expr_reads "a" (read_tid + expression.literal_int 1 p₁._proof_5) = ff := by refl,
 
         -- resolve get and update (the result should only be mcl_init, literals and memory (in case of loads))
 
