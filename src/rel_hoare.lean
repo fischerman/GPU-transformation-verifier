@@ -57,7 +57,7 @@ def initial_kernel_assertion.left_all_threads_active {init₁ : ℕ → σ₁} {
 
 #check initial_kernel_assertion.left_all_threads_active
 
-lemma rel_kernel_to_program (k₁ : kernel σ₁ τ₁) (k₂ : kernel σ₂ τ₂) (init₁ : ℕ → σ₁) (init₂ : ℕ → σ₂) (P Q : memory τ₁ → memory τ₂ → Prop) (f₁ : memory τ₁ → ℕ) (f₂ : memory τ₂ → ℕ)
+lemma rel_kernel_to_program {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P Q : memory τ₁ → memory τ₂ → Prop} {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ}
  (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ *} k₁ ~ k₂ 
  {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂ *} ) : -- if I have to proof syncability of s₁, do I really have to assume termination of the left?
  rel_hoare_program init₁ init₂ P (program.intro f₁ k₁) (program.intro f₂ k₂) Q :=

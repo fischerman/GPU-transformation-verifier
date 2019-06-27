@@ -442,12 +442,7 @@ lemma rel_mclk_to_mclp {sig₁ sig₂ : signature} (f₁ : memory (parlang_mcl_g
 (λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, initial_kernel_assertion mcl_init mcl_init P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂)
     k₁ k₂ 
 (λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂)) : 
-mclp_rel P (mclp.intro f₁ k₁) (mclp.intro f₂ k₂) Q := begin
-    unfold mclp_rel,
-    apply rel_kernel_to_program,
-    unfold mclk_rel at h,
-    assumption,
-end
+mclp_rel P (mclp.intro f₁ k₁) (mclp.intro f₂ k₂) Q := rel_kernel_to_program h
 
 set_option trace.check true
 
