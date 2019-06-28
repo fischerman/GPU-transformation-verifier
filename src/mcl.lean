@@ -24,8 +24,8 @@ end⟩
 
 structure array :=
 (dim : ℕ)
-(sizes : vector ℕ dim)
 (type : type)
+-- (sizes : vector ℕ dim)
 
 inductive scope
 | tlocal
@@ -43,7 +43,7 @@ variables {sig : signature}
 
 @[reducible]
 def create_signature : list (string × variable_def) → signature
-| [] n := { scope := scope.tlocal, type := ⟨1, 1 :: vector.nil, int⟩} -- by default all variables are tlocal int's
+| [] n := { scope := scope.tlocal, type := ⟨1, int⟩} -- by default all variables are tlocal int's
 | ((m, v) :: xs) n := if m = n then v else create_signature xs n
 
 @[reducible]
@@ -158,7 +158,7 @@ def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ
     (λ t h a b ih_a ih_b, ih_a + ih_b + 1)
 
 def s₁ : signature
-| _ := { scope := scope.global, type := ⟨_, [100], type.int⟩ }
+| _ := { scope := scope.global, type := ⟨1, type.int⟩ }
 -- appearently not true
 def test : (7 : expression s₁ int) = (literal_int 7 (by refl)) := begin
     sorry, -- not by refl
