@@ -6,8 +6,8 @@ open mcl.mclk
 namespace assign_mcl
 
 def sig : signature
-| "tid" := { scope := scope.tlocal, type := ⟨_, [1], type.int⟩ }
-| _ := { scope := scope.global, type := ⟨_, [100], type.int⟩ }
+| "tid" := { scope := scope.tlocal, type := ⟨1, type.int⟩ }
+| _ := { scope := scope.global, type := ⟨1, type.int⟩ }
 
 
 lemma a_is_global : is_global (sig "a") := by apply eq.refl
@@ -140,7 +140,7 @@ set_option trace.check true
 structure array_access (sig : signature) (var : string) (i : (string × (list ℕ))) : Prop :=
 (var_eq : i.1 = var)
 (idx_len : i.2.length = (sig var).type.dim)
-(bound : list.forall₂ eq i.2 (sig var).type.sizes.to_list)
+-- (bound : list.forall₂ nat.lt i.2 (sig var).type.sizes.to_list)
 
 structure array_access_tid_to_idx (sig : signature) (var : string) (i : (string × (list ℕ))) (n : ℕ) extends array_access sig var i : Prop :=
 (one_dim : i.2.length = 1)
@@ -188,9 +188,9 @@ end
 
 instance {sig var i} : decidable (array_access sig var i) :=
   if var_eq : i.1 = var then
-    if idx_len : i.2.length = (sig var).type.dim then 
-      if bound : list.forall₂ eq i.2 (sig var).type.sizes.to_list then is_true ⟨var_eq, idx_len, bound⟩
-      else is_false (assume h : array_access sig var i, bound (array_access.bound h))
+    if idx_len : i.2.length = (sig var).type.dim then is_true ⟨var_eq, idx_len⟩
+    --   if bound : list.forall₂ eq i.2 (sig var).type.sizes.to_list then is_true ⟨var_eq, idx_len, bound⟩
+    --   else is_false (assume h : array_access sig var i, bound (array_access.bound h))
     else is_false (assume h : array_access sig var i, idx_len (array_access.idx_len h))
   else is_false (assume h : array_access sig var i, var_eq (array_access.var_eq h))
 
