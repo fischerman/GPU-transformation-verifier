@@ -3,7 +3,7 @@ import parlang
 import rel_hoare
 open parlang
 
-notation `[` v:(foldr `, ` (h t, vector.cons h t) vector.nil `]`) := v
+notation `v[` v:(foldr `, ` (h t, vector.cons h t) vector.nil `]`) := v
 
 namespace mcl
 variables {n : ℕ}
@@ -76,41 +76,23 @@ def is_tlocal (v : variable_def) := v.scope = scope.tlocal
 def is_global : variable_def → Prop := λ v, v.scope = scope.global
 
 --(show type_of (sig "tid") = type.int, by sorry) (show (sig "tid").type.dim = ([1] : vector ℕ 1).length, by sorry)
-def mcl_signature := { sig : signature // type_of (sig "tid") = type.int ∧ (sig "tid").type.dim = ([0] : vector ℕ 1).length}
+def mcl_signature := { sig : signature // type_of (sig "tid") = type.int ∧ (sig "tid").type.dim = (v[0] : vector ℕ 1).length}
 
+-- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
 @[reducible]
-def state (sig : signature) : Type := Π (n : string) (idx : vector ℕ (sig n).type.dim), lean_type_of (sig n)
+def parlang_mcl_global (sig : signature) := (λ i : (Σ n: string, vector ℕ (sig n).type.dim), sig.lean_type_of i.1)
+@[reducible]
+def parlang_mcl_tlocal (sig : signature) := (λ i : (Σ n: string, vector ℕ (sig n).type.dim), sig.lean_type_of i.1)
+@[reducible]
+def parlang_mcl_kernel (sig : signature) := kernel (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)
 
--- type safety is proven given an instance of MCLK (mostly by refl)
--- same is done for the number of array indices
--- the same cannot be done for array indices values (we would have to reason about programs)
--- no out of bound checking
-def state.update {sig : signature} (name : string) (idx : vector ℕ (sig name).type.dim) (val : lean_type_of (sig name)) (s : state sig) : state sig :=
-λn idxq, if h : n = name 
-then by 
-    subst h; 
-    exact (
-        if idx = idxq
-        then  val 
-        else (s n idxq))
-else (s n idxq)
+-- lemma state_get_update_ignore (n₁ n₂) {sig dim₁ dim₂ t₁ t₂ idx₁ idx₂} {s h₁ h₁' h₂ h₂' v} (h : n₁ ≠ n₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = s.get' h₁ h₁' := begin
+--     sorry
+-- end
 
--- update' only requires proofs
--- we once define the structure of the proofs and use them everywhere (as a substitute for the identifier)
--- when we define a program must proofs will be refl
-def state.update' {sig : signature} {t : type} {name : string} {dim : ℕ} {idx : vector ℕ dim} (eq : type_of (sig name) = t) (h : (sig name).type.dim = idx.length) (val : type_map t) (s : state sig) : state sig :=
-state.update name (by rw [h]; exact idx) (begin unfold lean_type_of, rw [eq], exact val end) s
-
-def state.get' {sig : signature} {t : type} {name : string} {dim : ℕ} {idx : vector ℕ dim} (eq : type_of (sig name) = t) (h : (sig name).type.dim = idx.length) (s : state sig) : type_map t :=
-by rw [← eq]; rw [vector.length] at h; rw [← h] at idx; exact s name idx
-
-lemma state_get_update_ignore (n₁ n₂) {sig dim₁ dim₂ t₁ t₂ idx₁ idx₂} {s h₁ h₁' h₂ h₂' v} (h : n₁ ≠ n₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = s.get' h₁ h₁' := begin
-    sorry
-end
-
-lemma state_get_update_success (n₁ n₂) {sig dim₁ dim₂ t₁ t₂} {idx₁ : vector ℕ dim₁} {idx₂ : vector ℕ dim₂} {s h₁ h₁' h₂ h₂' v} (hn : n₁ = n₂) (hidx : idx₁.to_list = idx₂.to_list) (ht : type_map t₁ = type_map t₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = eq.mpr ht v := begin
-    sorry,
-end
+-- lemma state_get_update_success (n₁ n₂) {sig dim₁ dim₂ t₁ t₂} {idx₁ : vector ℕ dim₁} {idx₂ : vector ℕ dim₂} {s h₁ h₁' h₂ h₂' v} (hn : n₁ = n₂) (hidx : idx₁.to_list = idx₂.to_list) (ht : type_map t₁ = type_map t₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = eq.mpr ht v := begin
+--     sorry,
+-- end
 
 -- expression is an inductive family over types
 -- type is called an index
@@ -181,20 +163,12 @@ lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
 -- should we make this an inductive predicate
 -- it would have implications on parlang
 -- might have to change this to rec_on
-def eval {sig : signature} (s : state sig) {t : type} (expr : expression sig t) : type_map t := expression.rec_on expr 
+def eval {sig : signature} (s : memory $ parlang_mcl_tlocal sig) {t : type} (expr : expression sig t) : type_map t := expression.rec_on expr 
     -- tlocal
-    (λ t dim n idx h₁ h₂ h₃ ih, s.get' h₁ (show (sig n).type.dim = ((vector.range_fin dim).map ih).length, begin
-        rw vector.length_map,
-        rw vector.length_range_nth,
-        exact h₂,
-    end))
+    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact s.get ⟨n, (by rw h₂; exact (vector.range_fin dim).map ih)⟩)
     -- global
     -- requires that the global variable has been loaded into tstate under the same name
-    (λ t dim n idx h₁ h₂ h₃ ih, s.get' h₁ (show (sig n).type.dim = ((vector.range_fin dim).map ih).length, begin
-        rw vector.length_map,
-        rw vector.length_range_nth,
-        exact h₂,
-    end))
+    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact s.get ⟨n, (by rw h₂; exact (vector.range_fin dim).map ih)⟩)
     -- add
     (λ t a b ih_a ih_b, type_map_add ih_a ih_b)
     -- literal_int
@@ -202,18 +176,12 @@ def eval {sig : signature} (s : state sig) {t : type} (expr : expression sig t) 
     -- lt
     (λ t h a b ih_a ih_b, (by rw h; exact (ih_a < ih_b)))
 
--- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
-@[reducible]
-def parlang_mcl_global (sig : signature) := (λ i : string × (list ℕ), sig.lean_type_of i.1)
-@[reducible]
-def parlang_mcl_kernel (sig : signature) := kernel (state sig) (parlang_mcl_global sig)
-
 def load_global_vars_for_expr {sig : signature} {t : type} (expr : expression sig t) : list (parlang_mcl_kernel sig) := expression.rec_on expr 
     -- tlocal
     (λ t dim n idx h₁ h₂ h₃ ih, ((list.range_fin dim).map ih).foldl list.append [])
     -- global
     -- requires that the global variable has been loaded into tstate under the same name
-    (λ t dim n idx h₁ h₂ h₃ ih, ((list.range_fin dim).map ih).foldl list.append [] ++ [kernel.load (λ s, ⟨(n, ((vector.of_fn idx).map (eval s)).to_list), λ v, s.update' (show type_of (sig n) = type_of (sig n), by refl) (show (sig n).type.dim = ((vector.of_fn idx).map (eval s)).length, from h₂) v⟩)])
+    (λ t dim n idx h₁ h₂ h₃ ih, ((list.range_fin dim).map ih).foldl list.append [] ++ [(kernel.load (λ s, ⟨⟨n, by rw h₂; exact ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, by rw h₂; exact (vector.of_fn idx).map (eval s)⟩ v⟩) : parlang_mcl_kernel sig)])
     -- add
     (λ t a b ih_a ih_b, ih_a ++ ih_b)
     -- literal_int
@@ -262,14 +230,14 @@ def expr_reads (n : string) {t : type} (expr : expression sig t) : _root_.bool :
     -- lt
     (λ t h a b ih_a ih_b, ih_a || ih_b)
 
-lemma eval_update_ignore {sig : signature} {t t₂ : type} {dim₂ n} {idx₂ : vector ℕ dim₂} {v} {h₁ h₂} {expr : expression sig t} {s} (h : expr_reads n expr = ff) : 
-eval (@state.update' sig t₂ n dim₂ idx₂ h₁ h₂ v s) expr  = eval s expr := begin
+lemma eval_update_ignore {sig : signature} {t t₂ : type} {n} {idx₂ : vector ℕ ((sig n).type).dim} {v} {expr : expression sig t} {s : memory $ parlang_mcl_tlocal sig} (h : expr_reads n expr = ff) : 
+eval (s.update ⟨n, idx₂⟩ v) expr = eval s expr := begin
     admit
 end
 
 -- can we make use of functor abstraction
-lemma eval_update_ignore' {sig : signature} {t t₂ : type} {dim dim₂ n} {idx₂ : vector ℕ dim₂} {v} {h₁ h₂} {idx : vector (expression sig t) dim} {s} (h : (idx.to_list.all $ bnot ∘ expr_reads n) = tt) : 
-vector.map (eval (@state.update' sig t₂ n dim₂ idx₂ h₁ h₂ v s)) idx = vector.map (eval s) idx := begin
+lemma eval_update_ignore' {sig : signature} {t t₂ : type} {dim n} {idx₂ : vector ℕ ((sig n).type).dim} {v} {idx : vector (expression sig t) dim} {s : memory $ parlang_mcl_tlocal sig} (h : (idx.to_list.all $ bnot ∘ expr_reads n) = tt) : 
+vector.map (eval (s.update ⟨n, idx₂⟩ v)) idx = vector.map (eval s) idx := begin
     admit
 end
 
@@ -299,9 +267,9 @@ def mclk_reads (n : string) : mclk sig → _root_.bool
 def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | (skip) := kernel.compute id
-| (tlocal_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s : state sig, s.update' h₁ (show (sig n).type.dim = (idx.map (eval s)).length, from h₂) (eval s expr)))
-| (global_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update' h₁ (show (sig n).type.dim = (idx.map (eval s)).length, from h₂) (eval s expr))) ;; kernel.store (λ s, ⟨(n, (idx.map (eval s)).to_list), s.get' (begin simp, end) (show (sig n).type.dim = (idx.map (eval s)).length, from h₂)⟩)
-| (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' h (show (sig n).type.dim = (([0] : vector (expression sig int) _).map (eval s)).length, from h₂) (eval s expr))) ;; 
+| (tlocal_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, by rw h₂; exact idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)))
+| (global_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, by rw h₂; exact idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end))) ;; kernel.store (λ s, ⟨⟨n, by rw h₂; exact idx.map (eval s)⟩, s.get ⟨n, by rw h₂; exact idx.map (eval s)⟩⟩)
+| (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' ⟨n, by rw h₂; exact v[0].map (eval s)⟩ (show (sig n).type.dim = (([0] : vector (expression sig int) _).map (eval s)).length, from h₂) (eval s expr))) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
     )

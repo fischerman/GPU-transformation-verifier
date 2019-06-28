@@ -49,9 +49,9 @@ def memory {ι : Type} (τ : ι → Type) := Π (i : ι), τ i
 
 namespace memory
 
-def get (i : ι) (m : memory τ) : τ i := m i
+def get (m : memory τ) (i : ι) : τ i := m i
 
-def update (i : ι) (v : τ i) (m : memory τ) : memory τ := function.update m i v
+def update (m : memory τ) (i : ι) (v : τ i) : memory τ := function.update m i v
 
 end memory
 
