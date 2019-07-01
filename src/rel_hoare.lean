@@ -2,7 +2,7 @@ import parlang
 
 namespace parlang
 
-variables {σ σ₁ σ₂ : Type} {ι : Type} {τ τ₁ τ₂ : ι → Type} [decidable_eq ι]
+variables {σ σ₁ σ₂ : Type} {ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → Type} [decidable_eq ι₁] [decidable_eq ι₂]
 
 -- we assume the same type ι for addressing global memory
 def rel_hoare_state (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop) (k₁ : kernel σ₁ τ₁) (k₂ : kernel σ₂ τ₂) 
@@ -11,10 +11,6 @@ def rel_hoare_state (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n�
     ∃ s₂', exec_state k₂ ac₂ s₂ s₂' ∧ Q n₁ s₁' ac₁ n₂ s₂' ac₂
 
 notation `{* ` P : 1 ` *} ` k₁ : 1 ` ~ ` k₂ : 1 ` {* ` Q : 1 ` *}` := rel_hoare_state P k₁ k₂ Q
-
-def rel_hoare_memory (P : memory τ → memory τ → Prop) (k₁ : kernel σ τ) (k₂ : kernel σ τ) (Q : memory τ → memory τ → Prop) :=
-∀ (n₁ n₂) s (ac₁ : vector bool n₁) (ac₂ : vector bool n₂) m m' o, P m m' → exec_memory k₁ ac₁ s m o → ∃ u o', exec_memory k₂ ac₂ u m' o' → Q o o'
-
 
 namespace rel_hoare
 
