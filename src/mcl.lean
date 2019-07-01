@@ -80,9 +80,11 @@ def mcl_signature := { sig : signature // type_of (sig "tid") = type.int ∧ (si
 
 -- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
 @[reducible]
-def parlang_mcl_global (sig : signature) := (λ i : (Σ n: string, vector ℕ (sig n).type.dim), sig.lean_type_of i.1)
+def mcl_address (sig : signature) := (Σ n: string, vector ℕ (sig n).type.dim)
 @[reducible]
-def parlang_mcl_tlocal (sig : signature) := (λ i : (Σ n: string, vector ℕ (sig n).type.dim), sig.lean_type_of i.1)
+def parlang_mcl_global (sig : signature) := (λ i : mcl_address sig, sig.lean_type_of i.1)
+@[reducible]
+def parlang_mcl_tlocal (sig : signature) := (λ i : mcl_address sig, sig.lean_type_of i.1)
 @[reducible]
 def parlang_mcl_kernel (sig : signature) := kernel (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)
 
@@ -269,7 +271,7 @@ def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (skip) := kernel.compute id
 | (tlocal_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, by rw h₂; exact idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)))
 | (global_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, by rw h₂; exact idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end))) ;; kernel.store (λ s, ⟨⟨n, by rw h₂; exact idx.map (eval s)⟩, s.get ⟨n, by rw h₂; exact idx.map (eval s)⟩⟩)
-| (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update' ⟨n, by rw h₂; exact v[0].map (eval s)⟩ (show (sig n).type.dim = (([0] : vector (expression sig int) _).map (eval s)).length, from h₂) (eval s expr))) ;; 
+| (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, by rw h₂; exact v[eval s expr]⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, unfold signature.type_of at h, rw h, exact eval s expr end))) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
     )
@@ -330,12 +332,12 @@ example (k : mclk sig) (h : ∀ n, is_global (sig n) → ¬mclk_reads n k) : ∀
 end
 
 @[reducible]
-def state_assert (sig₁ sig₂ : signature) := Π n₁:ℕ, parlang.state n₁ (state sig₁) (λ n, type_map (sig₁.type_of n)) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (λ n, type_map (sig₂.type_of n)) → vector bool n₂ → Prop
+def state_assert (sig₁ sig₂ : signature) := Π n₁:ℕ, parlang.state n₁ (memory (parlang_mcl_tlocal sig₁)) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (memory (parlang_mcl_tlocal sig₂)) (parlang_mcl_global sig₂) → vector bool n₂ → Prop
 
 def mclk_rel {sig₁ sig₂ : signature} 
-    (P : Π n₁:ℕ, parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂) → vector bool n₂ → Prop)
+    (P : state_assert sig₁ sig₂)
     (k₁ : mclk sig₁) (k₂ : mclk sig₂)
-    (Q : Π n₁:ℕ, parlang.state n₁ (state sig₁) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (state sig₂) (parlang_mcl_global sig₂) → vector bool n₂ → Prop) := 
+    (Q : state_assert sig₁ sig₂) := 
 rel_hoare_state P (mclk_to_kernel k₁) (mclk_to_kernel k₂) Q
 
 inductive mclp (sig : signature)
