@@ -169,7 +169,7 @@ def vector_mpr {α : Type} {dim : ℕ} {sig : signature} {n} (h : (((sig n).type
     exact v,
 end
 
--- lemma vector_mpr_singleton {α : Type} {a : α} {dim : ℕ} {sig : signature} {n} (h : (((sig n).type).dim) = dim) : vector_mpr _ v[a] = sorry
+lemma vector_mpr_singleton {α : Type} {a : α} {sig : signature} {n} (h : (((sig n).type).dim) = 1) : vector_mpr h v[a] = eq.mpr (by rw h) v[a] := sorry
 
 -- should we make this an inductive predicate
 -- it would have implications on parlang

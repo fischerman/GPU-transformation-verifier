@@ -228,6 +228,8 @@ end
 
 -- #reduce eval ((map_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
 
+example {sig : signature} {i : mcl_address sig} {s idx} {a} (h : vector ℕ ((sig (i.fst)).type.dim) = vector ℕ ((sig (sigma.fst (⟨s, idx⟩ : mcl_address sig))).type.dim)) : i.snd = eq.mpr h a → i.snd = eq.mpr _ a
+
 -- todo change the definition of syncable to take a fin
 -- todo extend array_access_tid to contain the value as an expression
 
@@ -356,7 +358,17 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                         --dedup,
                         rw vector_map_single,
                         simp,
-                        apply heq_of_eq_mp,
+                        unfold array_access_tid_to_idx.tid_to_idx,
+                        simp,
+                        cases i,
+                        cases ha,
+                        cases ha__to_array_access,
+                        simp at ha__to_array_access_var_eq,
+                        simp at ha__to_array_access_idx_len,
+                        dedup,
+                        rw ha__to_array_access_var_eq_1,
+                        unfold map_list,
+                        repeat {rw vector_mpr_singleton},
                         refl,
                     }
                 }, {
