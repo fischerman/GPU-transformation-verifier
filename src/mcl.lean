@@ -36,15 +36,7 @@ structure variable_def :=
 (scope : scope)
 
 @[reducible]
-def signature := string → variable_def
-
--- todo: make sig parameter (instead of variable). That way I don't have to mention signature anywhere (see section 6.2)
-variables {sig : signature}
-
-@[reducible]
-def create_signature : list (string × variable_def) → signature
-| [] n := { scope := scope.tlocal, type := ⟨1, int⟩} -- by default all variables are tlocal int's
-| ((m, v) :: xs) n := if m = n then v else create_signature xs n
+def signature_core := string → variable_def
 
 @[reducible]
 def type_map : type → Type
@@ -64,23 +56,31 @@ instance (t) : inhabited (type_map t) := ⟨
 
 @[reducible]
 def type_of : variable_def → type := λ v, v.type.type
+
+def signature := { sig : signature_core // type_of (sig "tid") = type.int ∧ (sig "tid").type.dim = (v[0] : vector ℕ 1).length}
+
+-- todo: make sig parameter (instead of variable). That way I don't have to mention signature anywhere (see section 6.2)
+variables {sig : signature}
+
 @[reducible]
 def lean_type_of : variable_def → Type := λ v, type_map (type_of v)
 @[reducible]
-def signature.type_of (n : string) (sig :signature) := type_of (sig n)
+def signature.type_of (n : string) (sig :signature) := type_of (sig.val n)
 @[reducible]
-def signature.lean_type_of (n : string) (sig : signature) := lean_type_of (sig n)
+def signature.lean_type_of (n : string) (sig : signature) := lean_type_of (sig.val n)
 @[reducible]
 def is_tlocal (v : variable_def) := v.scope = scope.tlocal
 @[reducible]
 def is_global : variable_def → Prop := λ v, v.scope = scope.global
 
---(show type_of (sig "tid") = type.int, by sorry) (show (sig "tid").type.dim = ([1] : vector ℕ 1).length, by sorry)
-def mcl_signature := { sig : signature // type_of (sig "tid") = type.int ∧ (sig "tid").type.dim = (v[0] : vector ℕ 1).length}
+-- @[reducible]
+-- def create_signature : list (string × variable_def) → signature
+-- | [] n := { scope := scope.tlocal, type := ⟨1, int⟩} -- by default all variables are tlocal int's
+-- | ((m, v) :: xs) n := if m = n then v else create_signature xs n
 
 -- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
 @[reducible]
-def mcl_address (sig : signature) := (Σ n: string, vector ℕ (sig n).type.dim)
+def mcl_address (sig : signature) := (Σ n: string, vector ℕ (sig.val n).type.dim)
 @[reducible]
 def parlang_mcl_global (sig : signature) := (λ i : mcl_address sig, sig.lean_type_of i.1)
 @[reducible]
@@ -101,8 +101,8 @@ lemma address_eq {sig : mcl.signature} {a b : mcl.mcl_address sig} (h : a.1 = b.
 -- expression is an inductive family over types
 -- type is called an index
 inductive expression (sig : signature) : type → Type
-| tlocal_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_tlocal (sig n)) : expression t
-| global_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = dim) (h₃ : is_global (sig n)) : expression t
+| tlocal_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = dim) (h₃ : is_tlocal (sig.val n)) : expression t
+| global_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = dim) (h₃ : is_global (sig.val n)) : expression t
 | add {t} : expression t → expression t → expression t
 | literal_int {} {t} (n : ℕ) (h : t = type.int) : expression t
 | lt {t} (h : t = type.bool) : expression int → expression int → expression t
@@ -143,16 +143,16 @@ def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ
     -- lt
     (λ t h a b ih_a ih_b, ih_a + ih_b + 1)
 
-def s₁ : signature
-| _ := { scope := scope.global, type := ⟨1, type.int⟩ }
--- appearently not true
-def test : (7 : expression s₁ int) = (literal_int 7 (by refl)) := begin
-    sorry, -- not by refl
-end
-def idx₁ : fin 1 → expression s₁ int
-| _ := 7
-#eval expression_size (tlocal_var "n" idx₁ sorry sorry sorry  : expression s₁ int)
-#eval expression_size (expression.add (literal_int 123 (by refl)) (literal_int 123 (by refl)) : expression s₁ int)
+-- def s₁ : signature
+-- | _ := { scope := scope.global, type := ⟨1, type.int⟩ }
+-- -- appearently not true
+-- def test : (7 : expression s₁ int) = (literal_int 7 (by refl)) := begin
+--     sorry, -- not by refl
+-- end
+-- def idx₁ : fin 1 → expression s₁ int
+-- | _ := 7
+-- #eval expression_size (tlocal_var "n" idx₁ sorry sorry sorry  : expression s₁ int)
+-- #eval expression_size (expression.add (literal_int 123 (by refl)) (literal_int 123 (by refl)) : expression s₁ int)
 
 #print expression_size
 
@@ -164,14 +164,14 @@ lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
 #print has_well_founded_of_has_sizeof 
 #print expression.sizeof
 
-def vector_mpr {α : Type} {dim : ℕ} {sig : signature} {n} (h : (((sig n).type).dim) = dim) (v : vector α dim) : vector α (((sig n).type).dim) := begin
+def vector_mpr {α : Type} {dim : ℕ} {sig : signature} {n} (h : (((sig.val n).type).dim) = dim) (v : vector α dim) : vector α (((sig.val n).type).dim) := begin
     rw h,
     exact v,
 end
 
-lemma vector_mpr_singleton {α : Type} {a : α} {sig : signature} {n} (h : (((sig n).type).dim) = 1) : vector_mpr h v[a] = eq.mpr (by rw h) v[a] := sorry
+lemma vector_mpr_singleton {α : Type} {a : α} {sig : signature} {n} (h : (((sig.val n).type).dim) = 1) : vector_mpr h v[a] = eq.mpr (by rw h) v[a] := sorry
 
-lemma vector_mpr_rfl {sig : signature} {n} {α : Type} {h : (((sig n).type).dim) = (((sig n).type).dim)} {v : vector α (((sig n).type).dim)} : vector_mpr h v = v := by refl
+lemma vector_mpr_rfl {sig : signature} {n} {α : Type} {h : (((sig.val n).type).dim) = (((sig.val n).type).dim)} {v : vector α (((sig.val n).type).dim)} : vector_mpr h v = v := by refl
 
 -- should we make this an inductive predicate
 -- it would have implications on parlang
@@ -243,13 +243,13 @@ def expr_reads (n : string) {t : type} (expr : expression sig t) : _root_.bool :
     -- lt
     (λ t h a b ih_a ih_b, ih_a || ih_b)
 
-lemma eval_update_ignore {sig : signature} {t t₂ : type} {n} {idx₂ : vector ℕ ((sig n).type).dim} {v} {expr : expression sig t} {s : memory $ parlang_mcl_tlocal sig} (h : expr_reads n expr = ff) : 
+lemma eval_update_ignore {sig : signature} {t t₂ : type} {n} {idx₂ : vector ℕ ((sig.val n).type).dim} {v} {expr : expression sig t} {s : memory $ parlang_mcl_tlocal sig} (h : expr_reads n expr = ff) : 
 eval (s.update ⟨n, idx₂⟩ v) expr = eval s expr := begin
     admit
 end
 
 -- can we make use of functor abstraction
-lemma eval_update_ignore' {sig : signature} {t t₂ : type} {dim n} {idx₂ : vector ℕ ((sig n).type).dim} {v} {idx : vector (expression sig t) dim} {s : memory $ parlang_mcl_tlocal sig} (h : (idx.to_list.all $ bnot ∘ expr_reads n) = tt) : 
+lemma eval_update_ignore' {sig : signature} {t t₂ : type} {dim n} {idx₂ : vector ℕ ((sig.val n).type).dim} {v} {idx : vector (expression sig t) dim} {s : memory $ parlang_mcl_tlocal sig} (h : (idx.to_list.all $ bnot ∘ expr_reads n) = tt) : 
 vector.map (eval (s.update ⟨n, idx₂⟩ v)) idx = vector.map (eval s) idx := begin
     admit
 end
@@ -257,10 +257,10 @@ end
 -- TODO variable assign constructors should include global and local proof
 -- expression sig (type_of (sig n)) is not definitionally equal if sig is not computable
 inductive mclk (sig : signature)
-| tlocal_assign {t : type} {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = idx.length) : (expression sig t) → mclk
-| global_assign {t : type} {dim : ℕ} (n) (idx : vector (expression sig int) dim) (h₁ : type_of (sig n) = t) (h₂ : (sig n).type.dim = idx.length) : (expression sig t) → mclk
+| tlocal_assign {t : type} {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = idx.length) : (expression sig t) → mclk
+| global_assign {t : type} {dim : ℕ} (n) (idx : vector (expression sig int) dim) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = idx.length) : (expression sig t) → mclk
 | seq : mclk → mclk → mclk
-| for (n : string) (h : sig.type_of n = int) (h₂ : (sig n).type.dim = 1) :
+| for (n : string) (h : sig.type_of n = int) (h₂ : (sig.val n).type.dim = 1) :
   expression sig int → expression sig bool → mclk → mclk → mclk
 | skip {} : mclk
 
@@ -288,7 +288,7 @@ def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
     )
 
 -- if a kernel does not contain a global referencce it must not contain any loads
-example (k : mclk sig) (h : ∀ n, is_global (sig n) → ¬mclk_reads n k) : ∀ sk, subkernel sk (mclk_to_kernel k) → ¬∃ f, sk = (kernel.load f) := begin
+example (k : mclk sig) (h : ∀ n, is_global (sig.val n) → ¬mclk_reads n k) : ∀ sk, subkernel sk (mclk_to_kernel k) → ¬∃ f, sk = (kernel.load f) := begin
     intros sk hsk hl,
     cases hl with f hl,
     subst hl,
@@ -379,10 +379,10 @@ namespace mcl
 
 open mclk
 
-def empty_state {sig : signature} : (memory $ parlang_mcl_tlocal sig) := λ var, default (type_map (type_of (sig var.1)))
+def empty_state {sig : signature} : (memory $ parlang_mcl_tlocal sig) := λ var, default (type_map (type_of (sig.val var.1)))
 
 -- we need an assumption on the signature, i.e. tid must be int
-def mcl_init {sig : signature} : ℕ → (memory $ parlang_mcl_tlocal sig) := λ n : ℕ, empty_state.update ⟨"tid", begin have : (((sig "tid").type).dim) = 1 := sorry, rw this, exact v[0] end⟩ sorry -- n
+def mcl_init {sig : signature} : ℕ → (memory $ parlang_mcl_tlocal sig) := λ n : ℕ, empty_state.update ⟨"tid", begin rw sig.property.right, exact v[0] end⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw sig.property.left, exact n end)
 
 def mclp_rel {sig₁ sig₂ : signature} (P) (p₁ : mclp sig₁) (p₂ : mclp sig₂) (Q) := rel_hoare_program mcl_init mcl_init P (mclp_to_program p₁) (mclp_to_program p₂) Q
 
@@ -475,8 +475,8 @@ lemma skip_right_after {sig₁ sig₂ : signature} {P Q} {k₁ : mclk sig₁} {k
 variables {sig₁ sig₂ : signature} {k₁ k₁' : mclk sig₁} {k₂ k₂' : mclk sig₂} {P P' Q Q' R : Π n₁:ℕ, parlang.state n₁ (memory $ parlang_mcl_tlocal sig₁) (parlang_mcl_global sig₁) → vector bool n₁ → Π n₂:ℕ, parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_global sig₂) → vector bool n₂ → Prop}
 
 @[irreducible]
-def exprs_to_indices {sig : signature} {n dim} {idx : vector (expression sig type.int) dim} (h : ((sig n).type).dim = vector.length idx) (s : (memory $ parlang_mcl_tlocal sig)) : 
-(sig n).type.dim = (idx.map (eval s)).length := h
+def exprs_to_indices {sig : signature} {n dim} {idx : vector (expression sig type.int) dim} (h : ((sig.val n).type).dim = vector.length idx) (s : (memory $ parlang_mcl_tlocal sig)) : 
+(sig.val n).type.dim = (idx.map (eval s)).length := h
 
 open expression
 
@@ -624,10 +624,10 @@ def g := λ(n : nat), n + 1
 
 -- store the locally computed value in the shadow global
 @[irreducible]
-def mcl_store {sig : signature} {t} {dim} (var : string) (idx : vector (expression sig type.int) dim) (h₁ : type_of (sig var) = t) (h₂ : ((sig var).type).dim = dim) := 
+def mcl_store {sig : signature} {t} {dim} (var : string) (idx : vector (expression sig type.int) dim) (h₁ : type_of (sig.val var) = t) (h₂ : ((sig.val var).type).dim = dim) := 
 @thread_state.store _ _ (parlang_mcl_global sig) _ (λ (s : memory $ parlang_mcl_tlocal sig), ⟨⟨var, vector_mpr h₂ (idx.map (eval s))⟩, s.get ⟨var, vector_mpr h₂ (idx.map (eval s))⟩⟩)
 
-lemma global_assign_right {t dim n} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = dim} {expr : expression sig₂ t} : 
+lemma global_assign_right {t dim n} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂.val n) = t} {h₂ : ((sig₂.val n).type).dim = dim} {expr : expression sig₂ t} : 
 mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
     ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (
         mcl_store n idx h₁ h₂ ∘
@@ -666,7 +666,7 @@ mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂
     },
 end
 
-lemma global_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} : 
+lemma global_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁.val n) = t} {h₂ : ((sig₁.val n).type).dim = vector.length idx} : 
 mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ 
     ((s₁ : parlang.state n₁ (memory $ parlang_mcl_tlocal sig₁) (parlang_mcl_global sig₁)).map_active_threads ac₁ (
         mcl_store n idx h₁ h₂ ∘
@@ -677,7 +677,7 @@ mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁
     apply swap_skip global_assign_right,
 end
 
-lemma global_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁ n) = t} {h₂ : ((sig₁ n).type).dim = vector.length idx} 
+lemma global_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁.val n) = t} {h₂ : ((sig₁.val n).type).dim = vector.length idx} 
 (hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ 
     (s₁.map_active_threads ac₁ (
         mcl_store n idx h₁ h₂ ∘

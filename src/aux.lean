@@ -149,7 +149,11 @@ def range_fin (n : ℕ) : vector (fin n) n := ⟨list.range_fin n, sorry⟩
 
 @[simp] lemma length_range_nth : length (range_fin n) = n := sorry
 
-lemma eq_one {α : Type} (v : vector α 1) (v' : vector α 1) (h : v.nth ⟨0, sorry⟩ = v'.nth ⟨0, by sorry⟩) : v = v'
+lemma eq_one {α : Type} (v : vector α 1) (v' : vector α 1) (h : v.nth ⟨0, sorry⟩ = v'.nth ⟨0, by sorry⟩) : v = v' := sorry
+
+lemma length_list {α : Type} {n} {v : vector α n} : list.length (vector.to_list (v)) = vector.length v := begin
+  admit,
+end
 
 end vector
 
