@@ -228,7 +228,26 @@ end
 
 -- #reduce eval ((map_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
 
-example {sig : signature} {i : mcl_address sig} {s idx} {a} (h : vector ℕ ((sig (i.fst)).type.dim) = vector ℕ ((sig (sigma.fst (⟨s, idx⟩ : mcl_address sig))).type.dim)) : i.snd = eq.mpr h a → i.snd = eq.mpr _ a
+example {sig : signature} {i : mcl_address sig} {s idx} {a} (h : vector ℕ ((sig (i.fst)).type.dim) = vector ℕ ((sig (sigma.fst (⟨s, idx⟩ : mcl_address sig))).type.dim)) : i.snd = eq.mpr h a → i.snd = eq.mpr _ a := sorry
+universe u
+lemma hh {a b : Sort u} (h : a == b) : a = b := begin
+    cases h,
+    refl,
+end
+
+lemma hhh {α : Type} (h: α = α) (a b : α) : (a = eq.mpr h b) = (a = b) := by refl
+lemma hhh' {α : Type} (h: α = α) (a : α) : eq.mpr h a = a := by refl
+
+--set_option pp.implicit true
+
+#print p₁._proof_2
+
+#reduce eval (mcl_init 0) read_tid
+#check eval (mcl_init 0) read_tid = 0
+
+variable (a : nat)
+
+#check a = a
 
 -- todo change the definition of syncable to take a fin
 -- todo extend array_access_tid to contain the value as an expression
@@ -366,9 +385,27 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                         simp at ha__to_array_access_var_eq,
                         simp at ha__to_array_access_idx_len,
                         dedup,
-                        rw ha__to_array_access_var_eq_1,
+                        subst ha__to_array_access_var_eq_1,
                         unfold map_list,
+                        simp,
                         repeat {rw vector_mpr_singleton},
+                        rw hhh,
+                        rw hhh,
+                        apply vector.eq_one,
+                        simp [hhh'],
+                        conv {
+                            congr,
+                            skip,
+                            congr,
+                            congr,
+                            congr,
+                            congr,
+                            congr,
+                            funext,
+                            rw vector_mpr_rfl,
+                        },
+                        rw map,
+                        simp,
                         refl,
                     }
                 }, {

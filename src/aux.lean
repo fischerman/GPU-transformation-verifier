@@ -149,6 +149,8 @@ def range_fin (n : ℕ) : vector (fin n) n := ⟨list.range_fin n, sorry⟩
 
 @[simp] lemma length_range_nth : length (range_fin n) = n := sorry
 
+lemma eq_one {α : Type} (v : vector α 1) (v' : vector α 1) (h : v.nth ⟨0, sorry⟩ = v'.nth ⟨0, by sorry⟩) : v = v'
+
 end vector
 
 namespace bool

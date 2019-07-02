@@ -171,6 +171,8 @@ end
 
 lemma vector_mpr_singleton {α : Type} {a : α} {sig : signature} {n} (h : (((sig n).type).dim) = 1) : vector_mpr h v[a] = eq.mpr (by rw h) v[a] := sorry
 
+lemma vector_mpr_rfl {sig : signature} {n} {α : Type} {h : (((sig n).type).dim) = (((sig n).type).dim)} {v : vector α (((sig n).type).dim)} : vector_mpr h v = v := by refl
+
 -- should we make this an inductive predicate
 -- it would have implications on parlang
 -- might have to change this to rec_on
