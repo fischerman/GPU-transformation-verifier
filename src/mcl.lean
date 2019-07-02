@@ -88,6 +88,8 @@ def parlang_mcl_tlocal (sig : signature) := (λ i : mcl_address sig, sig.lean_ty
 @[reducible]
 def parlang_mcl_kernel (sig : signature) := kernel (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)
 
+lemma address_eq {sig : mcl.signature} {a b : mcl.mcl_address sig} (h : a.1 = b.1) (g: a.2 = begin rw h, exact b.2 end) : a = b := sorry
+
 -- lemma state_get_update_ignore (n₁ n₂) {sig dim₁ dim₂ t₁ t₂ idx₁ idx₂} {s h₁ h₁' h₂ h₂' v} (h : n₁ ≠ n₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = s.get' h₁ h₁' := begin
 --     sorry
 -- end
@@ -166,6 +168,8 @@ def vector_mpr {α : Type} {dim : ℕ} {sig : signature} {n} (h : (((sig n).type
     rw h,
     exact v,
 end
+
+-- lemma vector_mpr_singleton {α : Type} {a : α} {dim : ℕ} {sig : signature} {n} (h : (((sig n).type).dim) = dim) : vector_mpr _ v[a] = sorry
 
 -- should we make this an inductive predicate
 -- it would have implications on parlang
