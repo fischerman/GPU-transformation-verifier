@@ -34,6 +34,38 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
   exec_state (loop f k) ac t u →
   exec_state (loop f k) ac s u
 
+
+def contains_sync : kernel σ τ → Prop
+| sync := true
+| (seq a b) := (contains_sync a) ∨ (contains_sync b)
+| (ite _ a b) := (contains_sync a) ∨ (contains_sync b)
+| (loop _ a) := (contains_sync a)
+| _ := false
+
+instance decidable (k : kernel σ τ) : decidable (contains_sync k) := sorry
+
+variables {s t : state n σ τ} {ac : vector bool n}
+
+-- probably has to be an inducive type
+-- def ac_after_n_iteration (k : kernel σ τ) (f : σ → bool) : ℕ → state n σ τ → vector bool n → vector bool n
+-- | 0 s ac := ac
+-- | (n + 1) s ac := if (∃ t, exec_state k ac s t) then ac_after_n_iteration n t (deactivate_threads (bnot ∘ f) ac s) else ac -- all false
+
+-- this is similar to the semantic itself except we are not interested in states but the resulting active maps
+inductive ac_after_n_iteration (k : kernel σ τ) (f : σ → bool) : state n σ τ → vector bool n → vector bool n → ℕ → Prop
+| base (ac : vector bool n) (s : state n σ τ) : ac_after_n_iteration s ac ac 0
+| iteration (ac : vector bool n) (s t : state n σ τ) (i : ℕ) (ac' : vector bool n) : ac_after_n_iteration s ac ac' i → exec_state k ac' s t → ac_after_n_iteration s ac (deactivate_threads (bnot ∘ f) ac' t) (i + 1)
+| done (i : ℕ) (ac : vector bool n) (s t : state n σ τ) : ¬exec_state k ac s t → ac_after_n_iteration s ac ac i
+
+lemma ac_after_n_iteration_unique {k : kernel σ τ} {f : σ → bool} {ac' ac'' : vector bool n} {i} : 
+ac_after_n_iteration k f s ac ac' i → ac_after_n_iteration k f s ac ac'' i → ac' = ac'' := begin
+    admit,
+end
+
+def monotone_loop (f k) (s : state n σ τ) (ac : vector bool n) : Prop := 
+∀ (i i' : ℕ) (ac' ac'' : vector bool n), ac_after_n_iteration k f s ac ac' i ∧ ac_after_n_iteration k f s ac ac'' (i + i') →
+(∀ (t : fin n), ¬ (ac'.nth t) → ¬ (ac''.nth t))
+
 example (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_state k ac s s' ↔ parlang.exec_state k ac s s' := begin
     split,
     {
@@ -63,6 +95,34 @@ example (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_st
         }, {
             apply parlang.exec_state.loop_step,
             repeat { assumption },
+            have : monotone_loop h_f h_k h_s h_ac := begin
+                intros i i' ac' ac'' hit t hin,
+                cases hit,
+                induction i',
+                case nat.zero {
+                    have : ac' = ac'' := ac_after_n_iteration_unique hit_left hit_right,
+                    subst this,
+                    exact hin,
+                },
+                case nat.succ {
+                    apply i'_ih,
+                    cases hit_right,
+                    case parlang_nonmono.ac_after_n_iteration.iteration {
+                        --apply hit_right_a,
+                        admit,
+                    },
+                    case parlang_nonmono.ac_after_n_iteration.done {
+                        cases hit_left,
+                        case parlang_nonmono.ac_after_n_iteration.done {
+                            admit, -- can be done
+                        },
+                        case parlang_nonmono.ac_after_n_iteration.base {
+                            
+                        }
+                    },
+                }
+            end,
+            
         },
     }, {
         intro h,
