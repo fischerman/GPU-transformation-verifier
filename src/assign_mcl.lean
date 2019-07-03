@@ -415,23 +415,28 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                             exact lt_zero_one,
                         }, {
                             rw list_nth_vector,
+                            rw list_nth_vector,
                             rw vector.nth_map,
                             rw map_active_threads_nth_active,
                             rw initial_kernel_assertion_left_thread_state h,
                             exact hneqtt',
                             sorry, -- todo thread is actives
                         }, {
-                            sorry, -- todo prove length through map and stuff
+                            rw vector.length_list,
+                            rw vector.length,
+                            exact lt_zero_one,
                         }
                     }, {
                         rw function.comp.assoc,
                         rw map_list_merge,
                         apply store_access_elim_idx', {
                             apply list_neq_elem 0, 
-                            swap, { 
+                            swap, {
+                                rw vector.length_list,
                                 rw ha.one_dim,
                                 exact lt_zero_one,
                             }, {
+                                rw list_nth_vector,
                                 rw list_nth_vector,
                                 rw vector.nth_map,
                                 rw map_active_threads_nth_active,
