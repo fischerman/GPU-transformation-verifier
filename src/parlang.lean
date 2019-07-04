@@ -359,6 +359,7 @@ lemma no_threads_active_no_active_thread {ac : vector bool n} : no_thread_active
   }
 end
 
+@[irreducible]
 def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := (ac.map₂ prod.mk s.threads).map (λ ⟨a, t⟩, (bnot ∘ f) t.tlocal && a)
 
 lemma deactivate_threads_alive {f : σ → bool} {ac : vector bool n} {s : state n σ τ} {i} : (deactivate_threads f ac s).nth i → ac.nth i := begin

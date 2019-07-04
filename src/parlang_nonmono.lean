@@ -52,19 +52,89 @@ variables {s t : state n σ τ} {ac : vector bool n}
 -- | (n + 1) s ac := if (∃ t, exec_state k ac s t) then ac_after_n_iteration n t (deactivate_threads (bnot ∘ f) ac s) else ac -- all false
 
 -- this is similar to the semantic itself except we are not interested in states but the resulting active maps
-inductive ac_after_n_iteration (k : kernel σ τ) (f : σ → bool) : state n σ τ → vector bool n → vector bool n → ℕ → Prop
+-- it is reversed, maybe we should build it the other way around
+inductive ac_after_n_iteration (semantics : Π {σ ι : Type} {τ : ι → Type} [_inst_1 : decidable_eq ι] {n : ℕ}, kernel σ τ → vector bool n → state n σ τ → state n σ τ → Prop) (k : kernel σ τ) (f : σ → bool) : state n σ τ → vector bool n → vector bool n → ℕ → Prop
 | base (ac : vector bool n) (s : state n σ τ) : ac_after_n_iteration s ac ac 0
-| iteration (ac : vector bool n) (s t : state n σ τ) (i : ℕ) (ac' : vector bool n) : ac_after_n_iteration s ac ac' i → exec_state k ac' s t → ac_after_n_iteration s ac (deactivate_threads (bnot ∘ f) ac' t) (i + 1)
-| done (i : ℕ) (ac : vector bool n) (s t : state n σ τ) : ¬exec_state k ac s t → ac_after_n_iteration s ac ac i
+| step (ac : vector bool n) (s t : state n σ τ) (i : ℕ) (ac' : vector bool n) : ac_after_n_iteration t (deactivate_threads (bnot ∘ f) ac t) ac' i → semantics k ac s t → ac_after_n_iteration s ac ac' (i + 1)
+--| step (ac : vector bool n) (s t : state n σ τ) (i : ℕ) (ac' : vector bool n) : ac_after_n_iteration s ac ac' i → exec_state k ac' s t → ac_after_n_iteration s ac (deactivate_threads (bnot ∘ f) ac t) (i + 1)
 
 lemma ac_after_n_iteration_unique {k : kernel σ τ} {f : σ → bool} {ac' ac'' : vector bool n} {i} : 
-ac_after_n_iteration k f s ac ac' i → ac_after_n_iteration k f s ac ac'' i → ac' = ac'' := begin
+ac_after_n_iteration @parlang.exec_state k f s ac ac' i → ac_after_n_iteration @parlang.exec_state k f s ac ac'' i → ac' = ac'' := begin
     admit,
 end
 
+def ac_ge (ac' : vector bool n) (ac : vector bool n) : Prop := ∀ (t : fin n), ¬ (ac.nth t) → ¬ (ac'.nth t)
+
+instance : has_le (vector bool n) := ⟨ac_ge⟩
+
+lemma ac_sub_deac {f : σ → bool} : ac ≥ (deactivate_threads (bnot ∘ f) ac s) := begin
+    intros t h₁ h₂,
+    apply h₁,
+    unfold deactivate_threads at h₂,
+    rw vector.nth_map at h₂,
+    rw vector.nth_map₂ at h₂,
+    rw deactivate_threads._match_1 at h₂,
+    rw band_coe_iff at h₂,
+    cases h₂,
+    assumption,
+end
+
+lemma ac_ge_single {k : kernel σ τ} {f : σ → bool} {ac' : vector bool n} {i : ℕ} : ac_after_n_iteration @parlang.exec_state k f s ac ac' i → ac ≥ ac' := begin
+    intros h,
+    induction i generalizing s ac ac',
+    case nat.zero {
+        cases h,
+        intros t hna,
+        assumption,
+    },
+    case nat.succ {
+        cases h,
+        specialize i_ih h_a,
+        have : ac ≥ (deactivate_threads (bnot ∘ f) ac s) := by apply ac_sub_deac,
+        sorry, -- proof by transitivity
+    }
+end
+
+example {ac' ac'' : vector bool n} {k : kernel σ τ} {f : σ → bool} {i : ℕ} : 
+ac_after_n_iteration @parlang.exec_state k f s ac ac' i → ac_after_n_iteration @parlang.exec_state k f s ac ac'' (i + 1) → ac' ≥ ac'' := begin
+    intros h₁ h₂,
+    induction i generalizing s ac,
+    case nat.zero {
+        cases h₁,
+        cases h₂,
+        cases h₂_a,
+        apply ac_sub_deac,
+    },
+    case nat.succ {
+        cases h₁,
+        cases h₂,
+        have : h₁_t = h₂_t := exec_state_unique h₂_a_1 h₁_a_1,
+        subst this,
+        apply i_ih h₁_a h₂_a,
+    }
+end
+
+lemma ac_ge_two {k : kernel σ τ} {f : σ → bool} {i i' : ℕ} {ac' ac'' : vector bool n} : 
+ac_after_n_iteration @parlang.exec_state k f s ac ac' i → ac_after_n_iteration @parlang.exec_state k f s ac ac'' (i + i') → ac' ≥ ac'' := begin
+    intros h₁ h₂,
+    induction i generalizing s ac,
+    case nat.zero {
+        cases h₁,
+        apply ac_ge_single h₂,
+    },
+    case nat.succ {
+        cases h₁,
+        have : nat.succ i_n + i' = nat.succ (i_n + i') := by rw nat.succ_add,
+        rw this at h₂,
+        cases h₂,
+        have : h₁_t = h₂_t := exec_state_unique h₂_a_1 h₁_a_1,
+        subst this,
+        apply i_ih h₁_a h₂_a,
+    }
+end
+
 def monotone_loop (f k) (s : state n σ τ) (ac : vector bool n) : Prop := 
-∀ (i i' : ℕ) (ac' ac'' : vector bool n), ac_after_n_iteration k f s ac ac' i ∧ ac_after_n_iteration k f s ac ac'' (i + i') →
-(∀ (t : fin n), ¬ (ac'.nth t) → ¬ (ac''.nth t))
+∀ (i i' : ℕ) (ac' ac'' : vector bool n), ac_after_n_iteration @parlang.exec_state k f s ac ac' i → ac_after_n_iteration @parlang.exec_state k f s ac ac'' (i + i') → ac' ≥ ac''
 
 example (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_state k ac s s' ↔ parlang.exec_state k ac s s' := begin
     split,
@@ -95,33 +165,7 @@ example (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_st
         }, {
             apply parlang.exec_state.loop_step,
             repeat { assumption },
-            have : monotone_loop h_f h_k h_s h_ac := begin
-                intros i i' ac' ac'' hit t hin,
-                cases hit,
-                induction i',
-                case nat.zero {
-                    have : ac' = ac'' := ac_after_n_iteration_unique hit_left hit_right,
-                    subst this,
-                    exact hin,
-                },
-                case nat.succ {
-                    apply i'_ih,
-                    cases hit_right,
-                    case parlang_nonmono.ac_after_n_iteration.iteration {
-                        --apply hit_right_a,
-                        admit,
-                    },
-                    case parlang_nonmono.ac_after_n_iteration.done {
-                        cases hit_left,
-                        case parlang_nonmono.ac_after_n_iteration.done {
-                            admit, -- can be done
-                        },
-                        case parlang_nonmono.ac_after_n_iteration.base {
-                            
-                        }
-                    },
-                }
-            end,
+            have : monotone_loop h_f h_k h_s h_ac := by apply ac_ge_two,
             
         },
     }, {
