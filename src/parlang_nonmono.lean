@@ -101,7 +101,10 @@ lemma ac_deac_comm : deactivate_threads f (deactivate_threads f' ac s) t = deact
 end
 
 lemma ac_trans {ac' ac'' : vector bool n} : ac ≥ ac' → ac' ≥ ac'' → ac ≥ ac'' := begin
-    admit,
+    intros h₁ h₂ t hna ha,
+    specialize h₁ t hna,
+    specialize h₂ t h₁,
+    contradiction,
 end
 
 lemma ac_deac_ge (h : deactivate_threads f ac s ≥ deactivate_threads f' ac t) : deactivate_threads f' (deactivate_threads f ac s) t = deactivate_threads f' ac t := begin
