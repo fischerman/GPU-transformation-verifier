@@ -41,7 +41,39 @@ def ac_ge (ac' : vector bool n) (ac : vector bool n) : Prop := ∀ (t : fin n), 
 instance : has_le (vector bool n) := ⟨ac_ge⟩
 
 lemma exec_state_inactive_threads_untouched {s u : state n σ τ} {ac : vector bool n} {k} : exec_state k ac s u → ∀ i, ¬ ac.nth i → s.threads.nth i = u.threads.nth i := begin
-    admit,
+    intros he i hna,
+    induction he,
+    case exec_state.load {
+        apply state.map_active_threads_nth_inac hna,
+    },
+    case exec_state.store {
+        apply state.map_active_threads_nth_inac hna,
+    },
+    case exec_state.compute {
+        apply state.map_active_threads_nth_inac hna,
+    },
+    case exec_state.sync_all {
+        have : ↥(vector.nth he_ac i) := by apply all_threads_active_nth he_ha,
+        contradiction,
+    },
+    case exec_state.sync_none {
+        refl,
+    },
+    case exec_state.seq {
+        rw he_ih_a hna,
+        rw he_ih_a_1 hna,
+    },
+    case exec_state.ite {
+        rw he_ih_a (deactivate_threads_deactivate_inactive_thread hna),
+        rw ← he_ih_a_1 (deactivate_threads_deactivate_inactive_thread hna),
+    },
+    case exec_state.loop_stop {
+        refl,
+    },
+    case exec_state.loop_step {
+        rw he_ih_a (deactivate_threads_deactivate_inactive_thread hna),
+        rw ← he_ih_a_1 hna,
+    }
 end
 
 lemma monotonic_exec {f k} : 
