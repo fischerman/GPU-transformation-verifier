@@ -96,7 +96,6 @@ lemma ac_deac_comm : deactivate_threads f (deactivate_threads f' ac s) t = deact
     unfold deactivate_threads,
     simp [vector.nth_map, vector.nth_map₂],
     unfold deactivate_threads._match_1,
-    intro i,
     simp,
 end
 
@@ -108,7 +107,37 @@ lemma ac_trans {ac' ac'' : vector bool n} : ac ≥ ac' → ac' ≥ ac'' → ac �
 end
 
 lemma ac_deac_ge (h : deactivate_threads f ac s ≥ deactivate_threads f' ac t) : deactivate_threads f' (deactivate_threads f ac s) t = deactivate_threads f' ac t := begin
-    admit,
+    apply vector.eq_element_wise,
+    intro i,
+    specialize h i,
+    unfold deactivate_threads,
+    simp [vector.nth_map, vector.nth_map₂],
+    unfold deactivate_threads._match_1,
+    simp,
+    by_cases eq : vector.nth ac i = tt,
+    {
+        rw eq,
+        simp,
+        by_cases eq₂ : bnot (f' ((vector.nth (t.threads) i).tlocal)) = tt,
+        {
+            rw eq₂,
+            simp,
+            unfold deactivate_threads at h,
+            simp [vector.nth_map, vector.nth_map₂] at h,
+            unfold deactivate_threads._match_1 at h,
+            simp [*] at h,
+            rw ← eq_ff_eq_not_eq_tt,
+            intro,
+            apply h,
+            exact a,
+        }, {
+            simp at eq₂,
+            simp [*],
+        }
+    }, {
+        simp at eq,
+        simp [*],
+    }
 end
 
 lemma exec_deac_to_ac {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u) :
