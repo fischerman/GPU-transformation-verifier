@@ -109,7 +109,7 @@ lemma ac_deac_ge (h : deactivate_threads f ac s ≥ deactivate_threads f' ac t) 
     admit,
 end
 
-lemma vv {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u) :
+lemma exec_deac_to_ac {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u) :
 exec_state (loop f k) ac s u := begin
     apply exec_state.loop_step,
     repeat { assumption },
@@ -145,7 +145,7 @@ exec_state (loop f k) ac s u := begin
     }
 end
 
-lemma vvr {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : parlang.exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : parlang.exec_state (loop f k) ac t u) :
+lemma exec_ac_to_deac {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : parlang.exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : parlang.exec_state (loop f k) ac t u) :
 parlang.exec_state (loop f k) ac s u := begin
     apply parlang.exec_state.loop_step,
     repeat { assumption },
@@ -193,7 +193,7 @@ parlang.exec_state (loop f k) ac s u := begin
     }
 end
 
-example (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_state k ac s s' ↔ parlang.exec_state k ac s s' := begin
+lemma eq_parlang_parlangnonmono (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_state k ac s s' ↔ parlang.exec_state k ac s s' := begin
     split,
     {
         intro h,
@@ -220,7 +220,7 @@ example (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_st
             apply parlang.exec_state.loop_stop,
             assumption,
         }, {
-            apply vvr,
+            apply exec_ac_to_deac,
             repeat { assumption },
         },
     }, {
@@ -249,7 +249,7 @@ example (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_st
             assumption,
         }, 
         case parlang.exec_state.loop_step : a b c ac f k' ha hel hek ih₁ ih₂ {
-            apply vv,
+            apply exec_deac_to_ac,
             repeat { assumption },
         },
     }
