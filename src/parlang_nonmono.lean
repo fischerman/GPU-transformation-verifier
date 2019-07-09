@@ -66,8 +66,8 @@ deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t :=
         { assumption, },
         rw exec_state_inactive_threads_untouched h tid,
         assumption,
+        simp at e,
         simp [deactivate_threads, *],
-        sorry, -- trivial
     }, {
         assumption,
     }
@@ -76,7 +76,30 @@ end
 lemma parlang_monotonic_exec {f k} : 
 parlang.exec_state k (deactivate_threads (bnot ∘ f) ac s) s t →
 deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t := begin
-    admit,
+    intro h,
+    intros tid,
+    unfold deactivate_threads,
+    repeat { rw vector.nth_map },
+    repeat { rw vector.nth_map₂ },
+    repeat { rw deactivate_threads._match_1 },
+    repeat { rw band_coe_iff },
+    intros hna ha,
+    cases ha,
+    apply hna,
+    clear hna,
+    split, 
+    {
+        simp only [bool.bnot_bnot] at ha_left,
+        simp only [bool.bnot_bnot],
+        by_cases e : f ((vector.nth (s.threads) tid).tlocal) = tt,
+        { assumption, },
+        rw parlang.exec_state_inactive_threads_untouched h tid,
+        assumption,
+        simp at e,
+        simp [deactivate_threads, *],
+    }, {
+        assumption,
+    }
 end
 
 lemma ac_sub_deac {f : σ → bool} : ac ≥ (deactivate_threads (bnot ∘ f) ac s) := begin
