@@ -121,8 +121,10 @@ end
 --   end
 -- end
 
-@[simp] lemma vector_0_eq {α : Type*} : ∀(v : vector α 0), v = vector.nil
+@[simp] lemma vector_0_eq {α : Type} : ∀(v : vector α 0), v = vector.nil
 | ⟨l, hl⟩ := subtype.eq $ show l = list.nil, from list.length_eq_zero.1 hl
+
+lemma vector_0_eq' {α : Type} {v v' : vector α 0} : v = v' := sorry
 
 @[simp] lemma map₂_nil {α β γ : Type} {f : α → β → γ} :
   ∀ (v : vector α 0) w, vector.map₂ f v w = vector.nil
