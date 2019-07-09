@@ -95,6 +95,12 @@ deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t :=
     }
 end
 
+lemma parlang_monotonic_exec {f k} : 
+parlang.exec_state k (deactivate_threads (bnot ∘ f) ac s) s t →
+deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t := begin
+    admit,
+end
+
 -- probably has to be an inducive type
 -- def ac_after_n_iteration (k : kernel σ τ) (f : σ → bool) : ℕ → state n σ τ → vector bool n → vector bool n
 -- | 0 s ac := ac
@@ -342,6 +348,54 @@ exec_state (loop f k) ac s u := begin
     }
 end
 
+lemma vvr {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : parlang.exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : parlang.exec_state (loop f k) ac t u) :
+parlang.exec_state (loop f k) ac s u := begin
+    apply parlang.exec_state.loop_step,
+    repeat { assumption },
+    have hgest : deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t := parlang_monotonic_exec hi,
+    generalize_hyp eq_l : (loop f k) = l at h ⊢,
+    clear hi,
+    induction h;
+        cases eq_l,
+    {
+        apply parlang.exec_state.loop_stop,
+        rw ac_deac_ge hgest,
+        exact h_a,
+    }, {
+        clear t u,
+        rename h_s t,
+        rename h_t t₂,
+        rename h_u u,
+        rename h_ih_a_1 ih,
+        rename h_a_1 htt₂,
+        clear h_ih_a,
+        have hgett₂ : deactivate_threads (bnot ∘ f) h_ac t ≥ deactivate_threads (bnot ∘ f) h_ac t₂ := parlang_monotonic_exec htt₂,
+        have hgest₂ : deactivate_threads (bnot ∘ f) h_ac s ≥ deactivate_threads (bnot ∘ f) h_ac t₂ := ac_trans hgest hgett₂,
+        apply parlang.exec_state.loop_step,
+        {
+            rw ac_deac_ge hgest,
+            assumption,
+        }, {
+            rw ac_deac_ge hgest,
+            assumption,
+        }, {
+            rw ac_deac_comm,
+            apply ih,
+            {
+                rw ac_deac_comm,
+                rw ac_deac_ge hgest,
+                assumption,
+            }, {
+                rw ac_deac_comm,
+                rw ac_deac_ge hgest,
+                rw ac_deac_ge hgett₂,
+                exact hgett₂,
+            },
+            refl,
+        }
+    }
+end
+
 example (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_state k ac s s' ↔ parlang.exec_state k ac s s' := begin
     split,
     {
@@ -369,10 +423,8 @@ example (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_st
             apply parlang.exec_state.loop_stop,
             assumption,
         }, {
-            apply parlang.exec_state.loop_step,
+            apply vvr,
             repeat { assumption },
-            have : monotone_loop parlang.exec_state h_f h_k h_s h_ac := by apply ac_ge_two,
-            admit,
         },
     }, {
         intro h,
