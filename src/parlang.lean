@@ -201,10 +201,16 @@ lemma state_eq_per_thread {s u : state n σ τ} : (∀ i, s.threads.nth i = u.th
   apply vector.eq_element_wise hieq,
 end
 
-lemma map_active_threads_nth {s : state n σ τ} {ac : vector bool n} {f i} : ¬ ac.nth i → s.threads.nth i = (s.map_active_threads ac f).threads.nth i := begin
+lemma map_active_threads_nth_inac {s : state n σ τ} {ac : vector bool n} {f i} : ¬ ac.nth i → s.threads.nth i = (s.map_active_threads ac f).threads.nth i := begin
   intro hnac,
   unfold map_active_threads,
   simp [hnac],
+end
+
+lemma map_active_threads_nth_ac {s : state n σ τ} {ac : vector bool n} {f i} : ac.nth i → (s.map_active_threads ac f).threads.nth i = f (s.threads.nth i) := begin
+  intro hac,
+  unfold map_active_threads,
+  simp [hac],
 end
 
 @[simp]
@@ -567,13 +573,13 @@ lemma exec_state_inactive_threads_untouched {s u : state n σ τ} {ac : vector b
   intros he i hna,
   induction he,
   case parlang.exec_state.load {
-    apply state.map_active_threads_nth hna,
+    apply state.map_active_threads_nth_inac hna,
   },
   case parlang.exec_state.store {
-    apply state.map_active_threads_nth hna,
+    apply state.map_active_threads_nth_inac hna,
   },
   case parlang.exec_state.compute {
-    apply state.map_active_threads_nth hna,
+    apply state.map_active_threads_nth_inac hna,
   },
   case parlang.exec_state.sync_all {
     have : ↥(vector.nth he_ac i) := by apply all_threads_active_nth he_ha,
