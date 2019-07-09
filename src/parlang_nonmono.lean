@@ -92,13 +92,12 @@ lemma ac_sub_deac {f : σ → bool} : ac ≥ (deactivate_threads (bnot ∘ f) ac
 end
 
 lemma ac_deac_comm : deactivate_threads f (deactivate_threads f' ac s) t = deactivate_threads f' (deactivate_threads f ac t) s := begin
-    induction n,
-    case nat.zero {
-        apply vector.vector_0_eq',
-    },
-    case nat.succ {
-        sorry,
-    }
+    apply vector.eq_element_wise,
+    unfold deactivate_threads,
+    simp [vector.nth_map, vector.nth_map₂],
+    unfold deactivate_threads._match_1,
+    intro i,
+    simp,
 end
 
 lemma ac_trans {ac' ac'' : vector bool n} : ac ≥ ac' → ac' ≥ ac'' → ac ≥ ac'' := begin
