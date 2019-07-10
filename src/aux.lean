@@ -81,7 +81,7 @@ lemma eq_element_wise {α : Type} : ∀{a b : vector α n}, (∀ i, a.nth i = b.
   cases b,
   repeat { rw to_list },
   simp,
-  induction a_val generalizing b_val,
+  induction a_val generalizing b_val n,
   case list.nil {
     cases b_val,
     { refl },
@@ -99,6 +99,13 @@ lemma eq_element_wise {α : Type} : ∀{a b : vector α n}, (∀ i, a.nth i = b.
       contradiction,
     },
     {
+      have : _ := hieq ⟨0, sorry⟩,
+      rw [vector.nth, list.nth_le, vector.nth, list.nth_le] at this,
+      dunfold vector.nth at hieq,
+      rw this,
+      simp,
+      cases a_property,
+      apply a_val_ih,
       sorry
     }
   }
