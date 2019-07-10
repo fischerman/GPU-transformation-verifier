@@ -161,6 +161,8 @@ lemma ac_trans {ac' ac'' : vector bool n} : ac ≥ ac' → ac' ≥ ac'' → ac �
     contradiction,
 end
 
+instance : is_trans (vector bool n) ac_ge := ⟨begin intros a b c h₁ h₂, apply ac_trans, assumption, assumption, end⟩
+
 lemma ac_deac_ge (h : deactivate_threads f ac s ≥ deactivate_threads f' ac t) : deactivate_threads f' (deactivate_threads f ac s) t = deactivate_threads f' ac t := begin
     apply vector.eq_element_wise,
     intro i,
