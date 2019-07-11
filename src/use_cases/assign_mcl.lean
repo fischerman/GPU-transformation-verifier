@@ -72,19 +72,19 @@ end
 
 lemma lt_zero_one : 0 < 1 := by sorry
 
-def map_list {σ ι : Type} {τ : ι → Type} [decidable_eq ι] : list (σ → σ) → (thread_state σ τ → thread_state σ τ)
-| (f :: tl) := map_list tl ∘ @map σ ι τ _ f
+def compute_list {σ ι : Type} {τ : ι → Type} [decidable_eq ι] : list (σ → σ) → (thread_state σ τ → thread_state σ τ)
+| (f :: tl) := compute_list tl ∘ @compute σ ι τ _ f
 | [] := id
 
-lemma map_to_map_list {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (f : σ → σ) : @map σ ι τ _ f = map_list [f] := by refl
+lemma compute_to_compute_list {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (f : σ → σ) : @compute σ ι τ _ f = compute_list [f] := by refl
 
-lemma map_list_merge {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (f g : list (σ → σ)) : 
-(@map_list σ ι τ _ g) ∘ map_list f = map_list (f ++ g) := begin
+lemma compute_list_merge {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (f g : list (σ → σ)) : 
+(@compute_list σ ι τ _ g) ∘ compute_list f = compute_list (f ++ g) := begin
     induction f,
     case list.nil {
-        simp [map_list],
+        simp [compute_list],
     }, {
-        simp [map_list],
+        simp [compute_list],
         rw ← f_ih,
     }
 end
@@ -96,33 +96,33 @@ end
 
 lemma store_access_elim_name {sig : signature} {n n_idx} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
 {t h₄} {h₃ : type_of (sig.val var) = t } {f} {t : fin n} {i} {ac₁ : vector bool n} {updates}
-(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ map_list updates) s).threads) t)) 
+(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ compute_list updates) s).threads) t)) 
 (h₂ : i.1 ≠ var) :
-i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx h₃ h₄) ∘ map_list updates) s).threads) t) := begin
+i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx h₃ h₄) ∘ compute_list updates) s).threads) t) := begin
     sorry,
 end
 
 
 lemma store_access_elim_idx {sig : signature} {n n_idx} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
 {t} {h₄ : ((sig.val var).type).dim = n_idx} {h₃ : type_of (sig.val var) = t } {f} {t : fin n} {i : mcl_address sig} {ac₁ : vector bool n} {updates}
-(h₂ : i.2.to_list ≠ (idx.map ((eval (((map_active_threads ac₁ (map_list updates) s).threads).nth t).tlocal))).to_list) 
-(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ map_list updates) s).threads) t)) :
-i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx h₃ h₄) ∘ map_list updates) s).threads) t) := begin
+(h₂ : i.2.to_list ≠ (idx.map ((eval (((map_active_threads ac₁ (compute_list updates) s).threads).nth t).tlocal))).to_list) 
+(h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ compute_list updates) s).threads) t)) :
+i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx h₃ h₄) ∘ compute_list updates) s).threads) t) := begin
     sorry,
 end
 
 lemma store_access_elim_idx' {sig : signature} {n n_idx} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
 {t} {h₄ : ((sig.val var).type).dim = n_idx} {h₃ : type_of (sig.val var) = t } {t : fin n} {i : mcl_address sig} {ac₁ : vector bool n} {updates}
-(h₂ : i.2.to_list ≠ (idx.map ((eval (((map_active_threads ac₁ (map_list updates) s).threads).nth t).tlocal ))).to_list) 
+(h₂ : i.2.to_list ≠ (idx.map ((eval (((map_active_threads ac₁ (compute_list updates) s).threads).nth t).tlocal ))).to_list) 
 (h₁ : i ∉ accesses (vector.nth (s.threads) t)) :
-i ∉ accesses (vector.nth ((map_active_threads ac₁ ((mcl_store var idx h₃ h₄) ∘ map_list updates) s).threads) t) := begin
+i ∉ accesses (vector.nth ((map_active_threads ac₁ ((mcl_store var idx h₃ h₄) ∘ compute_list updates) s).threads) t) := begin
     sorry,
 end
 
 lemma store_store_success {sig : signature} {i : mcl_address sig} {updates} {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} 
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂ : ((sig.val var).type).dim = dim} 
 {f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
-i = ⟨var, vector_mpr h₂ (idx.map (eval (map_list updates ts).tlocal))⟩ → i ∈ ((f ∘ mcl_store var idx h₁ h₂ ∘ map_list updates) ts).stores := by sorry
+i = ⟨var, vector_mpr h₂ (idx.map (eval (compute_list updates ts).tlocal))⟩ → i ∈ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list updates) ts).stores := by sorry
 
 lemma access_init  {sig₁ sig₂ : signature} {P : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop} 
 {f₁ : memory (parlang_mcl_global sig₁) → ℕ} {f₂ : memory (parlang_mcl_global sig₂) → ℕ} {m₁ : memory (parlang_mcl_global sig₁)} {m₂ : memory (parlang_mcl_global sig₂)} 
@@ -210,9 +210,9 @@ lemma store_global_success {sig : signature} {i : mcl_address sig} {updates}
 {f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} (a : array_access sig var₁ i) (h : var₁ = var₂) : ((
         f ∘
         mcl_store var₂ idx h₁ h₂ ∘
-        map_list updates)
+        compute_list updates)
     ts
-).global i = (begin simp [parlang_mcl_global, signature.lean_type_of, lean_type_of], rw a.var_eq, rw h, exact ((map_list updates ts).tlocal.get ⟨var₂, vector_mpr h₂ $ idx.map (eval (map_list updates ts).tlocal)⟩) end) := sorry
+).global i = (begin simp [parlang_mcl_global, signature.lean_type_of, lean_type_of], rw a.var_eq, rw h, exact ((compute_list updates ts).tlocal.get ⟨var₂, vector_mpr h₂ $ idx.map (eval (compute_list updates ts).tlocal)⟩) end) := sorry
 
 def memory_array_update_tid {sig : signature} {n} (var) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (expr : expression sig (type_of (sig.val var))) (m : memory (parlang_mcl_global sig)) := 
 ((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) i, m.update ⟨var, eq.mpr sorry v[i]⟩ (eval (s.threads.nth i).tlocal expr))) m
@@ -233,7 +233,7 @@ lemma memory_array_update_tid_success {sig : signature} {n} {var₁ var₂} {s :
     admit,
 end
 
--- #reduce eval ((map_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
+-- #reduce eval ((compute_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
 
 universe u
 lemma hh {a b : Sort u} (h : a == b) : a = b := begin
@@ -360,7 +360,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
             right,
             use ha.tid_to_idx.1,
             apply exists.intro (ha.tid_to_idx.2),
-            repeat { rw map_to_map_list },
+            repeat { rw compute_to_compute_list },
             split,
             {
                 -- find the correct store instruction which performs the write
@@ -430,7 +430,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                         }
                     }, {
                         rw function.comp.assoc,
-                        rw map_list_merge,
+                        rw compute_list_merge,
                         apply store_access_elim_idx', {
                             apply list_neq_elem 0, 
                             swap, {

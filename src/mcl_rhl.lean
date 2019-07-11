@@ -261,14 +261,14 @@ lemma global_assign_right {t dim n} {idx : vector (expression sig₂ type.int) d
 mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
     ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (
         mcl_store n idx h₁ h₂ ∘
-        thread_state.map (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
+        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
         (update_global_vars_for_expr expr)
     )) ac₂)
 (skip : mclk sig₁) (global_assign n idx h₁ h₂ expr) P := begin
     intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
     use ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_global sig₂)).map_active_threads ac₂ (
         mcl_store n idx h₁ h₂ ∘
-        thread_state.map (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
+        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
         (update_global_vars_for_expr expr)
     )),
     split, {
@@ -300,7 +300,7 @@ lemma global_assign_left {t dim n expr} {idx : vector (expression sig₁ type.in
 mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ 
     ((s₁ : parlang.state n₁ (memory $ parlang_mcl_tlocal sig₁) (parlang_mcl_global sig₁)).map_active_threads ac₁ (
         mcl_store n idx h₁ h₂ ∘
-        thread_state.map (λ s : memory $ parlang_mcl_tlocal sig₁, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
+        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₁, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
         (update_global_vars_for_expr expr)
     )) ac₁ n₂ s₂ ac₂) 
 (global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) P := begin
@@ -311,7 +311,7 @@ lemma global_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.i
 (hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ 
     (s₁.map_active_threads ac₁ (
         mcl_store n idx h₁ h₂ ∘
-        thread_state.map (λ s : memory $ parlang_mcl_tlocal sig₁, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
+        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₁, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
         (update_global_vars_for_expr expr)
     )) ac₁ n₂ s₂ ac₂) : 
 mclk_rel P (global_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin

@@ -77,7 +77,7 @@ let ⟨i, v⟩ := f t.tlocal in
   stores := insert i t.stores,
   .. t}
 
-def map (f : σ → σ) (t : thread_state σ τ) : thread_state σ τ :=
+def compute (f : σ → σ) (t : thread_state σ τ) : thread_state σ τ :=
 { tlocal := f t.tlocal,
   .. t}
 
@@ -187,11 +187,11 @@ lemma syncable_unique {s : state n σ τ} {m m'} (h₁ : syncable s m) (h₂ : s
 end
 
 @[simp]
-lemma syncable_remove_map {s : state n σ τ} (ac : vector bool n) (f m g) : syncable (map_active_threads ac (thread_state.map g ∘ f) s) m ↔ syncable (map_active_threads ac f s) m := by sorry
+lemma syncable_remove_compute {s : state n σ τ} (ac : vector bool n) (f m g) : syncable (map_active_threads ac (thread_state.compute g ∘ f) s) m ↔ syncable (map_active_threads ac f s) m := by sorry
 
-lemma thread_state_map {f : thread_state σ τ → thread_state σ τ} {g h} : f ∘ thread_state.store g ∘ thread_state.map h = f ∘ thread_state.map h ∘ thread_state.store (λ s, g (h s)) := by sorry
+lemma thread_state_map {f : thread_state σ τ → thread_state σ τ} {g h} : f ∘ thread_state.store g ∘ thread_state.compute h = f ∘ thread_state.compute h ∘ thread_state.store (λ s, g (h s)) := by sorry
 
-lemma thread_state_map' {g : σ → Σ (i : ι), τ i} {h} : thread_state.store g ∘ thread_state.map h = thread_state.map h ∘ thread_state.store (λ s, g (h s)) := by sorry
+lemma thread_state_map' {g : σ → Σ (i : ι), τ i} {h} : thread_state.store g ∘ thread_state.compute h = thread_state.compute h ∘ thread_state.store (λ s, g (h s)) := by sorry
 
 lemma state_eq_per_thread {s u : state n σ τ} : (∀ i, s.threads.nth i = u.threads.nth i) → s = u := begin
   intros hieq,
@@ -223,7 +223,7 @@ lemma map_threads_all_threads_active {s : state n σ τ} {ac : vector bool n} {f
   sorry,
 end
 
-lemma map_active_threads_id (s : state n σ τ) (ac : vector bool n) : s = s.map_active_threads ac (thread_state.map id) := sorry
+lemma map_active_threads_id (s : state n σ τ) (ac : vector bool n) : s = s.map_active_threads ac (thread_state.compute id) := sorry
 
 lemma ac_distinct_cases {ac₁ ac₂ : vector bool n} (h : ac_distinct ac₁ ac₂) (i : fin n) : 
   (ac₁.nth i ∧ ¬ac₂.nth i) ∨ (ac₂.nth i ∧ ¬ac₁.nth i) ∨ (¬ac₁.nth i ∧ ¬ac₂.nth i) := begin
@@ -423,7 +423,7 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
 | store (f) (s : state n σ τ) (ac : vector bool n) :
   exec_state (store f) ac s (s.map_active_threads ac $ thread_state.store f)
 | compute (f : σ → σ) (s : state n σ τ) (ac : vector bool n) :
-  exec_state (compute f) ac s (s.map_active_threads ac $ thread_state.map f)
+  exec_state (compute f) ac s (s.map_active_threads ac $ thread_state.compute f)
 | sync_all (s : state n σ τ) (ac : vector bool n) (m : memory τ) (hs : s.syncable m)
   (ha : all_threads_active ac) :
   exec_state sync ac s (s.map_threads $ thread_state.sync m)
