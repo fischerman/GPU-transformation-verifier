@@ -1,7 +1,9 @@
 import mcl
+import mcl_rhl
 import parlang
 open mcl
 open mcl.mclk
+open mcl.rhl
 
 namespace assign_mcl
 
@@ -264,27 +266,27 @@ Show
 lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
     apply rel_mclk_to_mclp,
 
-    apply mcl.skip_right.mpr,
-    apply mcl.seq,
+    apply skip_right.mpr,
+    apply rhl.seq,
     swap,
 
-    apply mcl.skip_left_after.mpr,
-    apply mcl.skip_right.mpr,
-    apply mcl.seq,
-    tactic.swap,
+    apply skip_left_after.mpr,
+    apply skip_right.mpr,
+    apply rhl.seq,
+    swap,
 
     -- break it down into individual proofs
     apply add_skip_left.mpr,
-    apply mcl.seq,
-    tactic.swap,
+    apply rhl.seq,
+    swap,
     {
-        apply mcl.global_assign_right,
+        apply global_assign_right,
     },{
-        apply mcl.global_assign_right,
+        apply global_assign_right,
     }, {
-        apply mcl.global_assign_left,
+        apply global_assign_left,
     },
-    apply mcl.global_assign_left',
+    apply global_assign_left',
     intros _ _ _ _ _ _ h,
     cases h with m₁ h,
     cases h with m₂ h,

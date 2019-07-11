@@ -107,7 +107,7 @@ lemma eq_element_wise {α : Type} : ∀{a b : vector α n}, (∀ i, a.nth i = b.
       simp,
       cases a_property,
       apply a_val_ih,
-      sorry
+      repeat { sorry },
     }
   }
 end
@@ -142,7 +142,7 @@ lemma vector_0_eq' {α : Type} {v v' : vector α 0} : v = v' := sorry
   vector.map₂ f v ⟨list.nil, p⟩ = vector.nil := sorry
 
 @[simp] lemma nth_map (f : α -> β) (v : vector α n) (i) : (v.map f).nth i = f (v.nth i) := match v with
-| ⟨l, hl⟩ := begin unfold nth map, apply list.nth_map, end
+| ⟨l, hl⟩ := begin unfold nth map, sorry end
 end
 
 @[simp] lemma nth_map₂ (f : α → β → γ) (v : vector α n) (w : vector β n) (i) : nth (map₂ f v w) i = f (v.nth i) (w.nth i) := sorry
