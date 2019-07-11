@@ -94,7 +94,8 @@ end thread_state
 def no_thread_active (ac : vector bool n) : bool := ¬ac.to_list.any id
 def any_thread_active (ac : vector bool n) : bool := ac.to_list.any id
 def all_threads_active (ac : vector bool n) : bool := ac.to_list.all id
-def ac_distinct (ac₁ ac₂ : vector bool n) : Prop := ∀ (i : fin n), ac₁.nth i ≠ ac₂.nth i
+/-- thread can only be active either in ac₁ or ac₂ -/
+def ac_distinct (ac₁ ac₂ : vector bool n) : Prop := ∀ (i : fin n), ac₁.nth i = ff ∨ ac₂.nth i = ff
 
 /-- Global program state -/
 structure state {ι : Type} (n : ℕ) (σ : Type) (τ : ι → Type) : Type :=
@@ -225,51 +226,23 @@ end
 
 lemma map_active_threads_id (s : state n σ τ) (ac : vector bool n) : s = s.map_active_threads ac (thread_state.compute id) := sorry
 
-lemma ac_distinct_cases {ac₁ ac₂ : vector bool n} (h : ac_distinct ac₁ ac₂) (i : fin n) : 
-  (ac₁.nth i ∧ ¬ac₂.nth i) ∨ (ac₂.nth i ∧ ¬ac₁.nth i) ∨ (¬ac₁.nth i ∧ ¬ac₂.nth i) := begin
-  unfold ac_distinct at h,
-  by_cases h1 : ↥(vector.nth ac₁ i),
-  {
-    left,
-    specialize h i,
-    simp [h1] at h,
-    apply and.intro,
-    { assumption, },
-    {
-      intro,
-      apply h,
-      sorry,
-    }
-  }, {
-    by_cases h2 : ↥(vector.nth ac₂ i),
-    {
-      right,
-      left,
-      sorry,
-    }, {
-      right,
-      right,
-      exact ⟨h1, h2⟩,
-    }
-  }
-end
-
 lemma map_active_threads_comm {s : state n σ τ} {ac₁ ac₂ : vector bool n} {f g} (h : ac_distinct ac₁ ac₂) : 
   (s.map_active_threads ac₁ f).map_active_threads ac₂ g = (s.map_active_threads ac₂ g).map_active_threads ac₁ f := begin
   simp [map_active_threads],
   apply vector.eq_element_wise,
   intro i,
   repeat { rw vector.nth_map₂},
-  cases (ac_distinct_cases h i),
+  cases h i,
   {
     simp[h_1],
+    by_cases vector.nth ac₂ i = tt,
+    { rw h, },
+    { simp at h, simp [h], }
   }, {
-    cases h_1,
-    {
-      simp[h_1],
-    }, {
-      simp[h_1],
-    }
+    simp[h_1],
+    by_cases vector.nth ac₁ i = tt,
+    { rw h, },
+    { simp at h, simp [h], }
   }
 end
 
