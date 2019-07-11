@@ -67,7 +67,7 @@ open parlang.thread_state
 --list.all (vector.to_list ?m_4) (bnot ∘ expr_reads ?m_5)
 
 lemma vector_map_single {s : memory $ parlang_mcl_tlocal sig} {t} {expr : expression sig t} : vector.map (eval s) v[expr] = v[eval s expr] := begin
-    sorry
+    refl,
 end
 
 lemma lt_zero_one : 0 < 1 := by sorry
