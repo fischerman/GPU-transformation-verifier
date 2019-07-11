@@ -73,7 +73,8 @@ lemma contains_nth {α : Type} : ∀{n : ℕ} {v : vector α n} {i : fin n}, (v.
     exact ⟨i, hi, rfl⟩
   end
 
-lemma eq_element_wise {α : Type} : ∀{a b : vector α n}, (∀ i, a.nth i = b.nth i) → a = b := begin
+lemma eq_element_wise {α : Type} : ∀{a b : vector α n}, (∀ i, a.nth i = b.nth i) → a = b 
+:= begin
   -- TODO needs fixing
   intros a b hieq,
   apply vector.eq,
@@ -140,7 +141,9 @@ lemma vector_0_eq' {α : Type} {v v' : vector α 0} : v = v' := sorry
 @[simp] lemma map₂_nil' {α β γ : Type} {f : α → β → γ} (v : vector α 0) (p) :
   vector.map₂ f v ⟨list.nil, p⟩ = vector.nil := sorry
 
-@[simp] lemma nth_map (f : α -> β) (v : vector α n) (i) : (v.map f).nth i = f (v.nth i) := sorry
+@[simp] lemma nth_map (f : α -> β) (v : vector α n) (i) : (v.map f).nth i = f (v.nth i) := match v with
+| ⟨l, hl⟩ := begin unfold nth map, apply list.nth_map, end
+end
 
 @[simp] lemma nth_map₂ (f : α → β → γ) (v : vector α n) (w : vector β n) (i) : nth (map₂ f v w) i = f (v.nth i) (w.nth i) := sorry
 

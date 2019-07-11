@@ -1,6 +1,6 @@
 
 import parlang
-import rel_hoare
+import parlang_rhl
 open parlang
 
 notation `v[` v:(foldr `, ` (h t, vector.cons h t) vector.nil `]`) := v
