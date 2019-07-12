@@ -2,7 +2,12 @@ import data.list.basic
 import data.vector
 
 universes u v w
-variables {n : ℕ} {α β γ : Type}
+variables {n : ℕ} {α β γ δ : Type}
+
+@[simp]
+lemma ite_else_ite {c} [decidable c] {b₁ b₂ b₃ :  Sort u} : ite c b₁ (ite c b₂ b₃) = ite c b₁ b₃ := begin
+  by_cases c; simp *,
+end
 
 namespace list
 
@@ -23,6 +28,14 @@ range_fin_core n n (by refl) []
 
 @[simp] lemma length_range_nth : length (range_fin n) = n := begin
   admit
+end
+
+#print map₂._main
+
+lemma map₂_map₂ (g : γ → β → δ) (f : α → β → γ) (l : list α) (l' : list β) : map₂ g (map₂ f l l') l' = map₂ (λ a b, g (f a b) b) l l' := begin
+  induction l generalizing l',
+  case list.nil { cases l'; refl, },
+  case list.cons { cases l'; simp [map₂, *], }
 end
 
 end list
@@ -147,6 +160,20 @@ end
 
 @[simp] lemma nth_map₂ (f : α → β → γ) (v : vector α n) (w : vector β n) (i) : nth (map₂ f v w) i = f (v.nth i) (w.nth i) := sorry
 
+lemma map_map (g : β → γ) (f : α → β) (v : vector α n) : map g (map f v) = map (g ∘ f) v := begin
+  cases v,
+  apply vector.eq,
+  simp [to_list, map, list.map_map],
+end
+
+lemma map₂_map₂ (g : γ → β → δ) (f : α → β → γ) (v : vector α n) (v' : vector β n) : map₂ g (map₂ f v v') v' = map₂ (λ a b, g (f a b) b) v v' := begin
+  cases v,
+  cases v',
+  apply vector.eq,
+  simp [to_list, map, map₂],
+  apply list.map₂_map₂,
+end
+
 -- example {f a as b bs h h' h''} :
 --   vector.map₂ f ⟨ a :: as, h⟩ ⟨b :: bs, h'⟩ = ⟨f a b :: vector.map₂ f as bs, h''⟩ :=
 -- sorry
@@ -177,6 +204,12 @@ end
 
 lemma bnot_bnot {α : Type} {f : α → bool} : (bnot ∘ bnot ∘ f) = f := begin
   sorry,
+end
+
+lemma bnot_ff (b : bool) : bnot b = (b = ff) := begin
+  by_cases b = ff,
+  { rw h, refl, },
+  { simp at h, subst h, simp, }
 end
 
 end bool
