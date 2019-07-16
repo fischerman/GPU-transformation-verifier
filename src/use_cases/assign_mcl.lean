@@ -119,6 +119,12 @@ lemma store_store_success {sig : signature} {i : mcl_address sig} {updates} {ts 
 {f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
 i = ⟨var, vector_mpr h₂ (idx.map (eval (compute_list updates ts).tlocal))⟩ → i ∈ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list updates) ts).stores := by sorry
 
+/-- Stores can be skipped if the variable name does not match. Does not work for idx -/
+lemma store_store_skip_name {sig : signature} {i : mcl_address sig} {updates} {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} 
+{dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂ : ((sig.val var).type).dim = dim} 
+{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+i ∈ ((f ∘ compute_list updates) ts).stores → i ∈ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list updates) ts).stores := by sorry
+
 lemma access_init  {sig₁ sig₂ : signature} {P : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop} 
 {f₁ : memory (parlang_mcl_global sig₁) → ℕ} {f₂ : memory (parlang_mcl_global sig₂) → ℕ} {m₁ : memory (parlang_mcl_global sig₁)} {m₂ : memory (parlang_mcl_global sig₂)} 
 {n₁} {s₁ : state n₁ (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig₁)} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig₂)} {ac₂ : vector bool n₂} {t} {i} : 
@@ -139,18 +145,20 @@ variable (m''' : memory (parlang_mcl_global sig))
 set_option trace.check true
 
 -- question: should we limit ourselfs to global scope here?
+/-- generic array access for cases-distinction. Covers all accesses with the same variable name and the right number of dimensions -/
 structure array_access (sig : signature) (var : string) (i : mcl_address sig) : Prop :=
 (var_eq : i.1 = var)
 (idx_len : i.2.length = (sig.val var).type.dim)
 -- (bound : list.forall₂ nat.lt i.2 (sig var).type.sizes.to_list)
 
+/-- An extension of array_access. Restricts itself to arrays with one dimension and that index being less than n. n is usually used for the numer of threads to create a 1-to-1 mapping from threads to elements. Without shifting thread n stores to element n -/
 structure array_access_tid_to_idx (sig : signature) (var : string) (i : mcl_address sig) (n : ℕ) extends array_access sig var i : Prop :=
 (one_dim : i.2.length = 1)
-(field_per_thread : i.2.nth ⟨0, begin rw [var_eq, ←idx_len, one_dim], exact lt_zero_one end⟩ < n)
+(idx_1_lt_n : i.2.nth ⟨0, begin rw [var_eq, ←idx_len, one_dim], exact lt_zero_one end⟩ < n)
 
--- todo: can also be fin
-def array_access_tid_to_idx.tid_to_idx {sig : signature} {var : string} {i : mcl_address sig} {n} (a : array_access_tid_to_idx sig var i n) : 
-fin n := ⟨i.2.nth ⟨0, begin rw [a.to_array_access.var_eq, ← a.to_array_access.idx_len, a.one_dim], exact lt_zero_one end⟩, a.field_per_thread⟩
+/-- Returns the thread identifier, which performs the store -/
+def array_access_tid_to_idx.storing_tid {sig : signature} {var : string} {i : mcl_address sig} {n} (a : array_access_tid_to_idx sig var i n) : 
+fin n := ⟨i.2.nth ⟨0, begin rw [a.to_array_access.var_eq, ← a.to_array_access.idx_len, a.one_dim], exact lt_zero_one end⟩, a.idx_1_lt_n⟩
 
 instance forall₂_decidable {α : Type} [decidable_eq α] (l₁ : list α) (l₂ : list α) : decidable (list.forall₂ eq l₁ l₂) := begin
     induction l₁ generalizing l₂,
@@ -209,6 +217,16 @@ lemma store_global_success {sig : signature} {i : mcl_address sig} {updates}
     ts
 ).global i = (begin simp [parlang_mcl_global, signature.lean_type_of, lean_type_of], rw a.var_eq, rw h, exact ((compute_list updates ts).tlocal.get ⟨var₂, vector_mpr h₂ $ idx.map (eval (compute_list updates ts).tlocal)⟩) end) := sorry
 
+lemma store_global_skip {sig : signature} {i : mcl_address sig} {updates} 
+{dim} {idx : vector (expression sig type.int) dim} {var₁ var₂ t} {h₁ : type_of (sig.val var₂) = t} {h₂}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
+{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} (a : array_access sig var₁ i) (h : var₁ ≠ var₂) : ((
+        f ∘
+        mcl_store var₂ idx h₁ h₂ ∘
+        compute_list updates)
+    ts
+).global i = ((f ∘ compute_list updates) ts).global i := sorry
+
 def memory_array_update_tid {sig : signature} {n} (var) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (expr : expression sig (type_of (sig.val var))) (m : memory (parlang_mcl_global sig)) := 
 ((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) i, m.update ⟨var, eq.mpr sorry v[i]⟩ (eval (s.threads.nth i).tlocal expr))) m
 
@@ -224,7 +242,7 @@ end
 
 lemma memory_array_update_tid_success {sig : signature} {n} {var₁ var₂} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} 
 {expr : expression sig (type_of (sig.val var₂))} {m : memory (parlang_mcl_global sig)} {i} (a : array_access_tid_to_idx sig var₁ i n) (h : var₁ = var₂) : 
-(memory_array_update_tid var₂ s expr m) i = eval (s.threads.nth ⟨_, a.field_per_thread⟩).tlocal (by rw a.to_array_access.var_eq; rw h; exact expr) := begin
+(memory_array_update_tid var₂ s expr m) i = eval (s.threads.nth ⟨_, a.idx_1_lt_n⟩).tlocal (by rw a.to_array_access.var_eq; rw h; exact expr) := begin
     admit,
 end
 
@@ -300,6 +318,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
     -- the two updates read indepedently because they both depend on the same state (AFAIK they could still be swaped because the state is fixed)
     apply exists.intro (memory_array_update_tid "b" s₁ (read_tid + (expression.literal_int 1 (by refl))) (memory_array_update_tid "a" s₁ read_tid m₁)),
 
+    -- split up the proof for the individual memories
     split, {
         have : update_global_vars_for_expr read_tid = id := by refl,
         rw this,
@@ -350,10 +369,11 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
         --     rw eval_update_ignore hani',
         -- },
         intro,
-        by_cases ha : array_access_tid_to_idx sig "a" i n₁,
-        {
+        -- handle all addresses from array "a"
+        by_cases ha : array_access_tid_to_idx sig "a" i n₁, {
+            -- choose that we have a store
             right,
-            use ha.tid_to_idx,
+            use ha.storing_tid,
             repeat { rw compute_to_compute_list },
             split,
             {
@@ -382,28 +402,54 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                     apply all_threads_active_nth,
                     exact h.left_all_threads_active,
                 }
+            },
+            split,
+            {
+                -- proof that the value at i is the same in the resulting memory
+                rw map_active_threads_nth_ac (all_threads_active_nth h.left_all_threads_active _),
+                rw memory_array_update_tid_skip ha.to_array_access,
+                swap, {
+                    intro heq,
+                    cases heq,
+                },
+                rw memory_array_update_tid_success ha,
+                swap, {
+                    refl,
+                },
+                rw store_global_success ha.to_array_access,
+                swap, {
+                    refl
+                },
+                rw initial_kernel_assertion_left_thread_state h,
+                sorry, -- proof that the value is the same
             }, {
-                split,
-                {
-                    rw map_active_threads_nth_ac (all_threads_active_nth h.left_all_threads_active _),
-                    rw memory_array_update_tid_skip ha.to_array_access,
+                -- proof that all other threads t' don't access i
+                intros t' hneqtt',
+                -- handle store to "a"
+                apply store_access_elim_idx, {
+                    apply list_neq_elem 0, 
                     swap, {
-                        intro heq,
-                        cases heq,
-                    },
-                    rw memory_array_update_tid_success ha,
-                    swap, {
-                        refl,
-                    },
-                    rw store_global_success ha.to_array_access,
-                    swap, {
-                        refl
-                    },
-                    rw initial_kernel_assertion_left_thread_state h,
-                    sorry, -- proof that the value is the same
+                        rw vector.length_list,
+                        rw ha.one_dim,
+                        exact lt_zero_one,
+                    }, {
+                        rw list_nth_vector,
+                        rw list_nth_vector,
+                        rw vector.nth_map,
+                        rw map_active_threads_nth_ac,
+                        rw initial_kernel_assertion_left_thread_state h,
+                        exact fin.fin_eq hneqtt',
+                        sorry, -- todo thread is actives
+                    }, {
+                        rw vector.length_list,
+                        rw vector.length,
+                        exact lt_zero_one,
+                    }
                 }, {
-                    intros t' hneqtt',
-                    apply store_access_elim_idx, {
+                    -- handle store to "b"
+                    rw function.comp.assoc,
+                    rw compute_list_merge,
+                    apply store_access_elim_idx', {
                         apply list_neq_elem 0, 
                         swap, {
                             rw vector.length_list,
@@ -418,40 +464,129 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                             exact fin.fin_eq hneqtt',
                             sorry, -- todo thread is actives
                         }, {
-                            rw vector.length_list,
-                            rw vector.length,
-                            exact lt_zero_one,
+                            sorry, -- todo prove length through map and stuff
                         }
                     }, {
-                        rw function.comp.assoc,
-                        rw compute_list_merge,
-                        apply store_access_elim_idx', {
-                            apply list_neq_elem 0, 
-                            swap, {
-                                rw vector.length_list,
-                                rw ha.one_dim,
-                                exact lt_zero_one,
-                            }, {
-                                rw list_nth_vector,
-                                rw list_nth_vector,
-                                rw vector.nth_map,
-                                rw map_active_threads_nth_ac,
-                                rw initial_kernel_assertion_left_thread_state h,
-                                exact fin.fin_eq hneqtt',
-                                sorry, -- todo thread is actives
-                            }, {
-                                sorry, -- todo prove length through map and stuff
-                            }
-                        }, {
-                            -- initial state does not access any i
-                            apply access_init h,
-                        }
+                        -- initial state does not access any i
+                        apply access_init h,
                     }
                 }
+            }
+        }, 
+        -- handle all addresses from array "b"
+        by_cases hb : array_access_tid_to_idx sig "b" i n₁, {
+            -- choose that we have a store
+            right,
+            use hb.storing_tid,
+            repeat { rw compute_to_compute_list },
+            split,
+            {
+                -- find the correct store instruction which performs the write
+                rw map_active_threads_nth_ac, {
+                    rw initial_kernel_assertion_left_thread_state h,
+                    apply store_store_skip_name,
+                    rw function.comp.assoc,
+                    rw compute_list_merge,
+                    rw ← function.left_id (mcl_store _ _ _ _ ∘ _),
+                    apply store_store_success,
+                    apply address_eq,
+                    swap,
+                    {
+                        apply hb.var_eq,
+                    }, {
+                        rw vector_map_single,
+                        cases i,
+                        cases hb,
+                        cases hb__to_array_access,
+                        simp at hb__to_array_access_var_eq,
+                        simp at hb__to_array_access_idx_len,
+                        dedup,
+                        subst hb__to_array_access_var_eq_1,
+                        apply vector.eq_one,
+                        refl,
+                    }
+                }, {
+                    -- thread is active
+                    apply all_threads_active_nth,
+                    exact h.left_all_threads_active,
+                }
             },
-        }, {
-            sorry,
-        }
+            split,
+            {
+                -- proof that the value at i is the same in the resulting memory
+                rw map_active_threads_nth_ac (all_threads_active_nth h.left_all_threads_active _),
+                rw memory_array_update_tid_success hb,
+                swap, {
+                    refl,
+                },
+                rw store_global_skip hb.to_array_access,
+                swap, {
+                    intro heq,
+                    cases heq,
+                },
+                rw initial_kernel_assertion_left_thread_state h,
+                rw function.comp.assoc,
+                rw compute_list_merge,
+                rw ← function.left_id (mcl_store _ _ _ _ ∘ _),
+                rw store_global_success hb.to_array_access,
+                swap, {
+                    refl
+                },
+                sorry, -- proof that the value is the same
+            }, {
+                -- proof that all other threads t' don't access i
+                -- the order is defined by the program, we approach them similar to the proof for "a"
+                intros t' hneqtt',
+                -- handle store to "a"
+                apply store_access_elim_idx, {
+                    apply list_neq_elem 0, 
+                    swap, {
+                        rw vector.length_list,
+                        rw hb.one_dim,
+                        exact lt_zero_one,
+                    }, {
+                        rw list_nth_vector,
+                        rw list_nth_vector,
+                        rw vector.nth_map,
+                        rw map_active_threads_nth_ac,
+                        rw initial_kernel_assertion_left_thread_state h,
+                        exact fin.fin_eq hneqtt',
+                        sorry, -- todo thread is actives
+                    }, {
+                        rw vector.length_list,
+                        rw vector.length,
+                        exact lt_zero_one,
+                    }
+                }, {
+                    -- handle store to "b"
+                    rw function.comp.assoc,
+                    rw compute_list_merge,
+                    apply store_access_elim_idx', {
+                        apply list_neq_elem 0, 
+                        swap, {
+                            rw vector.length_list,
+                            rw hb.one_dim,
+                            exact lt_zero_one,
+                        }, {
+                            rw list_nth_vector,
+                            rw list_nth_vector,
+                            rw vector.nth_map,
+                            rw map_active_threads_nth_ac,
+                            rw initial_kernel_assertion_left_thread_state h,
+                            exact fin.fin_eq hneqtt',
+                            sorry, -- todo thread is actives
+                        }, {
+                            sorry, -- todo prove length through map and stuff
+                        }
+                    }, {
+                        -- initial state does not access any i
+                        apply access_init h,
+                    }
+                }
+            }
+        },
+        -- TODO: handle all remaining addresses but "a"
+        sorry,
     }, {
         sorry,
     }
