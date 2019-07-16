@@ -89,11 +89,6 @@ lemma compute_list_merge {σ ι : Type} {τ : ι → Type} [decidable_eq ι] (f 
     }
 end
 
-lemma map_active_threads_nth_active {σ ι : Type} {τ : ι → Type} [decidable_eq ι] {n} {s : state n σ τ} {ac : vector bool n} {f i} : 
-ac.nth i → (s.map_active_threads ac f).threads.nth i = f (s.threads.nth i) := begin
-  sorry
-end
-
 lemma store_access_elim_name {sig : signature} {n n_idx} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
 {t h₄} {h₃ : type_of (sig.val var) = t } {f} {t : fin n} {i} {ac₁ : vector bool n} {updates}
 (h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ compute_list updates) s).threads) t)) 
@@ -155,7 +150,7 @@ structure array_access_tid_to_idx (sig : signature) (var : string) (i : mcl_addr
 
 -- todo: can also be fin
 def array_access_tid_to_idx.tid_to_idx {sig : signature} {var : string} {i : mcl_address sig} {n} (a : array_access_tid_to_idx sig var i n) : 
-(Σ' t : ℕ, t < n) := ⟨i.2.nth ⟨0, begin rw [a.to_array_access.var_eq, ← a.to_array_access.idx_len, a.one_dim], exact lt_zero_one end⟩, a.field_per_thread⟩
+fin n := ⟨i.2.nth ⟨0, begin rw [a.to_array_access.var_eq, ← a.to_array_access.idx_len, a.one_dim], exact lt_zero_one end⟩, a.field_per_thread⟩
 
 instance forall₂_decidable {α : Type} [decidable_eq α] (l₁ : list α) (l₂ : list α) : decidable (list.forall₂ eq l₁ l₂) := begin
     induction l₁ generalizing l₂,
@@ -358,13 +353,12 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
         by_cases ha : array_access_tid_to_idx sig "a" i n₁,
         {
             right,
-            use ha.tid_to_idx.1,
-            apply exists.intro (ha.tid_to_idx.2),
+            use ha.tid_to_idx,
             repeat { rw compute_to_compute_list },
             split,
             {
                 -- find the correct store instruction which performs the write
-                rw map_active_threads_nth_active, {
+                rw map_active_threads_nth_ac, {
                     rw initial_kernel_assertion_left_thread_state h,
                     apply store_store_success,
                     apply address_eq,
@@ -391,7 +385,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
             }, {
                 split,
                 {
-                    rw map_active_threads_nth_active (all_threads_active_nth h.left_all_threads_active _),
+                    rw map_active_threads_nth_ac (all_threads_active_nth h.left_all_threads_active _),
                     rw memory_array_update_tid_skip ha.to_array_access,
                     swap, {
                         intro heq,
@@ -408,7 +402,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                     rw initial_kernel_assertion_left_thread_state h,
                     sorry, -- proof that the value is the same
                 }, {
-                    intros t' ht'n hneqtt',
+                    intros t' hneqtt',
                     apply store_access_elim_idx, {
                         apply list_neq_elem 0, 
                         swap, {
@@ -419,9 +413,9 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                             rw list_nth_vector,
                             rw list_nth_vector,
                             rw vector.nth_map,
-                            rw map_active_threads_nth_active,
+                            rw map_active_threads_nth_ac,
                             rw initial_kernel_assertion_left_thread_state h,
-                            exact hneqtt',
+                            exact fin.fin_eq hneqtt',
                             sorry, -- todo thread is actives
                         }, {
                             rw vector.length_list,
@@ -441,9 +435,9 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                                 rw list_nth_vector,
                                 rw list_nth_vector,
                                 rw vector.nth_map,
-                                rw map_active_threads_nth_active,
+                                rw map_active_threads_nth_ac,
                                 rw initial_kernel_assertion_left_thread_state h,
-                                exact hneqtt',
+                                exact fin.fin_eq hneqtt',
                                 sorry, -- todo thread is actives
                             }, {
                                 sorry, -- todo prove length through map and stuff

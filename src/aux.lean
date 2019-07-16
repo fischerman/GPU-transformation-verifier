@@ -9,6 +9,20 @@ lemma ite_else_ite {c} [decidable c] {b₁ b₂ b₃ :  Sort u} : ite c b₁ (it
   by_cases c; simp *,
 end
 
+namespace fin
+
+def fin_eq {f f' : fin n} : f ≠ f' → f.val ≠ f'.val := begin
+  intro h,
+  cases f,
+  cases f',
+  simp,
+  intro h',
+  apply h,
+  subst h',
+end
+
+end fin
+
 namespace list
 
 lemma list_length_neq_zero {α} : ∀{l : list α}, l.length ≠ 0 → ∃ x xs, l = (x :: xs)

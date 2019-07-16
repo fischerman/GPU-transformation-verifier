@@ -90,14 +90,6 @@ def parlang_mcl_kernel (sig : signature) := kernel (memory $ parlang_mcl_tlocal 
 
 lemma address_eq {sig : mcl.signature} {a b : mcl.mcl_address sig} (h : a.1 = b.1) (g: a.2 = begin rw h, exact b.2 end) : a = b := sorry
 
--- lemma state_get_update_ignore (n₁ n₂) {sig dim₁ dim₂ t₁ t₂ idx₁ idx₂} {s h₁ h₁' h₂ h₂' v} (h : n₁ ≠ n₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = s.get' h₁ h₁' := begin
---     sorry
--- end
-
--- lemma state_get_update_success (n₁ n₂) {sig dim₁ dim₂ t₁ t₂} {idx₁ : vector ℕ dim₁} {idx₂ : vector ℕ dim₂} {s h₁ h₁' h₂ h₂' v} (hn : n₁ = n₂) (hidx : idx₁.to_list = idx₂.to_list) (ht : type_map t₁ = type_map t₂) : @state.get' sig t₁ n₁ dim₁ idx₁  h₁ h₁' (@state.update' sig t₂ n₂ dim₂ idx₂ h₂ h₂' v s) = eq.mpr ht v := begin
---     sorry,
--- end
-
 -- expression is an inductive family over types
 -- type is called an index
 inductive expression (sig : signature) : type → Type
@@ -171,6 +163,7 @@ end
 
 lemma vector_mpr_singleton {α : Type} {a : α} {sig : signature} {n} (h : (((sig.val n).type).dim) = 1) : vector_mpr h v[a] = eq.mpr (by rw h) v[a] := sorry
 
+@[simp]
 lemma vector_mpr_rfl {sig : signature} {n} {α : Type} {h : (((sig.val n).type).dim) = (((sig.val n).type).dim)} {v : vector α (((sig.val n).type).dim)} : vector_mpr h v = v := by refl
 
 -- should we make this an inductive predicate

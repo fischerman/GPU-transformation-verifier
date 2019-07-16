@@ -149,7 +149,7 @@ def syncable (s : state n σ τ) (m : memory τ) : Prop :=
 ∀i:ι,
   (∀ tid, i ∉ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).global i) ∨
   (∃ tid, i ∈ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).global i ∧
-    (∀ tid', tid ≠ tid' → i ∉ (s.threads.nth tid).accesses))
+    (∀ tid', tid ≠ tid' → i ∉ (s.threads.nth tid').accesses))
 
 def precedes (s u : state n σ τ) : Prop :=
 ∀ (t : thread_state σ τ × thread_state σ τ), t ∈ (s.threads.map₂ prod.mk u.threads) → t.1.stores ⊆ t.2.stores ∧ t.1.loads ⊆ t.2.loads
