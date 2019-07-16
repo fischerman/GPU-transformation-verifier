@@ -11,7 +11,7 @@ end
 
 namespace fin
 
-def fin_eq {f f' : fin n} : f ≠ f' → f.val ≠ f'.val := begin
+lemma fin_eq {f f' : fin n} : f ≠ f' → f.val ≠ f'.val := begin
   intro h,
   cases f,
   cases f',

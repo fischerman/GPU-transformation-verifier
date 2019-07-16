@@ -195,10 +195,11 @@ lemma syncable_unique {s : state n σ τ} {m m'} (h₁ : syncable s m) (h₂ : s
       have hleq : h₁l = h₂l := begin
         by_contra hlneq,
         have : x ∉ thread_state.accesses (vector.nth (s.threads) h₁l) := begin
-          specialize h₁_3 h₂l,
-          apply h₁_3,
+          specialize h₂_3 h₁l,
+          apply h₂_3,
           intro a,
-          contradiction,
+          apply hlneq,
+          exact eq.symm a,
         end,
         unfold thread_state.accesses at this,
         have : x ∉ (vector.nth (s.threads) h₁l).stores := begin
