@@ -1,6 +1,8 @@
 import mcl
 import mcl_rhl
 import parlang
+import syncablep
+
 open mcl
 open mcl.mclk
 open mcl.rhl
@@ -97,7 +99,6 @@ i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx 
     sorry,
 end
 
-
 lemma store_access_elim_idx {sig : signature} {n n_idx} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
 {t} {h₄ : ((sig.val var).type).dim = n_idx} {h₃ : type_of (sig.val var) = t } {f} {t : fin n} {i : mcl_address sig} {ac₁ : vector bool n} {updates}
 (h₂ : i.2.to_list ≠ (idx.map ((eval (((map_active_threads ac₁ (compute_list updates) s).threads).nth t).tlocal))).to_list) 
@@ -127,7 +128,7 @@ i ∈ ((f ∘ compute_list updates) ts).stores → i ∈ ((f ∘ mcl_store var i
 
 lemma access_init  {sig₁ sig₂ : signature} {P : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop} 
 {f₁ : memory (parlang_mcl_global sig₁) → ℕ} {f₂ : memory (parlang_mcl_global sig₂) → ℕ} {m₁ : memory (parlang_mcl_global sig₁)} {m₂ : memory (parlang_mcl_global sig₂)} 
-{n₁} {s₁ : state n₁ (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig₁)} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig₂)} {ac₂ : vector bool n₂} {t} {i} : 
+{n₁} {s₁ : state n₁ (memory $ parlang_mcl_tlocal sig₁) (parlang_mcl_global sig₁)} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_global sig₂)} {ac₂ : vector bool n₂} {t} {i} : 
 initial_kernel_assertion mcl_init mcl_init P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ → i ∉ accesses (vector.nth (s₁.threads) t) := begin
     sorry
 end
@@ -246,6 +247,42 @@ lemma memory_array_update_tid_success {sig : signature} {n} {var₁ var₂} {s :
     admit,
 end
 
+structure array_access_oob (sig : signature) (var : string) (i : mcl_address sig) (n : ℕ) : Prop :=
+(var_eq: i.1 = var) (idx_len : i.2.length = (sig.val var).type.dim) (one_dim : i.2.length = 1)
+(oob: ¬i.2.nth ⟨0, begin rw [var_eq, ←idx_len, one_dim], exact lt_zero_one end⟩ < n)
+
+instance bet {sig var i n} : decidable (array_access_oob sig var i n) := sorry
+
+lemma array_access_false {sig : signature} {n i var} : ¬array_access_tid_to_idx sig var i n → 
+    i.1 ≠ var ∨ i.2.length ≠ (sig.val var).type.dim ∨ 
+    i.2.length ≠ 1 ∨ array_access_oob sig var i n := begin
+    intro h,
+    by_cases var_eq: i.fst = var, swap, {
+        left,
+        trivial,
+    },
+    by_cases idx_len : vector.length (i.snd) = ((sig.val var).type).dim, swap, {
+        right, left,
+        trivial,
+    },
+    by_cases one_dim : vector.length (i.snd) = 1, swap, {
+        right, right, left,
+        trivial,
+    },
+    by_cases array_access_oob sig var i n, {
+        right, right, right,
+        assumption,
+    }, {
+        have : i.2.nth ⟨0, begin rw [var_eq, ←idx_len, one_dim], exact lt_zero_one end⟩ < n := begin
+            by_contra oob,
+            have : array_access_oob sig var i n := ⟨var_eq, idx_len, one_dim, oob⟩,
+            contradiction,
+        end,
+        have : array_access_tid_to_idx sig var i n := ⟨⟨var_eq, idx_len⟩, one_dim, this⟩,
+        contradiction,
+    }
+end
+
 -- #reduce eval ((compute_list [/- λ (s : state sig), state.update' p₁._proof_1 _ (eval s read_tid) s -/] {tlocal := mcl_init 9, global := m''', loads := ∅, stores := ∅}).tlocal) (vector.nth [read_tid] ⟨0, lt_zero_one⟩)
 
 universe u
@@ -267,6 +304,50 @@ lemma hhh' {α : Type} (h: α = α) (a : α) : eq.mpr h a = a := by refl
 variable (a : nat)
 
 #check a = a
+
+lemma compute_list_accesses {sig : signature} {n} (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (i) (computes) (tid) : 
+i ∉ (compute_list computes (vector.nth (s.threads) tid)).accesses ↔ i ∉ (vector.nth (s.threads) tid).accesses := sorry
+
+example {sig₁ sig₂ : signature} {P : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop} 
+{f₁ : memory (parlang_mcl_global sig₁) → ℕ} {f₂ : memory (parlang_mcl_global sig₂) → ℕ} {m₁ : memory (parlang_mcl_global sig₁)} {m₂ : memory (parlang_mcl_global sig₂)} 
+{n₁} {s₁ : state n₁ (memory $ parlang_mcl_tlocal sig₁) (parlang_mcl_global sig₁)} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_global sig₂)} {ac₂ : vector bool n₂} 
+{stores loads : list $ mcl_address sig₁} {computes : list ((memory $ parlang_mcl_tlocal sig₁) → (memory $ parlang_mcl_tlocal sig₁))} : 
+initial_kernel_assertion mcl_init mcl_init P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ → syncable' stores loads (map_active_threads ac₁ (compute_list computes) s₁) m₁ := begin
+    intro h,
+    unfold syncable',
+    split, {
+        sorry,
+    },
+    split, {
+        intros i tid h',
+        rw map_active_threads_nth_ac,
+        apply thread_state.store_accesses,
+        rw compute_list_accesses,
+        apply access_init h,
+        sorry,
+    }, {
+        intros i tid _,
+        rw map_active_threads_nth_ac,
+        apply thread_state.loads_accesses,
+        rw compute_list_accesses,
+        apply access_init h,
+        sorry,
+    }
+end
+
+--def array : list (mcl_address sig) := list.
+
+example {sig : signature} {n} {ac : vector bool n} {computes} {stores loads}
+{dim} {idx : vector (expression sig type.int) dim} {var₁ var₂ t} {h₁ : type_of (sig.val var₂) = t} {h₂}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
+{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
+{s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
+{m : memory (parlang_mcl_global sig)} : 
+syncable' (stores ++ array var₂) loads (map_active_threads ac (f ∘ compute_list computes) s) m →
+(∀ idx, (⟨var₂, idx⟩ : mcl_address sig) ∉ stores) →
+(∀ tid₁ tid₂, tid₁ ≠ tid₂ → idx.map (λ ind, eval (s.threads.nth tid₁).tlocal ind) ≠ idx.map (λ ind, eval (s.threads.nth tid₂).tlocal ind)) →
+syncable' stores loads (map_active_threads ac (f ∘ mcl_store var₂ idx h₁ h₂ ∘ compute_list computes) s) m := begin
+end
 
 -- todo change the definition of syncable to take a fin
 -- todo extend array_access_tid to contain the value as an expression
@@ -585,6 +666,25 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                 }
             }
         },
+        -- no thread stores in addresses which are not "a" or "b"
+        left,
+        intro t,
+        split,
+        {
+            repeat { rw compute_to_compute_list },
+            apply thread_state.store_accesses,
+            by_cases i.fst = "a", {
+                have : _ := array_access_false ha,
+                sorry,
+                -- apply store_access_elim_idx, {
+                    
+                -- }
+            },
+            by_cases i.fst = "b", {
+                sorry,
+            },
+
+        }
         -- TODO: handle all remaining addresses but "a"
         sorry,
     }, {

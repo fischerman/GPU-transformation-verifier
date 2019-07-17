@@ -89,6 +89,9 @@ def sync (g : memory τ) (t : thread_state σ τ) : thread_state σ τ :=
 
 def accesses (t : thread_state σ τ) : set ι := t.stores ∪ t.loads
 
+lemma store_accesses {ts : thread_state σ τ} {i} : i ∉ accesses ts → i ∉ stores ts := sorry
+lemma loads_accesses {ts : thread_state σ τ} {i} : i ∉ accesses ts → i ∉ loads ts := sorry
+
 end thread_state
 
 def no_thread_active (ac : vector bool n) : bool := ¬ac.to_list.any id
