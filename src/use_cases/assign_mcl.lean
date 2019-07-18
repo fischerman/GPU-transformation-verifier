@@ -366,16 +366,27 @@ def ts_updates {sig : signature} : list (op sig) → thread_state (memory $ parl
 | (op.store var idx h₁ h₂ :: ops) ts := ts_updates ops $ mcl_store var idx h₁ h₂ ts
 | (op.compute_list computes :: ops) ts := ts_updates ops $ compute_list computes ts
 
+lemma compute_list_tlocal {sig : signature} {computes : list (memory (parlang_mcl_tlocal sig) → memory (parlang_mcl_tlocal sig))} {tlocal loads stores} {global : memory $ parlang_mcl_global sig} : compute_list computes
+{tlocal := tlocal, global := global, loads := loads, stores := stores} = {tlocal := computes.foldl (λ tl com, com tl) tlocal, global := global, loads := loads, stores := stores} := begin
+    induction computes generalizing tlocal,
+    {
+        refl,
+    }, {
+        simp [compute_list, compute, computes_ih],
+    }
+end
+                     
+
 example {sig : signature} {n} {ac : vector bool n} {computes} {stores loads : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
 {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
-{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
+{updates : list $ op sig}
 {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
 {m : memory (parlang_mcl_global sig)} : 
-syncable' (stores ∪ array var) loads (map_active_threads ac (f ∘ compute_list computes) s) m →
+syncable' (stores ∪ array var) loads (map_active_threads ac (ts_updates $ op.compute_list computes :: updates) s) m →
 (∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ stores) →
 (∀ tid₁ tid₂, tid₁ ≠ tid₂ → idx.map (λ ind, eval (s.threads.nth tid₁).tlocal ind) ≠ idx.map (λ ind, eval (s.threads.nth tid₂).tlocal ind)) →
-syncable' stores loads (map_active_threads ac (f ∘ mcl_store var idx h₁ h₂ ∘ compute_list computes) s) m
+syncable' stores loads (map_active_threads ac (ts_updates $ op.compute_list computes :: op.store var idx h₁ h₂ :: updates) s) m
 | (and.intro syncable (and.intro not_in_stores not_in_loads)) hole distinct := begin
     clear _example,
     unfold syncable',
@@ -397,11 +408,31 @@ syncable' stores loads (map_active_threads ac (f ∘ mcl_store var idx h₁ h₂
             by_cases tid_activeness : ac.nth tid = tt,
             {
                 rw map_active_threads_nth_ac tid_activeness,
+                rw map_active_threads_nth_ac tid_activeness at not_in_stores,
                 /- LARGE PROOF STARTS HERE -/
-                specialize syncable i,
-                cases syncable,
+                clear syncable not_in_loads,
+                induction updates,
                 {
-
+                    simp [ts_updates, mcl_store, store],
+                    simp [ts_updates, mcl_store, store] at not_in_stores,
+                    intro,
+                    cases a, {
+                        subst a,
+                        apply i_is_var,
+                        refl,
+                    }, {
+                        contradiction,
+                    },
+                }, {
+                    cases updates_hd,
+                    {
+                        simp [ts_updates] at not_in_stores,
+                        simp [ts_updates, mcl_store, store],
+                        sorry,
+                    }, {
+                        simp [ts_updates, mcl_store, store],
+                        rw compute_list_tlocal,
+                    }
                 }
                 sorry, -- apply the skip thing
             }, {
