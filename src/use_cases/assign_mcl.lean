@@ -375,7 +375,28 @@ lemma compute_list_tlocal {sig : signature} {computes : list (memory (parlang_mc
         simp [compute_list, compute, computes_ih],
     }
 end
-                     
+
+lemma ts_update_split {sig : signature} (up) (ups : list (op sig)) : ts_updates (list.reverse (up :: ups)) = ts_updates [up] ∘ ts_updates (list.reverse ups) := begin
+    funext ts,
+    rw list.reverse_cons,
+    induction (list.reverse ups) generalizing ts,
+    {
+        refl,
+    }, {
+        simp,
+        cases hd;
+        rw ts_updates;
+        apply ih,
+    }
+end
+
+lemma compute_list_stores {sig : signature} {computes}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
+i ∉ ts.stores ↔ i ∉ (compute_list computes ts).stores := begin
+    induction computes generalizing ts,
+    { simp [compute_list], },
+    { cases ts, simp [compute_list, compute], rw ← computes_ih, },
+end
 
 example {sig : signature} {n} {ac : vector bool n} {computes} {stores loads : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
@@ -411,7 +432,14 @@ syncable' stores loads (map_active_threads ac (ts_updates $ op.compute_list comp
                 rw map_active_threads_nth_ac tid_activeness at not_in_stores,
                 /- LARGE PROOF STARTS HERE -/
                 clear syncable not_in_loads,
-                induction updates,
+                rw [ts_updates, ts_updates],
+                rw [ts_updates] at not_in_stores,
+                revert not_in_stores,
+                generalize eq : compute_list computes (vector.nth (s.threads) tid) = s',
+                rw ← list.reverse_reverse updates,
+                generalize eq' : list.reverse updates = ups,
+                intro not_in_stores,
+                induction ups generalizing updates,
                 {
                     simp [ts_updates, mcl_store, store],
                     simp [ts_updates, mcl_store, store] at not_in_stores,
@@ -424,14 +452,23 @@ syncable' stores loads (map_active_threads ac (ts_updates $ op.compute_list comp
                         contradiction,
                     },
                 }, {
-                    cases updates_hd,
+                    rw [ts_update_split],
+                    simp,
+                    cases ups_hd,
                     {
                         simp [ts_updates] at not_in_stores,
                         simp [ts_updates, mcl_store, store],
                         sorry,
                     }, {
-                        simp [ts_updates, mcl_store, store],
-                        rw compute_list_tlocal,
+                        simp [ts_updates],
+                        apply compute_list_stores.mp,
+                        apply ups_ih,
+                        swap 3,
+                        exact list.reverse ups_tl,
+                        rw [ts_update_split] at not_in_stores,
+                        simp [ts_updates] at not_in_stores,
+                        exact compute_list_stores.mpr not_in_stores,
+                        simp,
                     }
                 }
                 sorry, -- apply the skip thing
