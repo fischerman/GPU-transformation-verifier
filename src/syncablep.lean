@@ -6,8 +6,8 @@ section
 
 variables {n : ℕ} {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 
-/-- syncable with the exception that no threads is allowed to store 
-or load in stores and loads respectively -/
+/-- syncable with the exception that no thread is allowed to store 
+or load in stores and loads respectively. Adding to stores or load makes this property stricter -/
 def syncable' (stores : set ι) (loads : set ι) (s : state n σ τ) (m : memory τ) : Prop :=
 (∀i:ι,
     (∀ tid, i ∉ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).global i) ∨

@@ -398,6 +398,22 @@ i ∉ ts.stores ↔ i ∉ (compute_list computes ts).stores := begin
     { cases ts, simp [compute_list, compute], rw ← computes_ih, },
 end
 
+lemma store_stores {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
+i ∉ (mcl_store var idx h₁ h₂ ts).stores → i ∉ ts.stores := by simp [mcl_store, store, not_or_distrib]
+
+-- MISSING ASSUMPTION
+lemma store_stores' {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
+i ∉ ts.stores → i ∉ (mcl_store var idx h₁ h₂ ts).stores := begin
+    sorry,
+end
+
+lemma ts_updates_tlocal {sig : signature}  {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {updates} (m loads stores) : 
+(ts_updates updates ts).tlocal = (ts_updates updates { tlocal := ts.tlocal, loads := loads, stores := stores, global := m }).tlocal := begin
+    sorry,
+end
+
 example {sig : signature} {n} {ac : vector bool n} {computes} {stores loads : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
 {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
@@ -411,10 +427,12 @@ syncable' stores loads (map_active_threads ac (ts_updates $ op.compute_list comp
 | (and.intro syncable (and.intro not_in_stores not_in_loads)) hole distinct := begin
     clear _example,
     unfold syncable',
+    -- proof: syncable
     split, {
         sorry,
-    }, 
+    },
     split, {
+        -- proof: store hole
         intros i tid i_in_store,
         have : i ∈ stores ∪ array var := sorry, --trivial
         specialize not_in_stores i tid this,
@@ -439,11 +457,13 @@ syncable' stores loads (map_active_threads ac (ts_updates $ op.compute_list comp
                 rw ← list.reverse_reverse updates,
                 generalize eq' : list.reverse updates = ups,
                 intro not_in_stores,
+                -- we do induction on the reverse of the list, such that we "append" elements to the end of updates (i.e. later)
+                -- afterwards cases on the update (either store or compute)
                 induction ups generalizing updates,
                 {
                     simp [ts_updates, mcl_store, store],
                     simp [ts_updates, mcl_store, store] at not_in_stores,
-                    intro,
+                    intro, 
                     cases a, {
                         subst a,
                         apply i_is_var,
@@ -456,9 +476,29 @@ syncable' stores loads (map_active_threads ac (ts_updates $ op.compute_list comp
                     simp,
                     cases ups_hd,
                     {
+                        simp only [ts_updates],
+                        simp only [ts_update_split] at not_in_stores,
                         simp [ts_updates] at not_in_stores,
-                        simp [ts_updates, mcl_store, store],
-                        sorry,
+                        specialize @ups_ih (store_stores not_in_stores) (list.reverse ups_tl),
+                        simp [mcl_store, store],
+                        simp [mcl_store, store] at ups_ih,
+                        rw not_or_distrib,
+                        split, {
+                            -- proof that the new store doesn't store in i
+                            simp [mcl_store, store] at not_in_stores,
+                            rw not_or_distrib at not_in_stores,
+                            cases not_in_stores,
+                            rw ts_updates_tlocal s'.global s'.loads s'.stores,
+                            simp,
+                            have : s' = {tlocal := s'.tlocal, global := s'.global, loads := s'.loads, stores := s'.stores} := begin
+                                cases s',
+                                simp,
+                            end,
+                            rw ← this,
+                            apply not_in_stores_left,
+                        }, {
+                            apply ups_ih,
+                        }
                     }, {
                         simp [ts_updates],
                         apply compute_list_stores.mp,
@@ -470,8 +510,7 @@ syncable' stores loads (map_active_threads ac (ts_updates $ op.compute_list comp
                         exact compute_list_stores.mpr not_in_stores,
                         simp,
                     }
-                }
-                sorry, -- apply the skip thing
+                },
             }, {
                 rw ← map_active_threads_nth_inac tid_activeness,
                 rw ← map_active_threads_nth_inac tid_activeness at not_in_stores,
@@ -479,6 +518,7 @@ syncable' stores loads (map_active_threads ac (ts_updates $ op.compute_list comp
             }
         }
     }, {
+        -- proof hole loads
         sorry,
     }
 end
