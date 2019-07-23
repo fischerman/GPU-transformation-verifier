@@ -311,22 +311,23 @@ i ∉ (compute_list computes (vector.nth (s.threads) tid)).accesses ↔ i ∉ (v
 example {sig₁ sig₂ : signature} {P : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop} 
 {f₁ : memory (parlang_mcl_global sig₁) → ℕ} {f₂ : memory (parlang_mcl_global sig₂) → ℕ} {m₁ : memory (parlang_mcl_global sig₁)} {m₂ : memory (parlang_mcl_global sig₂)} 
 {n₁} {s₁ : state n₁ (memory $ parlang_mcl_tlocal sig₁) (parlang_mcl_global sig₁)} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_global sig₂)} {ac₂ : vector bool n₂} 
-{stores loads : set $ mcl_address sig₁} {computes : list ((memory $ parlang_mcl_tlocal sig₁) → (memory $ parlang_mcl_tlocal sig₁))} : 
-initial_kernel_assertion mcl_init mcl_init P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ → syncable' stores loads (map_active_threads ac₁ (compute_list computes) s₁) m₁ := begin
+{shole lhole : set $ mcl_address sig₁} {computes : list ((memory $ parlang_mcl_tlocal sig₁) → (memory $ parlang_mcl_tlocal sig₁))} : 
+initial_kernel_assertion mcl_init mcl_init P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ → syncable' shole lhole (map_active_threads ac₁ (compute_list computes) s₁) m₁ := begin
     intro h,
     unfold syncable',
     split, {
         sorry,
     },
+    intros i tid,
     split, {
-        intros i tid h',
+        intros h',
         rw map_active_threads_nth_ac,
         apply thread_state.store_accesses,
         rw compute_list_accesses,
         apply access_init h,
         sorry,
     }, {
-        intros i tid _,
+        intros _,
         rw map_active_threads_nth_ac,
         apply thread_state.loads_accesses,
         rw compute_list_accesses,
@@ -337,25 +338,25 @@ end
 
 def array {sig : signature} (var : string) : set (mcl_address sig) := {i | i.1 = var}
 
-lemma store_no_stores_name {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂} {computes}
-{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig}
-{n} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {m : memory (parlang_mcl_global sig)} {tid}
-{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
-syncable ((f ∘ compute_list computes) s) m →
-i.fst ≠ var →
-i ∉ ((f ∘ compute_list computes) (s.threads.nth tid)).stores →
-i ∉ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list computes) (s.threads.nth tid)).stores := begin
-    intros syncable i_not_var i_not_in_f,
-    unfold parlang.state.syncable at syncable,
-    specialize syncable i,
-    cases ts,
-    induction computes,
-    {
-        simp [compute_list, mcl_store, store],
-    }, {
+-- lemma store_no_stores_name {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂} {computes : list (memory (parlang_mcl_tlocal sig) → memory (parlang_mcl_tlocal sig))}
+-- {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig}
+-- {n} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {m : memory (parlang_mcl_global sig)} {tid}
+-- {f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+-- syncable ((f ∘ compute_list computes) s) m →
+-- i.fst ≠ var →
+-- i ∉ ((f ∘ compute_list computes) (s.threads.nth tid)).stores →
+-- i ∉ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list computes) (s.threads.nth tid)).stores := begin
+--     intros syncable i_not_var i_not_in_f,
+--     unfold parlang.state.syncable at syncable,
+--     specialize syncable i,
+--     cases ts,
+--     induction computes,
+--     {
+--         simp [compute_list, mcl_store, store],
+--     }, {
 
-    }
-end
+--     }
+-- end
 
 inductive op (sig : signature)
 | store {t} {dim} (var : string) (idx : vector (expression sig type.int) dim) (h₁ : type_of (sig.val var) = t) (h₂ : ((sig.val var).type).dim = dim) : op
@@ -912,8 +913,8 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
             by_cases i.fst = "b", {
                 sorry,
             },
-
-        }
+            sorry,
+        },
         -- TODO: handle all remaining addresses but "a"
         sorry,
     }, {
