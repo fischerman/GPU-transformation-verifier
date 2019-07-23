@@ -398,9 +398,23 @@ i ∉ ts.stores ↔ i ∉ (compute_list computes ts).stores := begin
     { cases ts, simp [compute_list, compute], rw ← computes_ih, },
 end
 
+lemma compute_list_loads {sig : signature} {computes}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
+i ∉ ts.loads ↔ i ∉ (compute_list computes ts).loads := begin
+    induction computes generalizing ts,
+    { simp [compute_list], },
+    { cases ts, simp [compute_list, compute], rw ← computes_ih, },
+end
+
+@[simp]
 lemma store_stores {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
 {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
 i ∉ (mcl_store var idx h₁ h₂ ts).stores → i ∉ ts.stores := by simp [mcl_store, store, not_or_distrib]
+
+@[simp]
+lemma store_loads {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
+i ∉ (mcl_store var idx h₁ h₂ ts).loads → i ∉ ts.loads := by simp [mcl_store, store, not_or_distrib]
 
 -- MISSING ASSUMPTION
 lemma store_stores' {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
@@ -414,113 +428,154 @@ lemma ts_updates_tlocal {sig : signature}  {ts : thread_state (memory $ parlang_
     sorry,
 end
 
-example {sig : signature} {n} {ac : vector bool n} {computes} {stores loads : set $ mcl_address sig}
+example {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
 {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
 {updates : list $ op sig}
 {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
 {m : memory (parlang_mcl_global sig)} : 
-syncable' (stores ∪ array var) loads (map_active_threads ac (ts_updates $ op.compute_list computes :: updates) s) m →
-(∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ stores) →
+syncable' (shole ∪ array var) (lhole ∪ array var) (map_active_threads ac (ts_updates $ op.compute_list computes :: updates) s) m →
+(∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ shole) →
+(∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ lhole) →
 (∀ tid₁ tid₂, tid₁ ≠ tid₂ → idx.map (λ ind, eval (s.threads.nth tid₁).tlocal ind) ≠ idx.map (λ ind, eval (s.threads.nth tid₂).tlocal ind)) →
-syncable' stores loads (map_active_threads ac (ts_updates $ op.compute_list computes :: op.store var idx h₁ h₂ :: updates) s) m
-| (and.intro syncable (and.intro not_in_stores not_in_loads)) hole distinct := begin
+syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list computes :: op.store var idx h₁ h₂ :: updates) s) m
+| (and.intro syncable holes_constraint) var_not_in_shole var_not_in_lhole distinct_idx := begin
     clear _example,
     unfold syncable',
     -- proof: syncable
     split, {
         sorry,
-    },
-    split, {
+    }, {
         -- proof: store hole
-        intros i tid i_in_store,
-        have : i ∈ stores ∪ array var := sorry, --trivial
-        specialize not_in_stores i tid this,
+        intros i tid,
+        have : i ∈ shole ∪ array var := sorry, --trivial
+        
         by_cases i_is_var : i.fst = var,
         {
             -- if i is var we store into hole
             subst i_is_var,
-            specialize hole i.snd,
+            specialize var_not_in_shole i.snd,
+            specialize var_not_in_lhole i.snd,
             cases i,
-            contradiction,
+            split,
+            {
+                intros i_in_store,
+                contradiction,
+            }, {
+                intros i_in_loads,
+                contradiction,
+            }
         }, {
             by_cases tid_activeness : ac.nth tid = tt,
             {
                 rw map_active_threads_nth_ac tid_activeness,
-                rw map_active_threads_nth_ac tid_activeness at not_in_stores,
+                specialize holes_constraint i tid,
+                
+                rw map_active_threads_nth_ac tid_activeness at holes_constraint,
+                rw [ts_updates] at holes_constraint,
                 /- LARGE PROOF STARTS HERE -/
-                clear syncable not_in_loads,
+                clear syncable,
                 rw [ts_updates, ts_updates],
-                rw [ts_updates] at not_in_stores,
-                revert not_in_stores,
+                revert holes_constraint,
                 generalize eq : compute_list computes (vector.nth (s.threads) tid) = s',
                 rw ← list.reverse_reverse updates,
                 generalize eq' : list.reverse updates = ups,
-                intro not_in_stores,
+                intro holes_constraint,
                 -- we do induction on the reverse of the list, such that we "append" elements to the end of updates (i.e. later)
                 -- afterwards cases on the update (either store or compute)
                 induction ups generalizing updates,
                 {
                     simp [ts_updates, mcl_store, store],
-                    simp [ts_updates, mcl_store, store] at not_in_stores,
-                    intro, 
-                    cases a, {
-                        subst a,
-                        apply i_is_var,
-                        refl,
+                    simp [ts_updates, mcl_store, store] at holes_constraint,
+                    cases holes_constraint with shole_constraint lhole_constraint,
+                    split, {
+                        intros i_in_shole i_in_stores,
+                        cases i_in_stores, {
+                            subst i_in_stores,
+                            apply i_is_var,
+                            refl,
+                        }, {
+                            specialize shole_constraint (or.inl i_in_shole),
+                            contradiction,
+                        },
                     }, {
-                        contradiction,
-                    },
+                        intro i_in_lhole,
+                        apply lhole_constraint (or.inl i_in_lhole),
+                    }
                 }, {
                     rw [ts_update_split],
                     simp,
                     cases ups_hd,
                     {
                         simp only [ts_updates],
-                        simp only [ts_update_split] at not_in_stores,
-                        simp [ts_updates] at not_in_stores,
-                        specialize @ups_ih (store_stores not_in_stores) (list.reverse ups_tl),
+                        simp only [ts_update_split] at holes_constraint,
+                        simp [ts_updates, -set.mem_union_eq] at holes_constraint,
+                        specialize @ups_ih _ (list.reverse ups_tl),
+                        swap,
+                        {
+                            split, {
+                                intro,
+                                apply store_stores,
+                                apply holes_constraint.left a,
+                            }, {
+                                intro,
+                                apply store_loads,
+                                apply holes_constraint.right a,
+                            },
+                        },
                         simp [mcl_store, store],
                         simp [mcl_store, store] at ups_ih,
-                        rw not_or_distrib,
-                        split, {
-                            -- proof that the new store doesn't store in i
-                            simp [mcl_store, store] at not_in_stores,
-                            rw not_or_distrib at not_in_stores,
-                            cases not_in_stores,
-                            rw ts_updates_tlocal s'.global s'.loads s'.stores,
-                            simp,
-                            have : s' = {tlocal := s'.tlocal, global := s'.global, loads := s'.loads, stores := s'.stores} := begin
-                                cases s',
+                        split,
+                        {
+                            intros i_in_shole,
+                            rw not_or_distrib,
+                            split, {
+                                -- proof that the new store doesn't store in i
+                                cases holes_constraint with shole_constraint lhole_constraint,
+                                simp [mcl_store, store] at shole_constraint,
+                                rw not_or_distrib at shole_constraint,
+                                cases shole_constraint (or.inl i_in_shole),
+                                rw ts_updates_tlocal s'.global s'.loads s'.stores,
                                 simp,
-                            end,
-                            rw ← this,
-                            apply not_in_stores_left,
+                                have : s' = {tlocal := s'.tlocal, global := s'.global, loads := s'.loads, stores := s'.stores} := begin
+                                    cases s',
+                                    simp,
+                                end,
+                                rw ← this,
+                                assumption,
+                            }, {
+                                apply ups_ih.left i_in_shole,
+                            }
                         }, {
-                            apply ups_ih,
+                            intros i_in_lhole,
+                            apply ups_ih.right i_in_lhole,
                         }
                     }, {
+                        -- the head element is compute_list
                         simp [ts_updates],
-                        apply compute_list_stores.mp,
+                        rw ← compute_list_stores,
+                        rw ← compute_list_loads,
                         apply ups_ih,
                         swap 3,
                         exact list.reverse ups_tl,
-                        rw [ts_update_split] at not_in_stores,
-                        simp [ts_updates] at not_in_stores,
-                        exact compute_list_stores.mpr not_in_stores,
+                        rw [ts_update_split] at holes_constraint,
+                        simp [ts_updates] at holes_constraint,
+                        rw [← compute_list_stores, ← compute_list_loads] at holes_constraint,
+                        simp,
+                        exact holes_constraint,
                         simp,
                     }
                 },
             }, {
+                specialize holes_constraint i tid,
                 rw ← map_active_threads_nth_inac tid_activeness,
-                rw ← map_active_threads_nth_inac tid_activeness at not_in_stores,
-                assumption,
+                rw ← map_active_threads_nth_inac tid_activeness at holes_constraint,
+                simp *,
+                intro a,
+                apply holes_constraint.right (or.inl a),
             }
         }
-    }, {
-        -- proof hole loads
-        sorry,
-    }
+    },
 end
 
 -- todo change the definition of syncable to take a fin
