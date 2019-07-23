@@ -429,9 +429,25 @@ lemma ts_updates_tlocal {sig : signature}  {ts : thread_state (memory $ parlang_
     sorry,
 end
 
-example {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
+lemma ts_updates_nil {sig : signature} (f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) : 
+ts_updates [] ∘ f = f := begin
+    refl,
+end
+
+@[simp]
+lemma ts_updates_store {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂} {updates} (f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) : 
+ts_updates updates ∘ mcl_store var idx h₁ h₂ ∘ f = ts_updates (op.store var idx h₁ h₂ :: updates) ∘ f := begin
+    refl,
+end
+
+@[simp]
+lemma ts_updates_compute {sig : signature} {g} {updates} (f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) : 
+ts_updates updates ∘ compute g ∘ f = ts_updates (op.compute_list [g] :: updates) ∘ f := begin
+    refl,
+end
+
+lemma syncable'_store {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
-{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
 {updates : list $ op sig}
 {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
 {m : memory (parlang_mcl_global sig)} : 
@@ -441,7 +457,6 @@ syncable' (shole ∪ array var) (lhole ∪ array var) (map_active_threads ac (ts
 (∀ tid₁ tid₂, tid₁ ≠ tid₂ → idx.map (λ ind, eval (s.threads.nth tid₁).tlocal ind) ≠ idx.map (λ ind, eval (s.threads.nth tid₂).tlocal ind)) →
 syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list computes :: op.store var idx h₁ h₂ :: updates) s) m
 | (and.intro syncable holes_constraint) var_not_in_shole var_not_in_lhole distinct_idx := begin
-    clear _example,
     unfold syncable',
     -- proof: syncable
     split, {
@@ -579,6 +594,92 @@ syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list compu
     },
 end
 
+#eval eval (mcl_init 7) read_tid
+
+lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
+    apply rel_mclk_to_mclp,
+
+    apply skip_right.mpr,
+    apply rhl.seq,
+    swap,
+
+    apply skip_left_after.mpr,
+    apply skip_right.mpr,
+    apply rhl.seq,
+    swap,
+
+    -- break it down into individual proofs
+    apply add_skip_left.mpr,
+    apply rhl.seq,
+    swap,
+    {
+        apply global_assign_right,
+    },{
+        apply global_assign_right,
+    }, {
+        apply global_assign_left,
+    },
+    apply global_assign_left',
+    intros _ _ _ _ _ _ h,
+    cases h with m₁ h,
+    cases h with m₂ h,
+    simp,
+    have : n₁ = n₂ := begin
+        sorry
+    end,
+    subst this,
+    have hseq : s₁ = s₂ := begin
+        sorry
+    end,
+
+    -- the proof obligation in the form of a map thread on syncable is the simple version because we never consider threads to change active state (here all threads are always active)
+
+    -- the two updates store indepedently because "a" ≠ "b"
+    -- the two updates read indepedently because they both depend on the same state (AFAIK they could still be swaped because the state is fixed)
+    apply exists.intro (memory_array_update_tid "b" s₁ (read_tid + (expression.literal_int 1 (by refl))) (memory_array_update_tid "a" s₁ read_tid m₁)),
+
+    -- split up the proof for the individual memories
+    split, {
+        have : update_global_vars_for_expr read_tid = id := by refl,
+        rw this,
+        have : update_global_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
+        rw this,
+        simp,
+
+        -- resolve get and update (the result should only be mcl_init, literals and memory (in case of loads))
+        rw ← syncable_syncable',
+        rw function.comp.assoc,
+        rw ← ts_updates_nil (mcl_store _ _ _ _ ∘ _),
+        rw [ts_updates_store, ts_updates_compute, ts_updates_store],
+        rw [← function.comp.right_id (compute _)],
+        rw [ts_updates_compute],
+        rw [function.comp.right_id],
+        apply syncable'_store,
+        sorry,
+        {
+            simp,
+        }, {
+            simp,
+        }, {
+            intros tid₁ tid₂ hneq,
+            simp [vector.map_cons],
+            repeat { rw vector.map_nil },
+            rw initial_kernel_assertion_left_thread_state h,
+            rw initial_kernel_assertion_left_thread_state h,
+            simp,
+            rw ← vector.eq_one',
+            intro a,
+            cases tid₁,
+            cases tid₂,
+            have : tid₁_val = tid₂_val := begin
+                apply a,
+            end,
+            subst this,
+            contradiction,
+        }
+    }
+end
+
 -- todo change the definition of syncable to take a fin
 -- todo extend array_access_tid to contain the value as an expression
 
@@ -705,7 +806,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                         simp at ha__to_array_access_idx_len,
                         dedup,
                         subst ha__to_array_access_var_eq_1,
-                        apply vector.eq_one,
+                        rw ← vector.eq_one,
                         refl,
                     }
                 }, {
@@ -813,7 +914,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                         simp at hb__to_array_access_idx_len,
                         dedup,
                         subst hb__to_array_access_var_eq_1,
-                        apply vector.eq_one,
+                        rw ← vector.eq_one,
                         refl,
                     }
                 }, {

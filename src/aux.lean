@@ -4,6 +4,8 @@ import data.vector
 universes u v w
 variables {n : ℕ} {α β γ δ : Type}
 
+notation `v[` v:(foldr `, ` (h t, vector.cons h t) vector.nil `]`) := v
+
 @[simp]
 lemma ite_else_ite {c} [decidable c] {b₁ b₂ b₃ :  Sort u} : ite c b₁ (ite c b₂ b₃) = ite c b₁ b₃ := begin
   by_cases c; simp *,
@@ -202,7 +204,9 @@ def range_fin (n : ℕ) : vector (fin n) n := ⟨list.range_fin n, sorry⟩
 
 @[simp] lemma length_range_nth : length (range_fin n) = n := sorry
 
-lemma eq_one {α : Type} (v : vector α 1) (v' : vector α 1) (h : v.nth ⟨0, sorry⟩ = v'.nth ⟨0, by sorry⟩) : v = v' := sorry
+lemma eq_one {α : Type} (v : vector α 1) (v' : vector α 1) : v.nth ⟨0, sorry⟩ = v'.nth ⟨0, by sorry⟩ ↔ (v = v') := sorry
+
+lemma eq_one' {α : Type} (a b : α) : a = b ↔ (v[a] = v[b]) := sorry
 
 lemma length_list {α : Type} {n} {v : vector α n} : list.length (vector.to_list (v)) = vector.length v := begin
   admit,

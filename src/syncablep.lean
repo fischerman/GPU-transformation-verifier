@@ -16,7 +16,7 @@ def syncable' (shole : set ι) (lhole : set ι) (s : state n σ τ) (m : memory 
 (∀ i tid, (i ∈ shole → i ∉ (s.threads.nth tid).stores) ∧
         (i ∈ lhole → i ∉ (s.threads.nth tid).loads))
 
-example (s : state n σ τ) (m : memory τ) : syncable' ∅ ∅ s m ↔ state.syncable s m := begin
+lemma syncable_syncable' (s : state n σ τ) (m : memory τ) : syncable' ∅ ∅ s m ↔ state.syncable s m := begin
     unfold syncable',
     simp,
     refl,
