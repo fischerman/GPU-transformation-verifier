@@ -446,17 +446,31 @@ ts_updates updates ∘ compute g ∘ f = ts_updates (op.compute_list [g] :: upda
     refl,
 end
 
+@[simp]
+lemma ts_updates_merge_computes_list {sig : signature} {updates} {com com' : list (memory (parlang_mcl_tlocal sig) → memory (parlang_mcl_tlocal sig))} :
+ts_updates (op.compute_list com :: op.compute_list com' :: updates) = ts_updates (op.compute_list (com ++ com') :: updates) := begin
+    sorry,
+end
+
+@[simp]
+lemma array_hole_name_neq {sig : signature} (var₁ var₂ : string) (h : var₁ ≠ var₂) (idx : vector ℕ (((sig.val var₁).type).dim)) :
+(⟨var₁, idx⟩ : mcl_address sig) ∉ @array sig var₂ := begin
+    unfold array,
+    intro,
+    contradiction,
+end
+
 lemma syncable'_store {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
 {updates : list $ op sig}
 {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
 {m : memory (parlang_mcl_global sig)} : 
-syncable' (shole ∪ array var) (lhole ∪ array var) (map_active_threads ac (ts_updates $ op.compute_list computes :: updates) s) m →
 (∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ shole) →
 (∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ lhole) →
 (∀ tid₁ tid₂, tid₁ ≠ tid₂ → idx.map (λ ind, eval (s.threads.nth tid₁).tlocal ind) ≠ idx.map (λ ind, eval (s.threads.nth tid₂).tlocal ind)) →
+syncable' (shole ∪ array var) (lhole ∪ array var) (map_active_threads ac (ts_updates $ op.compute_list computes :: updates) s) m →
 syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list computes :: op.store var idx h₁ h₂ :: updates) s) m
-| (and.intro syncable holes_constraint) var_not_in_shole var_not_in_lhole distinct_idx := begin
+| var_not_in_shole var_not_in_lhole distinct_idx (and.intro syncable holes_constraint) := begin
     unfold syncable',
     -- proof: syncable
     split, {
@@ -655,7 +669,6 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
         rw [ts_updates_compute],
         rw [function.comp.right_id],
         apply syncable'_store,
-        sorry,
         {
             simp,
         }, {
@@ -676,7 +689,35 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
             end,
             subst this,
             contradiction,
-        }
+        },
+        rw ts_updates_merge_computes_list,
+        apply syncable'_store,
+        {
+            intro idx,
+            have : "b" ≠ "a" := by intro; cases a,
+            simp [this],
+        }, {
+            intro idx,
+            have : "b" ≠ "a" := by intro; cases a,
+            simp [this],
+        }, {
+            intros tid₁ tid₂ hneq,
+            simp [vector.map_cons],
+            repeat { rw vector.map_nil },
+            rw initial_kernel_assertion_left_thread_state h,
+            rw initial_kernel_assertion_left_thread_state h,
+            simp,
+            rw ← vector.eq_one',
+            intro a,
+            cases tid₁,
+            cases tid₂,
+            have : tid₁_val = tid₂_val := begin
+                apply a,
+            end,
+            subst this,
+            contradiction,
+        },
+        rw [append],
     }
 end
 
