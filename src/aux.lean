@@ -42,8 +42,35 @@ def range_fin_core (dim : ℕ) : Π n : ℕ, n <= dim → list (fin dim) → lis
 def range_fin (n : ℕ) : list (fin n) :=
 range_fin_core n n (by refl) []
 
+-- TODO: we need something like list.range' for fin
+--def range_fin' : ℕ → ℕ → list (fin n)
+
 @[simp] lemma length_range_nth : length (range_fin n) = n := begin
   admit
+end
+
+
+def fin_inc : fin n → fin (nat.succ n)
+| ⟨val, is_lt⟩ := ⟨val, nat.lt.step is_lt⟩
+
+instance (n : ℕ) : has_coe (list (fin $ n)) (list (fin $ nat.succ n)) := ⟨map fin_inc⟩
+
+lemma range_fin_succ : range_fin (nat.succ n) = ((range_fin n : list (fin n)) : list (fin $ nat.succ n)) ++ [⟨n, sorry⟩] := begin
+  unfold range_fin,
+  induction n, { refl, },
+  {
+    rw range_fin_core,
+    sorry,
+  }
+end
+
+lemma foldl_range_fin_succ {α : Type} {n : ℕ} (i : α) (r : α → fin (nat.succ n) → α) : foldl r i (range_fin (n + 1)) = r (foldl r i (range_fin n : list (fin n))) (nat.succ n) := begin
+  induction n,
+  { refl, },
+  {
+    rw [range_fin, range_fin_core],
+    sorry,
+  }
 end
 
 #print map₂._main

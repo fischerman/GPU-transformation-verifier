@@ -367,6 +367,8 @@ def ts_updates {sig : signature} : list (op sig) → thread_state (memory $ parl
 | (op.store var idx h₁ h₂ :: ops) ts := ts_updates ops $ mcl_store var idx h₁ h₂ ts
 | (op.compute_list computes :: ops) ts := ts_updates ops $ compute_list computes ts
 
+lemma ts_update_compute_list {sig : signature} (ups : list (op sig)) (computes) : ts_updates (op.compute_list computes :: ups) = ts_updates ups ∘ compute_list computes := by refl
+
 lemma compute_list_tlocal {sig : signature} {computes : list (memory (parlang_mcl_tlocal sig) → memory (parlang_mcl_tlocal sig))} {tlocal loads stores} {global : memory $ parlang_mcl_global sig} : compute_list computes
 {tlocal := tlocal, global := global, loads := loads, stores := stores} = {tlocal := computes.foldl (λ tl com, com tl) tlocal, global := global, loads := loads, stores := stores} := begin
     induction computes generalizing tlocal,
@@ -536,6 +538,37 @@ end
 
 def from_tlocal {sig : signature} {n} (var) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (m : memory (parlang_mcl_global sig)) (h : (((sig.val var).type).dim) = 1) := 
 ((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) tid, m.update ⟨var, eq.mpr (by rw h) v[tid.val]⟩ ((s.threads.nth tid).tlocal.get ⟨var, eq.mpr (by rw h) v[tid.val]⟩))) m
+
+#eval list.foldl (λ s (n : nat), s ++ n.repr) "" (list.range 3)
+
+lemma from_tlocal_comm_update {sig : signature} {n} (var₁ var₂) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig))
+(m : memory (parlang_mcl_global sig)) {h₁} {idx val} :
+from_tlocal var₁ s (m.update ⟨var₂, idx⟩ val) h₁ = memory.update (from_tlocal var₁ s m h₁) ⟨var₂, idx⟩ val := begin
+    unfold from_tlocal,
+    induction n,
+    { refl, },
+    {
+        rw [list.foldl_range_fin_succ],
+        sorry, -- complicated with dependent type fin
+    }
+end
+
+lemma from_tlocal_comm {sig : signature} {n} (var₁ var₂) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig))
+(s' : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (m : memory (parlang_mcl_global sig)) {h₁ h₂} :
+from_tlocal var₁ s (from_tlocal var₂ s' m h₂) h₁ = from_tlocal var₂ s' (from_tlocal var₁ s m h₁) h₂ := begin
+    unfold from_tlocal,
+    induction n,
+    {
+        refl,
+    }, {
+        rw [list.foldl_range_fin_succ],
+        rw [list.foldl_range_fin_succ],
+        repeat { rw ← from_tlocal },
+        sorry,
+    }
+end
+
+lemma : from_tlocal "b" (map_active_threads ac (ts_updates [op.compute_list (... :: coms)]) s = from_tlocal "b" (map_active_threads ac (ts_updates [op.compute_list (... :: coms)]) s
 
 lemma syncable'_store {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
@@ -871,7 +904,10 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
         sorry, --trivial from h
     }, {
         -- show post-condition
-        
+        simp [append, list.append],
+        rw ts_update_compute_list,
+        rw map_active_threads,
+        rw ts_updates [op.compute_list _] s₁,
     }
 end
 
