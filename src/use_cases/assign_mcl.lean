@@ -391,21 +391,40 @@ lemma ts_update_split {sig : signature} (up) (ups : list (op sig)) : ts_updates 
     }
 end
 
-lemma compute_list_stores {sig : signature} {computes}
-{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
-i ∉ ts.stores ↔ i ∉ (compute_list computes ts).stores := begin
+@[simp]
+lemma compute_list_stores_core {sig : signature} {computes}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+(compute_list computes ts).stores = ts.stores := begin
     induction computes generalizing ts,
     { simp [compute_list], },
-    { cases ts, simp [compute_list, compute], rw ← computes_ih, },
+    { cases ts, simp [compute_list, compute], rw computes_ih, },
 end
+
+@[simp]
+lemma compute_list_loads_core {sig : signature} {computes}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+(compute_list computes ts).loads = ts.loads := begin
+    induction computes generalizing ts,
+    { simp [compute_list], },
+    { cases ts, simp [compute_list, compute], rw computes_ih, },
+end
+
+@[simp]
+lemma compute_list_shared {sig : signature} {computes}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+(compute_list computes ts).global = ts.global := begin
+    induction computes generalizing ts,
+    { simp [compute_list], },
+    { cases ts, simp [compute_list, compute], rw computes_ih, },
+end
+
+lemma compute_list_stores {sig : signature} {computes}
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
+i ∉ ts.stores ↔ i ∉ (compute_list computes ts).stores := by simp
 
 lemma compute_list_loads {sig : signature} {computes}
 {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
-i ∉ ts.loads ↔ i ∉ (compute_list computes ts).loads := begin
-    induction computes generalizing ts,
-    { simp [compute_list], },
-    { cases ts, simp [compute_list, compute], rw ← computes_ih, },
-end
+i ∉ ts.loads ↔ i ∉ (compute_list computes ts).loads := by simp
 
 @[simp]
 lemma store_stores {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
@@ -460,17 +479,77 @@ lemma array_hole_name_neq {sig : signature} (var₁ var₂ : string) (h : var₁
     contradiction,
 end
 
+@[simp]
+lemma compute_list_stores' {sig : signature} {n} {tid : fin n} {ac : vector bool n} {computes}
+{s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+(vector.nth ((map_active_threads ac (ts_updates [op.compute_list computes]) s).threads) tid).stores = (vector.nth s.threads tid).stores := begin
+    by_cases h : ac.nth tid = tt,
+    {
+        simp [ts_updates, map_active_threads_nth_ac h],
+    }, {
+        rw ←map_active_threads_nth_inac h,
+    }
+end
+
+@[simp]
+lemma compute_list_loads' {sig : signature} {n} {tid : fin n} {ac : vector bool n} {computes}
+{s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+(vector.nth ((map_active_threads ac (ts_updates [op.compute_list computes]) s).threads) tid).loads = (vector.nth s.threads tid).loads := begin
+    by_cases h : ac.nth tid = tt,
+    {
+        simp [ts_updates, map_active_threads_nth_ac h],
+    }, {
+        rw ←map_active_threads_nth_inac h,
+    }
+end
+
+@[simp]
+lemma compute_list_shared' {sig : signature} {n} {tid : fin n} {ac : vector bool n} {computes}
+{s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+(vector.nth ((map_active_threads ac (ts_updates [op.compute_list computes]) s).threads) tid).global = (vector.nth s.threads tid).global := begin
+    by_cases h : ac.nth tid = tt,
+    {
+        simp [ts_updates, map_active_threads_nth_ac h],
+    }, {
+        rw ←map_active_threads_nth_inac h,
+    }
+end
+
+lemma syncable'_compute_list_syncable {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
+{s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
+{m : memory (parlang_mcl_global sig)} : 
+s.syncable m →
+(∀ tid : fin n, (s.threads.nth tid).stores = ∅) →
+(∀ tid : fin n, (s.threads.nth tid).loads = ∅) →
+syncable' shole lhole (map_active_threads ac (ts_updates [op.compute_list computes]) s) m := begin
+    intros syncable no_stores no_loads,
+    unfold syncable',
+    split,
+    {
+        simp only [accesses, compute_list_stores', compute_list_loads', compute_list_shared'],
+        exact syncable,
+    }, {
+        intros i tid,
+        simp [no_stores tid, no_loads tid],
+    }
+end
+
+def from_tlocal {sig : signature} {n} (var) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (m : memory (parlang_mcl_global sig)) (h : (((sig.val var).type).dim) = 1) := 
+((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) tid, m.update ⟨var, eq.mpr (by rw h) v[tid.val]⟩ ((s.threads.nth tid).tlocal.get ⟨var, eq.mpr (by rw h) v[tid.val]⟩))) m
+
 lemma syncable'_store {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
 {updates : list $ op sig}
 {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
-{m : memory (parlang_mcl_global sig)} : 
+{m : memory (parlang_mcl_global sig)} 
+(idx_1 : (((sig.val var).type).dim) = 1) : 
 (∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ shole) →
 (∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ lhole) →
 (∀ tid₁ tid₂, tid₁ ≠ tid₂ → idx.map (λ ind, eval (s.threads.nth tid₁).tlocal ind) ≠ idx.map (λ ind, eval (s.threads.nth tid₂).tlocal ind)) →
 syncable' (shole ∪ array var) (lhole ∪ array var) (map_active_threads ac (ts_updates $ op.compute_list computes :: updates) s) m →
-syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list computes :: op.store var idx h₁ h₂ :: updates) s) m
+syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list computes :: op.store var idx h₁ h₂ :: updates) s) (from_tlocal var (map_active_threads ac (ts_updates [op.compute_list computes]) s) m idx_1)
 | var_not_in_shole var_not_in_lhole distinct_idx (and.intro syncable holes_constraint) := begin
+    clear syncable'_store,
     unfold syncable',
     -- proof: syncable
     split, {
@@ -583,14 +662,11 @@ syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list compu
                     }, {
                         -- the head element is compute_list
                         simp [ts_updates],
-                        rw ← compute_list_stores,
-                        rw ← compute_list_loads,
                         apply ups_ih,
                         swap 3,
                         exact list.reverse ups_tl,
                         rw [ts_update_split] at holes_constraint,
                         simp [ts_updates] at holes_constraint,
-                        rw [← compute_list_stores, ← compute_list_loads] at holes_constraint,
                         simp,
                         exact holes_constraint,
                         simp,
@@ -637,7 +713,7 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
     intros _ _ _ _ _ _ h,
     cases h with m₁ h,
     cases h with m₂ h,
-    simp,
+    simp only [map_map_active_threads],
     have : n₁ = n₂ := begin
         sorry
     end,
@@ -650,7 +726,8 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
 
     -- the two updates store indepedently because "a" ≠ "b"
     -- the two updates read indepedently because they both depend on the same state (AFAIK they could still be swaped because the state is fixed)
-    apply exists.intro (memory_array_update_tid "b" s₁ (read_tid + (expression.literal_int 1 (by refl))) (memory_array_update_tid "a" s₁ read_tid m₁)),
+    apply exists.intro _,
+    apply exists.intro _,
 
     -- split up the proof for the individual memories
     split, {
@@ -717,7 +794,84 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
             subst this,
             contradiction,
         },
-        rw [append],
+        simp [append, list.append],
+        apply syncable'_compute_list_syncable,
+        exact h.left,
+        sorry, --trivial from h
+        sorry, --trivial from h
+    }, 
+    split, {
+        have : update_global_vars_for_expr read_tid = id := by refl,
+        rw this,
+        have : update_global_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
+        rw this,
+        simp,
+
+        -- resolve get and update (the result should only be mcl_init, literals and memory (in case of loads))
+        rw ← syncable_syncable',
+        rw function.comp.assoc,
+        rw ← ts_updates_nil (mcl_store _ _ _ _ ∘ _),
+        rw [ts_updates_store, ts_updates_compute, ts_updates_store],
+        rw [← function.comp.right_id (compute _)],
+        rw [ts_updates_compute],
+        rw [function.comp.right_id],
+        apply syncable'_store,
+        {
+            simp,
+        }, {
+            simp,
+        }, {
+            intros tid₁ tid₂ hneq,
+            simp [vector.map_cons],
+            repeat { rw vector.map_nil },
+            rw h.right_thread_state,
+            rw h.right_thread_state,
+            simp,
+            rw ← vector.eq_one',
+            intro a,
+            cases tid₁,
+            cases tid₂,
+            have : tid₁_val = tid₂_val := begin
+                apply a,
+            end,
+            subst this,
+            contradiction,
+        },
+        rw ts_updates_merge_computes_list,
+        apply syncable'_store,
+        {
+            intro idx,
+            have : "a" ≠ "b" := by intro; cases a,
+            simp [this],
+        }, {
+            intro idx,
+            have : "a" ≠ "b" := by intro; cases a,
+            simp [this],
+        }, {
+            intros tid₁ tid₂ hneq,
+            simp [vector.map_cons],
+            repeat { rw vector.map_nil },
+            rw h.right_thread_state,
+            rw h.right_thread_state,
+            simp,
+            rw ← vector.eq_one',
+            intro a,
+            cases tid₁,
+            cases tid₂,
+            have : tid₁_val = tid₂_val := begin
+                apply a,
+            end,
+            subst this,
+            contradiction,
+        },
+        simp [append, list.append],
+        apply syncable'_compute_list_syncable,
+        exact h.right.left,
+        sorry, --trivial from h
+        sorry, --trivial from h
+    }, {
+        -- show post-condition
+        
     }
 end
 
