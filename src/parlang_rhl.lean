@@ -57,7 +57,27 @@ def initial_kernel_assertion.left_all_threads_active {init₁ : ℕ → σ₁} {
 {n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
 (i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.right.right.right.left
 
+def initial_kernel_assertion.precondition {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
+{f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
+{n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
+(i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.right.right.left
+
 #check initial_kernel_assertion.left_all_threads_active
+
+lemma initial_kernel_assertion.initial_state_eq {init₁ : ℕ → σ₁}
+{f₁ : memory τ₁ → ℕ} {f₂ : memory τ₁ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₁} 
+{n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {s₂ : state n₁ σ₁ τ₁} {ac₂ : vector bool n₁} :
+initial_kernel_assertion init₁ init₁ eq f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₁ s₂ ac₂ →
+s₁ = s₂ |
+(and.intro _ (and.intro _ (and.intro _ (and.intro _ (and.intro s_eq (and.intro s'_eq _)))))) := begin
+    clear initial_kernel_assertion.initial_state_eq,
+    cases s₁,
+    cases s₂,
+    simp,
+    apply vector.eq_element_wise,
+    intro tid,
+    simp *,
+end
 
 lemma rel_kernel_to_program {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P Q : memory τ₁ → memory τ₂ → Prop} {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ}
  (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ *} k₁ ~ k₂ 

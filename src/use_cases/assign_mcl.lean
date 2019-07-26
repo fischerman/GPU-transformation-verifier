@@ -568,7 +568,24 @@ from_tlocal var₁ s (from_tlocal var₂ s' m h₂) h₁ = from_tlocal var₂ s'
     }
 end
 
-lemma : from_tlocal "b" (map_active_threads ac (ts_updates [op.compute_list (... :: coms)]) s = from_tlocal "b" (map_active_threads ac (ts_updates [op.compute_list (... :: coms)]) s
+--lemma : from_tlocal "b" (map_active_threads ac (ts_updates [op.compute_list (... :: coms)]) s = from_tlocal "b" (map_active_threads ac (ts_updates [op.compute_list (... :: coms)]) s
+
+lemma from_tlocal_eq {sig : signature} {n}
+{s s' : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
+{m m' : memory (parlang_mcl_global sig)} {var} {h : ((sig.val var).type).dim = 1} :
+(∀ tid, (s.threads.nth tid).tlocal.get ⟨var, begin rw h, exact v[tid] end⟩ = (s'.threads.nth tid).tlocal.get ⟨var, begin rw h, exact v[tid] end⟩) →
+m = m' →
+from_tlocal var s m h = from_tlocal var s' m' h := begin
+    intros hveq hmeq,
+    subst hmeq,
+    unfold from_tlocal,
+    induction n,
+    { refl, },
+    {
+        rw list.foldl_range_fin_succ,
+        sorry,
+    }
+end
 
 lemma syncable'_store {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
@@ -906,8 +923,30 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
         -- show post-condition
         simp [append, list.append],
         rw ts_update_compute_list,
-        rw map_active_threads,
-        rw ts_updates [op.compute_list _] s₁,
+        rw from_tlocal_comm,
+        have := h.precondition,
+        subst this,
+        have := h.initial_state_eq,
+        subst this,
+        apply from_tlocal_eq,
+        {
+            intro tid,
+            rw map_active_threads_nth_ac,
+            rw map_active_threads_nth_ac,
+            refl,
+            sorry, -- trivial
+            sorry, -- trivial
+        },
+        apply from_tlocal_eq,
+        {
+            intro tid,
+            rw map_active_threads_nth_ac,
+            rw map_active_threads_nth_ac,
+            refl,
+            sorry, -- trivial
+            sorry, -- trivial
+        },
+        refl,
     }
 end
 
