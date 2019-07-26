@@ -795,7 +795,7 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
         rw [← function.comp.right_id (compute _)],
         rw [ts_updates_compute],
         rw [function.comp.right_id],
-        apply syncable'_store,
+        apply syncable'_store (show ((sig.val "a").type).dim = 1, by refl),
         {
             simp,
         }, {
@@ -818,7 +818,7 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
             contradiction,
         },
         rw ts_updates_merge_computes_list,
-        apply syncable'_store,
+        apply syncable'_store (show ((sig.val "b").type).dim = 1, by refl),
         {
             intro idx,
             have : "b" ≠ "a" := by intro; cases a,
@@ -865,7 +865,7 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
         rw [← function.comp.right_id (compute _)],
         rw [ts_updates_compute],
         rw [function.comp.right_id],
-        apply syncable'_store,
+        apply syncable'_store (show ((sig.val "b").type).dim = 1, by refl),
         {
             simp,
         }, {
@@ -888,7 +888,7 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
             contradiction,
         },
         rw ts_updates_merge_computes_list,
-        apply syncable'_store,
+        apply syncable'_store (show ((sig.val "a").type).dim = 1, by refl),
         {
             intro idx,
             have : "a" ≠ "b" := by intro; cases a,
