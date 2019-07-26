@@ -239,6 +239,10 @@ lemma length_list {α : Type} {n} {v : vector α n} : list.length (vector.to_lis
   admit,
 end
 
+lemma map_single {α β : Type} (f : α → β) (e : α) : vector.map f v[e] = v[f e] := begin
+    refl,
+end
+
 end vector
 
 namespace bool
@@ -258,3 +262,5 @@ lemma bnot_ff (b : bool) : bnot b = (b = ff) := begin
 end
 
 end bool
+
+lemma lt_zero_one : 0 < 1 := by sorry
