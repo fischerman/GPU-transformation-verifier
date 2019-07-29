@@ -9,6 +9,7 @@ branches:
 cache:
   directories:
     - $HOME/.elan
+    - $TRAVIS_BUILD_DIR/_target
 
 install:
   - |
