@@ -1,9 +1,12 @@
-import mcl
-import mcl_rhl
+import mcl.defs
+import mcl.rhl
 import parlang
+import mcl.compute_list
+import mcl.ts_updates
 import syncablep
-import use_cases.assign_mcl
-import use_cases.assign_mcl.def
+import mcl.syncablep
+import mcl.lemmas
+import .defs
 
 open mcl
 open mcl.mclk
@@ -11,7 +14,6 @@ open mcl.rhl
 open parlang
 open parlang.state
 open parlang.thread_state
-open assign_mcl
 
 namespace assign_mcl
 namespace proof2

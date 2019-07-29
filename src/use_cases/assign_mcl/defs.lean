@@ -1,8 +1,7 @@
-import mcl
-import mcl_rhl
-import parlang
+import mcl.defs
+import mcl.rhl
+--import parlang
 import syncablep
-import use_cases.assign_mcl
 
 open mcl
 open mcl.mclk
@@ -10,7 +9,6 @@ open mcl.rhl
 open parlang
 open parlang.state
 open parlang.thread_state
-open assign_mcl
 
 namespace assign_mcl
 

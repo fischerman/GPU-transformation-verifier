@@ -252,7 +252,8 @@ def g := λ(n : nat), n + 1
 --     assumption,
 -- end
 
--- store the locally computed value in the shadow global
+-- TODO should this moved to defs?
+/-- store the locally computed value in the shadow global -/
 @[irreducible]
 def mcl_store {sig : signature} {t} {dim} (var : string) (idx : vector (expression sig type.int) dim) (h₁ : type_of (sig.val var) = t) (h₂ : ((sig.val var).type).dim = dim) := 
 @thread_state.store _ _ (parlang_mcl_global sig) _ (λ (s : memory $ parlang_mcl_tlocal sig), ⟨⟨var, vector_mpr h₂ (idx.map (eval s))⟩, s.get ⟨var, vector_mpr h₂ (idx.map (eval s))⟩⟩)

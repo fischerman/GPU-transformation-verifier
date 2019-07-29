@@ -89,6 +89,9 @@ def parlang_mcl_kernel (sig : signature) := kernel (memory $ parlang_mcl_tlocal 
 
 lemma address_eq {sig : mcl.signature} {a b : mcl.mcl_address sig} (h : a.1 = b.1) (g: a.2 = begin rw h, exact b.2 end) : a = b := sorry
 
+/-- all all addresses of array *var* -/
+def array_address_range {sig : signature} (var : string) : set (mcl_address sig) := {i | i.1 = var}
+
 -- expression is an inductive family over types
 -- type is called an index
 inductive expression (sig : signature) : type → Type

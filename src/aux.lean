@@ -11,6 +11,8 @@ lemma ite_else_ite {c} [decidable c] {b₁ b₂ b₃ :  Sort u} : ite c b₁ (it
   by_cases c; simp *,
 end
 
+lemma lt_zero_one : 0 < 1 := by sorry
+
 namespace fin
 
 lemma fin_eq {f f' : fin n} : f ≠ f' → f.val ≠ f'.val := begin
@@ -80,6 +82,12 @@ lemma map₂_map₂ (g : γ → β → δ) (f : α → β → γ) (l : list α) 
   case list.nil { cases l'; refl, },
   case list.cons { cases l'; simp [map₂, *], }
 end
+
+lemma list_neq_elem {α : Type} {l l' : list α} (n : ℕ) (h : n < l.length) (h' : n < l'.length) : l.nth_le n h ≠ l'.nth_le n h' → l ≠ l' := by sorry
+
+lemma list_nth_vector {α l} {v : vector α l} {n h} : list.nth_le (vector.to_list v) n h = v.nth ⟨n, (by sorry)⟩ := by sorry
+
+lemma list_one_eq {α : Type} {l₁ l₂ : list α} (h : l₁.length = 1) : ([l₁.nth_le 0 (by rw h; exact lt_zero_one)] : list α) = l₂ → l₁ = l₂ := sorry
 
 end list
 
@@ -262,5 +270,3 @@ lemma bnot_ff (b : bool) : bnot b = (b = ff) := begin
 end
 
 end bool
-
-lemma lt_zero_one : 0 < 1 := by sorry

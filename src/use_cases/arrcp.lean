@@ -1,4 +1,4 @@
-import rel_hoare
+/- import rel_hoare
 
 namespace arrcp
 
@@ -104,4 +104,4 @@ lemma arrcprel : rel_hoare_program init init eq arrcp₁ arrcp₂ eq := begin
     }
 end
 
-end arrcp
+end arrcp -/

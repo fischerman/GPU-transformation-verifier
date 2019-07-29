@@ -1,4 +1,4 @@
-import mcl
+/- import mcl
 import mcl_rhl
 import parlang
 import syncablep
@@ -529,4 +529,4 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
 end
 
 end proof1
-end assign_mcl
+end assign_mcl -/

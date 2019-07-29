@@ -1,4 +1,4 @@
-import mcl
+/- import mcl
 import parlang
 open mcl
 open mcl.mclk
@@ -65,4 +65,4 @@ example : mclp_rel eq arrcp₁ arrcp₂ eq := begin
     apply rel_mclk_to_mclp,
 end
 
-end arrcp_mcl
+end arrcp_mcl -/
