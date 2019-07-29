@@ -1,4 +1,6 @@
-import parlang
+import parlang.def
+import parlang.lemmas_state
+import parlang.lemmas_exec
 
 namespace parlang
 
@@ -10,6 +12,7 @@ def rel_hoare_state (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n�
     ∀ (n₁ n₂ : ℕ) (s₁ s₁' : state n₁ σ₁ τ₁) (s₂ : state n₂ σ₂ τ₂) ac₁ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → exec_state k₁ ac₁ s₁ s₁' →
     ∃ s₂', exec_state k₂ ac₂ s₂ s₂' ∧ Q n₁ s₁' ac₁ n₂ s₂' ac₂
 
+-- TODO change ~ to something assymetric
 notation `{* ` P : 1 ` *} ` k₁ : 1 ` ~ ` k₂ : 1 ` {* ` Q : 1 ` *}` := rel_hoare_state P k₁ k₂ Q
 
 namespace rel_hoare

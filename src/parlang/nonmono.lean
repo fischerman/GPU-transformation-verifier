@@ -1,4 +1,6 @@
-import parlang
+import parlang.def
+import parlang.lemmas_state
+import parlang.lemmas_exec
 
 namespace parlang_nonmono
 variables {n : ℕ} {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
@@ -13,7 +15,7 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
 | store (f) (s : state n σ τ) (ac : vector bool n) :
   exec_state (store f) ac s (s.map_active_threads ac $ thread_state.store f)
 | compute (f : σ → σ) (s : state n σ τ) (ac : vector bool n) :
-  exec_state (compute f) ac s (s.map_active_threads ac $ thread_state.map f)
+  exec_state (compute f) ac s (s.map_active_threads ac $ thread_state.compute f)
 | sync_all (s : state n σ τ) (ac : vector bool n) (m : memory τ) (hs : s.syncable m)
   (ha : all_threads_active ac) :
   exec_state sync ac s (s.map_threads $ thread_state.sync m)

@@ -101,6 +101,7 @@ def map_threads (f : thread_state σ τ → thread_state σ τ) (s : state n σ 
 
 -- we generally don't want to unfold this if possible
 -- this would for example happen when you do cases in (exec_state (compute f) ...) 
+-- TODO: rename this to mat? It would shorten a lot of names
 @[irreducible]
 def map_active_threads (ac : vector bool n) (f : thread_state σ τ → thread_state σ τ) (s : state n σ τ) : state n σ τ :=
 { threads := (s.threads.map₂ (λ t (a : bool), if a then f t else t) ac), ..s }
