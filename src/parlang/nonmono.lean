@@ -1,4 +1,4 @@
-import parlang.def
+import parlang.defs
 import parlang.lemmas_state
 import parlang.lemmas_exec
 

@@ -1,4 +1,4 @@
-import parlang.def
+import parlang.defs
 
 namespace parlang
 namespace memory

@@ -1,4 +1,4 @@
-import parlang.def
+import parlang.defs
 import parlang.lemmas_active_map
 import parlang.lemmas_thread_state
 import parlang.lemmas_state

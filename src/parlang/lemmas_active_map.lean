@@ -1,4 +1,4 @@
-import parlang.def
+import parlang.defs
 
 namespace parlang
 variables {n : ℕ} {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
