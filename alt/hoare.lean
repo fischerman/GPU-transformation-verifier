@@ -1,5 +1,6 @@
-import parlang
 import aux
+import parlang.def
+import parlang.lemmas_exec
 import data.bool
 
 namespace parlang
@@ -7,6 +8,7 @@ namespace parlang
 variables {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 
 /-
+
     because this holds for all n and ac the pre- and postcondition probably contain ite or forall quantifiers
 -/
 def hoare (P : thread_state σ τ → Prop) (k : kernel σ τ) (Q : thread_state σ τ → Prop) : Prop :=
@@ -69,7 +71,7 @@ begin
             apply active_map_deactivate_threads' hac hc,
         }
     }, {
-
+        sorry,
     }
 end
 
@@ -79,6 +81,7 @@ example :
     {* λ (t : thread_state (ℕ × ℕ) τ), t.tlocal.1 = 0 *} kernel.ite (λt, t.1 = 0) (kernel.compute (λ l, (l.1, 1))) (kernel.compute (λ l, (l.1, 2))) {* λ (t : thread_state (ℕ × ℕ) τ), t.tlocal.2 = 1 *} := begin
     intros h_then h_else n s u ac hp he i hac,
     cases he,
+    sorry,
 end
 
 end parlang

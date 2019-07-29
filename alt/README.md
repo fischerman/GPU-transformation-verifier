@@ -1,0 +1,1 @@
+This folder contains lean files which are not in use anymore, but might still be inspirational.
