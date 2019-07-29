@@ -1,11 +1,15 @@
 import mcl.defs
+import mcl.rhl
+import mcl.lemmas
 import mcl.compute_list
 import mcl.ts_updates
 import syncablep
 
 open parlang
+open parlang.thread_state
 open parlang.state
 open mcl
+open mcl.rhl
 
 /-- Copies *var* from tlocal of the nth thread into index n of *m* (forall n). Generally used as an assertion language for Hoare proofs -/
 def from_tlocal {sig : signature} {n} (var) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (m : memory (parlang_mcl_global sig)) (h : (((sig.val var).type).dim) = 1) := 
