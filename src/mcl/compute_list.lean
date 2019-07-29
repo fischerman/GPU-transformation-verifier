@@ -1,5 +1,5 @@
-import parlang
-import mcl
+import parlang.defs
+import mcl.defs
 
 open parlang
 open parlang.state

@@ -1,5 +1,5 @@
-import mcl
-import parlang_rhl
+import mcl.defs
+import parlang.rhl
 
 namespace mcl
 namespace rhl

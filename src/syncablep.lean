@@ -1,4 +1,4 @@
-import parlang
+import parlang.defs
 
 open parlang
 

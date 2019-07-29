@@ -1,7 +1,6 @@
-import parlang
-import mcl
-import mcl_rhl
-import compute_list
+import mcl.defs
+import mcl.rhl
+import mcl.compute_list
 
 open parlang
 open parlang.state
