@@ -34,13 +34,13 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
     apply rhl.seq,
     swap,
     {
-        apply global_assign_right,
+        apply shared_assign_right,
     },{
-        apply global_assign_right,
+        apply shared_assign_right,
     }, {
-        apply global_assign_left,
+        apply shared_assign_left,
     },
-    apply global_assign_left',
+    apply shared_assign_left',
     intros _ _ _ _ _ _ h,
     cases h with m₁ h,
     cases h with m₂ h,
@@ -62,9 +62,9 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
 
     -- split up the proof for the individual memories
     split, {
-        have : update_global_vars_for_expr read_tid = id := by refl,
+        have : update_shared_vars_for_expr read_tid = id := by refl,
         rw this,
-        have : update_global_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
+        have : update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
         rw this,
         simp,
 
@@ -132,9 +132,9 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
         sorry, --trivial from h
     }, 
     split, {
-        have : update_global_vars_for_expr read_tid = id := by refl,
+        have : update_shared_vars_for_expr read_tid = id := by refl,
         rw this,
-        have : update_global_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
+        have : update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
         rw this,
         simp,
 

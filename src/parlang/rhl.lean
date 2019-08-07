@@ -6,7 +6,7 @@ namespace parlang
 
 variables {σ σ₁ σ₂ : Type} {ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → Type} [decidable_eq ι₁] [decidable_eq ι₂]
 
--- we assume the same type ι for addressing global memory
+-- we assume the same type ι for addressing shared memory
 def rel_hoare_state (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop) (k₁ : kernel σ₁ τ₁) (k₂ : kernel σ₂ τ₂) 
     (Q : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop) : Prop :=
     ∀ (n₁ n₂ : ℕ) (s₁ s₁' : state n₁ σ₁ τ₁) (s₂ : state n₂ σ₂ τ₂) ac₁ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → exec_state k₁ ac₁ s₁ s₁' →
@@ -38,8 +38,8 @@ def initial_kernel_assertion (init₁ : ℕ → σ₁) (init₂ : ℕ → σ₂)
 (f₁ : memory τ₁ → ℕ) (f₂ : memory τ₂ → ℕ) (m₁ : memory τ₁) (m₂ : memory τ₂) 
 (n₁) (s₁ : state n₁ σ₁ τ₁) (ac₁ : vector bool n₁) (n₂) (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂) := 
 s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ n₁ = f₁ m₁ ∧ n₂ = f₂ m₂ ∧
-(∀ i : fin n₁, s₁.threads.nth i = { tlocal := init₁ i, global := m₁, stores := ∅, loads := ∅ }) ∧ 
-(∀ i : fin n₂, s₂.threads.nth i = { tlocal := init₂ i, global := m₂, stores := ∅, loads := ∅ }) ∧
+(∀ i : fin n₁, s₁.threads.nth i = { tlocal := init₁ i, shared := m₁, stores := ∅, loads := ∅ }) ∧ 
+(∀ i : fin n₂, s₂.threads.nth i = { tlocal := init₂ i, shared := m₂, stores := ∅, loads := ∅ }) ∧
 P m₁ m₂ ∧ all_threads_active ac₁ ∧ all_threads_active ac₂
 
 def initial_kernel_assertion_left_thread_state {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 

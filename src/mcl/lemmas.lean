@@ -8,12 +8,12 @@ open parlang.thread_state
 
 @[simp]
 lemma store_stores {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
-{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} {i : mcl_address sig} : 
 i ∉ (mcl_store var idx h₁ h₂ ts).stores → i ∉ ts.stores := by simp [mcl_store, store, not_or_distrib]
 
 @[simp]
 lemma store_loads {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
-{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {i : mcl_address sig} : 
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} {i : mcl_address sig} : 
 i ∉ (mcl_store var idx h₁ h₂ ts).loads → i ∉ ts.loads := by simp [mcl_store, store, not_or_distrib]
 
 @[simp]

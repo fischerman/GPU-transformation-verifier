@@ -14,7 +14,7 @@ namespace assign_mcl
 
 def sigc : signature_core
 | "tid" := { scope := scope.tlocal, type := ⟨1, type.int⟩ }
-| _ := { scope := scope.global, type := ⟨1, type.int⟩ }
+| _ := { scope := scope.shared, type := ⟨1, type.int⟩ }
 
 def sig : signature := ⟨sigc, begin
     split,
@@ -22,7 +22,7 @@ def sig : signature := ⟨sigc, begin
     refl,
 end⟩
 
-lemma a_is_global : is_global (sig.val "a") := by apply eq.refl
+lemma a_is_shared : is_shared (sig.val "a") := by apply eq.refl
 lemma tid_is_tlocal : is_tlocal (sig.val "tid") := by apply eq.refl
 
 -- TODO generate those proofs directly from signature
@@ -37,13 +37,13 @@ instance : has_one (expression sig (type_of (sig.val "b"))) := begin
 end
 
 def p₁ : mclp sig := mclp.intro (λ m, 100) (
-    mclk.global_assign "a" v[read_tid] (by refl) (by refl) read_tid ;;
-    mclk.global_assign "b" v[read_tid] (by refl) (by refl) (read_tid + (expression.literal_int 1 (by refl)))
+    mclk.shared_assign "a" v[read_tid] (by refl) (by refl) read_tid ;;
+    mclk.shared_assign "b" v[read_tid] (by refl) (by refl) (read_tid + (expression.literal_int 1 (by refl)))
 )
 
 def p₂ : mclp sig := mclp.intro (λ m, 100) (
-    mclk.global_assign "b" v[read_tid] (by refl) (by refl) (read_tid + (expression.literal_int 1 (by refl))) ;;
-    mclk.global_assign "a" v[read_tid] (by refl) (by refl) read_tid
+    mclk.shared_assign "b" v[read_tid] (by refl) (by refl) (read_tid + (expression.literal_int 1 (by refl))) ;;
+    mclk.shared_assign "a" v[read_tid] (by refl) (by refl) read_tid
 )
 
 end assign_mcl

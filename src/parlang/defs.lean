@@ -13,15 +13,15 @@ variables {n : ℕ} {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 We use the following conventions for type variables:
 
  `σ` -- thread internal states
- `ι` -- global memory index
- `τ` -- global memory type map
+ `ι` -- shared memory index
+ `τ` -- shared memory type map
 
 -/
 
 /-- Kernel of a parallel program.
 
 The general idea is to not have explicit expressions, but use Lean functions to compute values. What
-we are explicit global loads and stores.
+we are explicit shared loads and stores.
 
 Σ is constructor where the second argument may depend on the type of the first (in this case i). Can be constructed using ⟨...⟩
 -/
@@ -48,11 +48,11 @@ def update (m : memory τ) (i : ι) (v : τ i) : memory τ := function.update m 
 
 end memory
 
-/-- Thread state inclusing a global memory *view*, the list of loads and stores tells what should
+/-- Thread state inclusing a shared memory *view*, the list of loads and stores tells what should
 differ between differnet threads. -/
 structure thread_state {ι : Type} (σ : Type) (τ : ι → Type) : Type :=
 (tlocal : σ)
-(global : memory τ)
+(shared : memory τ)
 (loads  : set ι := ∅)
 (stores : set ι := ∅)
 
@@ -60,13 +60,13 @@ namespace thread_state
 
 def load (f : σ → (Σi:ι, (τ i → σ))) (t : thread_state σ τ) : thread_state σ τ :=
 let ⟨i, tr⟩ := f t.tlocal in
-{ tlocal := tr (t.global.get i),
+{ tlocal := tr (t.shared.get i),
   loads := insert i t.loads,
   .. t }
 
 def store (f : σ → (Σi:ι, τ i)) (t : thread_state σ τ) : thread_state σ τ :=
 let ⟨i, v⟩ := f t.tlocal in
-{ global := t.global.update i v,
+{ shared := t.shared.update i v,
   stores := insert i t.stores,
   .. t}
 
@@ -75,7 +75,7 @@ def compute (f : σ → σ) (t : thread_state σ τ) : thread_state σ τ :=
   .. t}
 
 def sync (g : memory τ) (t : thread_state σ τ) : thread_state σ τ :=
-{ global := g,
+{ shared := g,
   loads := ∅,
   stores := ∅,
   .. t}
@@ -90,7 +90,7 @@ def all_threads_active (ac : vector bool n) : bool := ac.to_list.all id
 /-- thread can only be active either in ac₁ or ac₂ -/
 def ac_distinct (ac₁ ac₂ : vector bool n) : Prop := ∀ (i : fin n), ac₁.nth i = ff ∨ ac₂.nth i = ff
 
-/-- Global program state -/
+/-- shared program state -/
 structure state {ι : Type} (n : ℕ) (σ : Type) (τ : ι → Type) : Type :=
 (threads : vector (thread_state σ τ) n)
 
@@ -113,8 +113,8 @@ def active_threads (ac : vector bool n) (s : state n σ τ) : list (thread_state
 -- case 2: thread t changed ι and all other threads must not access ι
 def syncable (s : state n σ τ) (m : memory τ) : Prop :=
 ∀i:ι,
-  (∀ tid, i ∉ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).global i) ∨
-  (∃ tid, i ∈ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).global i ∧
+  (∀ tid, i ∉ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).shared i) ∨
+  (∃ tid, i ∈ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).shared i ∧
     (∀ tid', tid ≠ tid' → i ∉ (s.threads.nth tid').accesses))
 
 def precedes (s u : state n σ τ) : Prop :=
@@ -131,7 +131,7 @@ def subkernel (q : kernel σ τ) : kernel σ τ → Prop
 | (loop c body) := body = q ∨ subkernel body
 | k := k = q
 
-/-- Execute a kernel on a global state, i.e. a list of threads -/
+/-- Execute a kernel on a shared state, i.e. a list of threads -/
 inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ τ → state n σ τ → Prop
 | load (f) (s : state n σ τ) (ac : vector bool n) :
   exec_state (load f) ac s (s.map_active_threads ac $ thread_state.load f)
@@ -178,7 +178,7 @@ def state_initializer := ℕ → σ
 
 @[reducible]
 def init_state (init : ℕ → σ) (f : memory τ → ℕ) (m : memory τ) : state (f m) σ τ := 
-{ threads := (vector.range (f m)).map (λ n, { tlocal := init n, global := m, loads := ∅, stores := ∅ })}
+{ threads := (vector.range (f m)).map (λ n, { tlocal := init n, shared := m, loads := ∅, stores := ∅ })}
 
 inductive exec_prog : (ℕ → σ) → program σ τ → memory τ → memory τ → Prop
 | intro (k : kernel σ τ) (f : memory τ → ℕ) (a b : memory τ) (init : ℕ → σ) (s' : state (f a) σ τ) (hsync : s'.syncable b)

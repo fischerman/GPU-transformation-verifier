@@ -12,12 +12,12 @@ open mcl
 open mcl.rhl
 
 /-- Copies *var* from tlocal of the nth thread into index n of *m* (forall n). Generally used as an assertion language for Hoare proofs -/
-def from_tlocal {sig : signature} {n} (var) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (m : memory (parlang_mcl_global sig)) (h : (((sig.val var).type).dim) = 1) := 
-((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) tid, 
+def from_tlocal {sig : signature} {n} (var) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)) (m : memory (parlang_mcl_shared sig)) (h : (((sig.val var).type).dim) = 1) := 
+((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_shared sig)) tid, 
     m.update ⟨var, eq.mpr (by rw h) v[tid.val]⟩ ((s.threads.nth tid).tlocal.get ⟨var, eq.mpr (by rw h) v[tid.val]⟩))) m
 
-lemma from_tlocal_comm_update {sig : signature} {n} (var₁ var₂) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig))
-(m : memory (parlang_mcl_global sig)) {h₁} {idx val} :
+lemma from_tlocal_comm_update {sig : signature} {n} (var₁ var₂) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig))
+(m : memory (parlang_mcl_shared sig)) {h₁} {idx val} :
 from_tlocal var₁ s (m.update ⟨var₂, idx⟩ val) h₁ = memory.update (from_tlocal var₁ s m h₁) ⟨var₂, idx⟩ val := begin
     unfold from_tlocal,
     induction n,
@@ -28,8 +28,8 @@ from_tlocal var₁ s (m.update ⟨var₂, idx⟩ val) h₁ = memory.update (from
     }
 end
 
-lemma from_tlocal_comm {sig : signature} {n} (var₁ var₂) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig))
-(s' : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (m : memory (parlang_mcl_global sig)) {h₁ h₂} :
+lemma from_tlocal_comm {sig : signature} {n} (var₁ var₂) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig))
+(s' : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)) (m : memory (parlang_mcl_shared sig)) {h₁ h₂} :
 from_tlocal var₁ s (from_tlocal var₂ s' m h₂) h₁ = from_tlocal var₂ s' (from_tlocal var₁ s m h₁) h₂ := begin
     unfold from_tlocal,
     induction n,
@@ -46,8 +46,8 @@ end
 --lemma : from_tlocal "b" (map_active_threads ac (ts_updates [op.compute_list (... :: coms)]) s = from_tlocal "b" (map_active_threads ac (ts_updates [op.compute_list (... :: coms)]) s
 
 lemma from_tlocal_eq {sig : signature} {n}
-{s s' : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
-{m m' : memory (parlang_mcl_global sig)} {var} {h : ((sig.val var).type).dim = 1} :
+{s s' : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)}
+{m m' : memory (parlang_mcl_shared sig)} {var} {h : ((sig.val var).type).dim = 1} :
 (∀ tid, (s.threads.nth tid).tlocal.get ⟨var, begin rw h, exact v[tid] end⟩ = (s'.threads.nth tid).tlocal.get ⟨var, begin rw h, exact v[tid] end⟩) →
 m = m' →
 from_tlocal var s m h = from_tlocal var s' m' h := begin
@@ -63,8 +63,8 @@ from_tlocal var s m h = from_tlocal var s' m' h := begin
 end
 
 lemma syncable'_compute_list_syncable {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
-{s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
-{m : memory (parlang_mcl_global sig)} : 
+{s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)}
+{m : memory (parlang_mcl_shared sig)} : 
 s.syncable m →
 (∀ tid : fin n, (s.threads.nth tid).stores = ∅) →
 (∀ tid : fin n, (s.threads.nth tid).loads = ∅) →
@@ -84,8 +84,8 @@ end
 lemma syncable'_store {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
 {updates : list $ op sig}
-{s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
-{m : memory (parlang_mcl_global sig)} 
+{s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)}
+{m : memory (parlang_mcl_shared sig)} 
 (idx_1 : (((sig.val var).type).dim) = 1) : 
 (∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ shole) →
 (∀ idx, (⟨var, idx⟩ : mcl_address sig) ∉ lhole) →
@@ -188,9 +188,9 @@ syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list compu
                                 simp [mcl_store, store] at shole_constraint,
                                 rw not_or_distrib at shole_constraint,
                                 cases shole_constraint (or.inl i_in_shole),
-                                rw ts_updates_tlocal s'.global s'.loads s'.stores,
+                                rw ts_updates_tlocal s'.shared s'.loads s'.stores,
                                 simp,
-                                have : s' = {tlocal := s'.tlocal, global := s'.global, loads := s'.loads, stores := s'.stores} := begin
+                                have : s' = {tlocal := s'.tlocal, shared := s'.shared, loads := s'.loads, stores := s'.stores} := begin
                                     cases s',
                                     simp,
                                 end,

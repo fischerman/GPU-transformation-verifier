@@ -10,8 +10,8 @@ variables {n : ℕ} {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 or load in stores and loads respectively. Adding to stores or load makes this property stricter -/
 def syncable' (shole : set ι) (lhole : set ι) (s : state n σ τ) (m : memory τ) : Prop :=
 (∀i:ι,
-    (∀ tid, i ∉ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).global i) ∨
-    (∃ tid, i ∈ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).global i ∧
+    (∀ tid, i ∉ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).shared i) ∨
+    (∃ tid, i ∈ (s.threads.nth tid).stores ∧ m i = (s.threads.nth tid).shared i ∧
         (∀ tid', tid ≠ tid' → i ∉ (s.threads.nth tid').accesses))) ∧
 (∀ i tid, (i ∈ shole → i ∉ (s.threads.nth tid).stores) ∧
         (i ∈ lhole → i ∉ (s.threads.nth tid).loads))

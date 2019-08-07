@@ -16,7 +16,7 @@ open assign_mcl
 namespace assign_mcl
 namespace proof1
 
-lemma store_access_elim_idx {sig : signature} {n n_idx} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
+lemma store_access_elim_idx {sig : signature} {n n_idx} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} {var} {idx : vector (expression sig type.int) n_idx} 
 {t} {h₄ : ((sig.val var).type).dim = n_idx} {h₃ : type_of (sig.val var) = t } {f} {t : fin n} {i : mcl_address sig} {ac₁ : vector bool n} {updates}
 (h₂ : i.2.to_list ≠ (idx.map ((eval (((map_active_threads ac₁ (compute_list updates) s).threads).nth t).tlocal))).to_list) 
 (h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ compute_list updates) s).threads) t)) :
@@ -24,7 +24,7 @@ i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx 
     sorry,
 end
 
-lemma store_access_elim_idx' {sig : signature} {n n_idx} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} {var} {idx : vector (expression sig type.int) n_idx} 
+lemma store_access_elim_idx' {sig : signature} {n n_idx} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} {var} {idx : vector (expression sig type.int) n_idx} 
 {t} {h₄ : ((sig.val var).type).dim = n_idx} {h₃ : type_of (sig.val var) = t } {t : fin n} {i : mcl_address sig} {ac₁ : vector bool n} {updates}
 (h₂ : i.2.to_list ≠ (idx.map ((eval (((map_active_threads ac₁ (compute_list updates) s).threads).nth t).tlocal ))).to_list) 
 (h₁ : i ∉ accesses (vector.nth (s.threads) t)) :
@@ -32,25 +32,25 @@ i ∉ accesses (vector.nth ((map_active_threads ac₁ ((mcl_store var idx h₃ h
     sorry,
 end
 
-lemma store_store_success {sig : signature} {i : mcl_address sig} {updates} {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} 
+lemma store_store_success {sig : signature} {i : mcl_address sig} {updates} {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} 
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂ : ((sig.val var).type).dim = dim} 
-{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} : 
 i = ⟨var, vector_mpr h₂ (idx.map (eval (compute_list updates ts).tlocal))⟩ → i ∈ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list updates) ts).stores := by sorry
 
 /-- Stores can be skipped if the variable name does not match. Does not work for idx -/
-lemma store_store_skip_name {sig : signature} {i : mcl_address sig} {updates} {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} 
+lemma store_store_skip_name {sig : signature} {i : mcl_address sig} {updates} {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} 
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂ : ((sig.val var).type).dim = dim} 
-{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} : 
+{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} : 
 i ∈ ((f ∘ compute_list updates) ts).stores → i ∈ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list updates) ts).stores := by sorry
 
-lemma access_init  {sig₁ sig₂ : signature} {P : memory (parlang_mcl_global sig₁) → memory (parlang_mcl_global sig₂) → Prop} 
-{f₁ : memory (parlang_mcl_global sig₁) → ℕ} {f₂ : memory (parlang_mcl_global sig₂) → ℕ} {m₁ : memory (parlang_mcl_global sig₁)} {m₂ : memory (parlang_mcl_global sig₂)} 
-{n₁} {s₁ : state n₁ (memory $ parlang_mcl_tlocal sig₁) (parlang_mcl_global sig₁)} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_global sig₂)} {ac₂ : vector bool n₂} {t} {i} : 
+lemma access_init  {sig₁ sig₂ : signature} {P : memory (parlang_mcl_shared sig₁) → memory (parlang_mcl_shared sig₂) → Prop} 
+{f₁ : memory (parlang_mcl_shared sig₁) → ℕ} {f₂ : memory (parlang_mcl_shared sig₂) → ℕ} {m₁ : memory (parlang_mcl_shared sig₁)} {m₂ : memory (parlang_mcl_shared sig₂)} 
+{n₁} {s₁ : state n₁ (memory $ parlang_mcl_tlocal sig₁) (parlang_mcl_shared sig₁)} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_shared sig₂)} {ac₂ : vector bool n₂} {t} {i} : 
 initial_kernel_assertion mcl_init mcl_init P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ → i ∉ accesses (vector.nth (s₁.threads) t) := begin
     sorry
 end
 
--- question: should we limit ourselfs to global scope here?
+-- question: should we limit ourselfs to shared scope here?
 /-- generic array access for cases-distinction. Covers all accesses with the same variable name and the right number of dimensions -/
 structure array_access (sig : signature) (var : string) (i : mcl_address sig) : Prop :=
 (var_eq : i.1 = var)
@@ -113,31 +113,31 @@ instance {sig var i} : decidable (array_access sig var i) :=
 
 instance ll {sig var i n} : decidable (array_access_tid_to_idx sig var i n) := sorry
 
-lemma store_global_success {sig : signature} {i : mcl_address sig} {updates} 
+lemma store_shared_success {sig : signature} {i : mcl_address sig} {updates} 
 {dim} {idx : vector (expression sig type.int) dim} {var₁ var₂ t} {h₁ : type_of (sig.val var₂) = t} {h₂}
-{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
-{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} (a : array_access sig var₁ i) (h : var₁ = var₂) : ((
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)}
+{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} (a : array_access sig var₁ i) (h : var₁ = var₂) : ((
         f ∘
         mcl_store var₂ idx h₁ h₂ ∘
         compute_list updates)
     ts
-).global i = (begin simp [parlang_mcl_global, signature.lean_type_of, lean_type_of], rw a.var_eq, rw h, exact ((compute_list updates ts).tlocal.get ⟨var₂, vector_mpr h₂ $ idx.map (eval (compute_list updates ts).tlocal)⟩) end) := sorry
+).shared i = (begin simp [parlang_mcl_shared, signature.lean_type_of, lean_type_of], rw a.var_eq, rw h, exact ((compute_list updates ts).tlocal.get ⟨var₂, vector_mpr h₂ $ idx.map (eval (compute_list updates ts).tlocal)⟩) end) := sorry
 
-lemma store_global_skip {sig : signature} {i : mcl_address sig} {updates} 
+lemma store_shared_skip {sig : signature} {i : mcl_address sig} {updates} 
 {dim} {idx : vector (expression sig type.int) dim} {var₁ var₂ t} {h₁ : type_of (sig.val var₂) = t} {h₂}
-{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)}
-{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} (a : array_access sig var₁ i) (h : var₁ ≠ var₂) : ((
+{ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)}
+{f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} (a : array_access sig var₁ i) (h : var₁ ≠ var₂) : ((
         f ∘
         mcl_store var₂ idx h₁ h₂ ∘
         compute_list updates)
     ts
-).global i = ((f ∘ compute_list updates) ts).global i := sorry
+).shared i = ((f ∘ compute_list updates) ts).shared i := sorry
 
-def memory_array_update_tid {sig : signature} {n} (var) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)) (expr : expression sig (type_of (sig.val var))) (m : memory (parlang_mcl_global sig)) := 
-((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_global sig)) i, m.update ⟨var, eq.mpr sorry v[i]⟩ (eval (s.threads.nth i).tlocal expr))) m
+def memory_array_update_tid {sig : signature} {n} (var) (s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)) (expr : expression sig (type_of (sig.val var))) (m : memory (parlang_mcl_shared sig)) := 
+((list.range_fin n).foldl (λ (m : parlang.memory (parlang_mcl_shared sig)) i, m.update ⟨var, eq.mpr sorry v[i]⟩ (eval (s.threads.nth i).tlocal expr))) m
 
-lemma memory_array_update_tid_skip {sig : signature} {n} {var₁ var₂} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} 
-{expr : expression sig (type_of (sig.val var₂))} {m : memory (parlang_mcl_global sig)} {i} (a : array_access sig var₁ i) (h : var₁ ≠ var₂) : 
+lemma memory_array_update_tid_skip {sig : signature} {n} {var₁ var₂} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} 
+{expr : expression sig (type_of (sig.val var₂))} {m : memory (parlang_mcl_shared sig)} {i} (a : array_access sig var₁ i) (h : var₁ ≠ var₂) : 
 (memory_array_update_tid var₂ s expr m) i = m i := begin
     cases i,
     have : i_fst = var₁ := a.var_eq,
@@ -146,8 +146,8 @@ lemma memory_array_update_tid_skip {sig : signature} {n} {var₁ var₂} {s : st
     -- show non-interference on memory.update
 end
 
-lemma memory_array_update_tid_success {sig : signature} {n} {var₁ var₂} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)} 
-{expr : expression sig (type_of (sig.val var₂))} {m : memory (parlang_mcl_global sig)} {i} (a : array_access_tid_to_idx sig var₁ i n) (h : var₁ = var₂) : 
+lemma memory_array_update_tid_success {sig : signature} {n} {var₁ var₂} {s : state n (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} 
+{expr : expression sig (type_of (sig.val var₂))} {m : memory (parlang_mcl_shared sig)} {i} (a : array_access_tid_to_idx sig var₁ i n) (h : var₁ = var₂) : 
 (memory_array_update_tid var₂ s expr m) i = eval (s.threads.nth ⟨_, a.idx_1_lt_n⟩).tlocal (by rw a.to_array_access.var_eq; rw h; exact expr) := begin
     admit,
 end
@@ -210,13 +210,13 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
     apply rhl.seq,
     swap,
     {
-        apply global_assign_right,
+        apply shared_assign_right,
     },{
-        apply global_assign_right,
+        apply shared_assign_right,
     }, {
-        apply global_assign_left,
+        apply shared_assign_left,
     },
-    apply global_assign_left',
+    apply shared_assign_left',
     intros _ _ _ _ _ _ h,
     cases h with m₁ h,
     cases h with m₂ h,
@@ -237,9 +237,9 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
 
     -- split up the proof for the individual memories
     split, {
-        have : update_global_vars_for_expr read_tid = id := by refl,
+        have : update_shared_vars_for_expr read_tid = id := by refl,
         rw this,
-        have : update_global_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
+        have : update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
         rw this,
         simp,
 
@@ -333,7 +333,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                 swap, {
                     refl,
                 },
-                rw store_global_success ha.to_array_access,
+                rw store_shared_success ha.to_array_access,
                 swap, {
                     refl
                 },
@@ -436,7 +436,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                 swap, {
                     refl,
                 },
-                rw store_global_skip hb.to_array_access,
+                rw store_shared_skip hb.to_array_access,
                 swap, {
                     intro heq,
                     cases heq,
@@ -445,7 +445,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                 rw function.comp.assoc,
                 rw compute_list_merge,
                 rw ← function.left_id (mcl_store _ _ _ _ ∘ _),
-                rw store_global_success hb.to_array_access,
+                rw store_shared_success hb.to_array_access,
                 swap, {
                     refl
                 },

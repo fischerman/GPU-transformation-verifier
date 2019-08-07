@@ -42,10 +42,10 @@ lemma arrcprel : rel_hoare_program init init eq arrcp₁ arrcp₂ eq := begin
                n₂ = 10 ∧
                 (∀ (i : fin n₁),
                       vector.nth (s₁.threads) i =
-                        {tlocal := (init ↑i) & "n" ::= m₁ 0, global := m₁, loads := insert 0 ((vector.nth (s₁.threads) i).loads), stores := ∅}) ∧
+                        {tlocal := (init ↑i) & "n" ::= m₁ 0, shared := m₁, loads := insert 0 ((vector.nth (s₁.threads) i).loads), stores := ∅}) ∧
                 (∀ (i : fin n₂),
                     vector.nth (s₂.threads) i =
-                        {tlocal := init ↑i, global := m₂, loads := ∅, stores := ∅}) ∧
+                        {tlocal := init ↑i, shared := m₂, loads := ∅, stores := ∅}) ∧
                     m₁ = m₂ ∧ ↥(all_threads_active ac₁) ∧ ↥(all_threads_active ac₂))),
     {
         intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp hek₁,
@@ -84,7 +84,7 @@ lemma arrcprel : rel_hoare_program init init eq arrcp₁ arrcp₂ eq := begin
                     simp [haa],
                     rw thread_state.load,
                     rw thread_state.load._match_1,
-                    have : m₁ = (vector.nth (s₁.threads) i).global := begin
+                    have : m₁ = (vector.nth (s₁.threads) i).shared := begin
                         rw hp.right.right.right.right.left,
                     end,
                     subst this,

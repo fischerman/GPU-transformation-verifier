@@ -28,7 +28,7 @@ structure array :=
 
 inductive scope
 | tlocal
-| global
+| shared
 
 structure variable_def :=
 (type : array)
@@ -70,7 +70,7 @@ def signature.lean_type_of (n : string) (sig : signature) := lean_type_of (sig.v
 @[reducible]
 def is_tlocal (v : variable_def) := v.scope = scope.tlocal
 @[reducible]
-def is_global : variable_def → Prop := λ v, v.scope = scope.global
+def is_shared : variable_def → Prop := λ v, v.scope = scope.shared
 
 -- @[reducible]
 -- def create_signature : list (string × variable_def) → signature
@@ -81,11 +81,11 @@ def is_global : variable_def → Prop := λ v, v.scope = scope.global
 @[reducible]
 def mcl_address (sig : signature) := (Σ n: string, vector ℕ (sig.val n).type.dim)
 @[reducible]
-def parlang_mcl_global (sig : signature) := (λ i : mcl_address sig, sig.lean_type_of i.1)
+def parlang_mcl_shared (sig : signature) := (λ i : mcl_address sig, sig.lean_type_of i.1)
 @[reducible]
 def parlang_mcl_tlocal (sig : signature) := (λ i : mcl_address sig, sig.lean_type_of i.1)
 @[reducible]
-def parlang_mcl_kernel (sig : signature) := kernel (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)
+def parlang_mcl_kernel (sig : signature) := kernel (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)
 
 lemma address_eq {sig : mcl.signature} {a b : mcl.mcl_address sig} (h : a.1 = b.1) (g: a.2 = begin rw h, exact b.2 end) : a = b := sorry
 
@@ -96,7 +96,7 @@ def array_address_range {sig : signature} (var : string) : set (mcl_address sig)
 -- type is called an index
 inductive expression (sig : signature) : type → Type
 | tlocal_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = dim) (h₃ : is_tlocal (sig.val n)) : expression t
-| global_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = dim) (h₃ : is_global (sig.val n)) : expression t
+| shared_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = dim) (h₃ : is_shared (sig.val n)) : expression t
 | add {t} : expression t → expression t → expression t
 | literal_int {} {t} (n : ℕ) (h : t = type.int) : expression t
 | lt {t} (h : t = type.bool) : expression int → expression int → expression t
@@ -128,7 +128,7 @@ def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ := expression.rec_on expr 
     -- tlocal
     (λ t dim n idx h₁ h₂ h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
-    -- global
+    -- shared
     (λ t dim n idx h₁ h₂ h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
     -- add
     (λ t a b ih_a ih_b, (1 : ℕ) + (ih_a : ℕ) + (ih_b : ℕ))
@@ -138,7 +138,7 @@ def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ
     (λ t h a b ih_a ih_b, ih_a + ih_b + 1)
 
 -- def s₁ : signature
--- | _ := { scope := scope.global, type := ⟨1, type.int⟩ }
+-- | _ := { scope := scope.shared, type := ⟨1, type.int⟩ }
 -- -- appearently not true
 -- def test : (7 : expression s₁ int) = (literal_int 7 (by refl)) := begin
 --     sorry, -- not by refl
@@ -174,8 +174,8 @@ lemma vector_mpr_rfl {sig : signature} {n} {α : Type} {h : (((sig.val n).type).
 def eval {sig : signature} (s : memory $ parlang_mcl_tlocal sig) {t : type} (expr : expression sig t) : type_map t := expression.rec_on expr 
     -- tlocal
     (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact s.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
-    -- global
-    -- requires that the global variable has been loaded into tstate under the same name
+    -- shared
+    -- requires that the shared variable has been loaded into tstate under the same name
     (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact s.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
     -- add
     (λ t a b ih_a ih_b, type_map_add ih_a ih_b)
@@ -184,11 +184,11 @@ def eval {sig : signature} (s : memory $ parlang_mcl_tlocal sig) {t : type} (exp
     -- lt
     (λ t h a b ih_a ih_b, (by rw h; exact (ih_a < ih_b)))
 
-def load_global_vars_for_expr {sig : signature} {t : type} (expr : expression sig t) : list (parlang_mcl_kernel sig) := expression.rec_on expr 
+def load_shared_vars_for_expr {sig : signature} {t : type} (expr : expression sig t) : list (parlang_mcl_kernel sig) := expression.rec_on expr 
     -- tlocal
     (λ t dim n idx h₁ h₂ h₃ ih, ((list.range_fin dim).map ih).foldl list.append [])
-    -- global
-    -- requires that the global variable has been loaded into tstate under the same name
+    -- shared
+    -- requires that the shared variable has been loaded into tstate under the same name
     (λ t dim n idx h₁ h₂ h₃ ih, ((list.range_fin dim).map ih).foldl list.append [] ++ [(kernel.load (λ s, ⟨⟨n, vector_mpr h₂ $ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ $ (vector.of_fn idx).map (eval s)⟩ v⟩) : parlang_mcl_kernel sig)])
     -- add
     (λ t a b ih_a ih_b, ih_a ++ ih_b)
@@ -198,25 +198,25 @@ def load_global_vars_for_expr {sig : signature} {t : type} (expr : expression si
     (λ t h a b ih_a ih_b, ih_a ++ ih_b)
 
 def prepend_load_expr {sig : signature} {t : type} (expr : expression sig t) (k : parlang_mcl_kernel sig) :=
-(load_global_vars_for_expr expr).foldr kernel.seq k
---list_to_kernel_seq (load_global_vars_for_expr expr ++ [k])
+(load_shared_vars_for_expr expr).foldr kernel.seq k
+--list_to_kernel_seq (load_shared_vars_for_expr expr ++ [k])
 
 def append_load_expr  {sig : signature} {t : type} (expr : expression sig t) (k : parlang_mcl_kernel sig) :=
-(load_global_vars_for_expr expr).foldl kernel.seq k
---list_to_kernel_seq ([k] ++ load_global_vars_for_expr expr)
+(load_shared_vars_for_expr expr).foldl kernel.seq k
+--list_to_kernel_seq ([k] ++ load_shared_vars_for_expr expr)
 
 example (k) : prepend_load_expr (7 : expression sig int) k = k := by refl
-example (k) (n idx h₁ h₂ h₃) : prepend_load_expr (@global_var sig _ 1 n idx h₁ h₂ h₃ : expression sig int) k = k := begin
+example (k) (n idx h₁ h₂ h₃) : prepend_load_expr (@shared_var sig _ 1 n idx h₁ h₂ h₃ : expression sig int) k = k := begin
     rw prepend_load_expr,
-    rw load_global_vars_for_expr,
+    rw load_shared_vars_for_expr,
     repeat { rw list.foldr },
     sorry
 end
 
 example (k) : append_load_expr (7 : expression sig int) k = k := by refl
-example (k) (n idx h₁ h₂ h₃) : append_load_expr (@global_var sig _ 1 n idx h₁ h₂ h₃ : expression sig int) k = k := begin
+example (k) (n idx h₁ h₂ h₃) : append_load_expr (@shared_var sig _ 1 n idx h₁ h₂ h₃ : expression sig int) k = k := begin
     rw append_load_expr,
-    rw load_global_vars_for_expr,
+    rw load_shared_vars_for_expr,
     repeat { rw list.foldl },
     sorry
 end
@@ -229,7 +229,7 @@ end
 def expr_reads (n : string) {t : type} (expr : expression sig t) : _root_.bool := expression.rec_on expr
     -- tlocal
     (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || ((list.range_fin dim).map ih).any id)
-    -- global
+    -- shared
     (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || ((list.range_fin dim).map ih).any id)
     -- add
     (λ t a b ih_a ih_b, ih_a || ih_b)
@@ -249,11 +249,11 @@ vector.map (eval (s.update ⟨n, idx₂⟩ v)) idx = vector.map (eval s) idx := 
     admit
 end
 
--- TODO variable assign constructors should include global and local proof
+-- TODO variable assign constructors should include shared and local proof
 -- expression sig (type_of (sig n)) is not definitionally equal if sig is not computable
 inductive mclk (sig : signature)
 | tlocal_assign {t : type} {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = idx.length) : (expression sig t) → mclk
-| global_assign {t : type} {dim : ℕ} (n) (idx : vector (expression sig int) dim) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = idx.length) : (expression sig t) → mclk
+| shared_assign {t : type} {dim : ℕ} (n) (idx : vector (expression sig int) dim) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = idx.length) : (expression sig t) → mclk
 | seq : mclk → mclk → mclk
 | for (n : string) (h : sig.type_of n = int) (h₂ : (sig.val n).type.dim = 1) :
   expression sig int → expression sig bool → mclk → mclk → mclk
@@ -265,7 +265,7 @@ open mclk
 
 def mclk_reads (n : string) : mclk sig → _root_.bool
 | (tlocal_assign _ idx _ _ expr) := expr_reads n expr || (idx.to_list.any (λ e, expr_reads n e))
-| (global_assign _ idx _ _ expr) := expr_reads n expr || (idx.to_list.any (λ e, expr_reads n e))
+| (shared_assign _ idx _ _ expr) := expr_reads n expr || (idx.to_list.any (λ e, expr_reads n e))
 | (seq k₁ k₂) := mclk_reads k₁ || mclk_reads k₂
 | (for _ _ _ init c inc body) := expr_reads n init || expr_reads n c || mclk_reads inc || mclk_reads body
 | (skip) := false
@@ -276,14 +276,14 @@ def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | (skip) := kernel.compute id
 | (tlocal_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)))
-| (global_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end))) ;; kernel.store (λ s, ⟨⟨n, vector_mpr h₂ $ idx.map (eval s)⟩, s.get ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩⟩)
+| (shared_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end))) ;; kernel.store (λ s, ⟨⟨n, vector_mpr h₂ $ idx.map (eval s)⟩, s.get ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩⟩)
 | (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  v[eval s expr]⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, unfold signature.type_of at h, rw h, exact eval s expr end))) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
     )
 
--- if a kernel does not contain a global referencce it must not contain any loads
-example (k : mclk sig) (h : ∀ n, is_global (sig.val n) → ¬mclk_reads n k) : ∀ sk, subkernel sk (mclk_to_kernel k) → ¬∃ f, sk = (kernel.load f) := begin
+-- if a kernel does not contain a shared referencce it must not contain any loads
+example (k : mclk sig) (h : ∀ n, is_shared (sig.val n) → ¬mclk_reads n k) : ∀ sk, subkernel sk (mclk_to_kernel k) → ¬∃ f, sk = (kernel.load f) := begin
     intros sk hsk hl,
     cases hl with f hl,
     subst hl,
@@ -338,9 +338,9 @@ example (k : mclk sig) (h : ∀ n, is_global (sig.val n) → ¬mclk_reads n k) :
 end
 
 inductive mclp (sig : signature)
-| intro (f : memory (parlang_mcl_global sig) → ℕ) (k : mclk sig) : mclp
+| intro (f : memory (parlang_mcl_shared sig) → ℕ) (k : mclk sig) : mclp
 
-def mclp_to_program {sig : signature} : mclp sig → parlang.program (memory $ parlang_mcl_tlocal sig) (parlang_mcl_global sig)
+def mclp_to_program {sig : signature} : mclp sig → parlang.program (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)
 | (mclp.intro f k) := parlang.program.intro f (mclk_to_kernel k)
 
 def empty_state {sig : signature} : (memory $ parlang_mcl_tlocal sig) := λ var, default (type_map (type_of (sig.val var.1)))

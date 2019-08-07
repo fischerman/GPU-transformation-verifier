@@ -92,8 +92,8 @@ lemma compute_loads_state {s : state n σ τ} {ac : vector bool n} {tid} {f g} :
 end
 
 @[simp]
-lemma compute_global_state {s : state n σ τ} {ac : vector bool n} {tid} {f g} : 
-(vector.nth ((map_active_threads ac (thread_state.compute g ∘ f) s).threads) tid).global = (vector.nth ((map_active_threads ac f s).threads) tid).global := begin
+lemma compute_shared_state {s : state n σ τ} {ac : vector bool n} {tid} {f g} : 
+(vector.nth ((map_active_threads ac (thread_state.compute g ∘ f) s).threads) tid).shared = (vector.nth ((map_active_threads ac f s).threads) tid).shared := begin
   unfold map_active_threads,
   simp,
   by_cases h : vector.nth ac tid = tt, {
@@ -110,7 +110,7 @@ thread_state.accesses (vector.nth ((map_active_threads ac (thread_state.compute 
 
 @[simp]
 lemma syncable_remove_compute {s : state n σ τ} (ac : vector bool n) (f m g) : syncable (map_active_threads ac (thread_state.compute g ∘ f) s) m ↔ syncable (map_active_threads ac f s) m := begin
-  simp [syncable, compute_stores_state, compute_global_state, compute_access_state],
+  simp [syncable, compute_stores_state, compute_shared_state, compute_access_state],
 end
 
 lemma state_eq_per_thread {s u : state n σ τ} : (∀ i, s.threads.nth i = u.threads.nth i) → s = u := begin
