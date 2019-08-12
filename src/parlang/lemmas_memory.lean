@@ -5,7 +5,7 @@ namespace memory
 
 variables {ι : Type} {τ : ι → Type} [decidable_eq ι] {m : memory τ} {i i' : ι} {val : τ i}
 
-lemma get_update_success : memory.get (memory.update m i val) i = val := begin
+lemma get_update_success : get (update m i val) i = val := begin
     unfold update get function.update,
     simp,
 end

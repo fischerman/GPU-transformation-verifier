@@ -11,7 +11,10 @@ lemma ite_else_ite {c} [decidable c] {b₁ b₂ b₃ :  Sort u} : ite c b₁ (it
   by_cases c; simp *,
 end
 
-lemma lt_zero_one : 0 < 1 := by sorry
+lemma lt_zero_one : 0 < 1 := nat.lt.base 0
+
+@[simp]
+lemma nat.succ_lt_succ_iff {n m : ℕ} : n + 1 < m + 1 ↔ n < m := nat.lt_succ_iff
 
 namespace fin
 

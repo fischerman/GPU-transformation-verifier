@@ -27,35 +27,29 @@ lemma all_threads_active_nth : ∀ {n} {ac : vector bool n}, all_threads_active 
   }
 end
 
-lemma no_threads_active_nth : ∀ {n} {ac : vector bool n}, no_thread_active ac → ∀ i, ¬ac.nth i := begin
-  sorry,
-end
+lemma all_threads_active_nth_zero (ac : vector bool (nat.succ n)) : all_threads_active ac → ac.nth 0
+| h := all_threads_active_nth h 0
 
-lemma no_threads_active_nth_zero (ac : vector bool (nat.succ n)) : no_thread_active ac → ¬ac.nth 0 := begin
-  cases ac,
-  cases ac_val,
-  case list.nil {
-    intro,
-    apply no_threads_active_nth,
-    assumption,
-  },
-  case list.cons {
-    rw vector.nth_zero,
-    rw no_thread_active,
-    rw list.any,
-    simp,
-    rw vector.head,
-    intro h,
-    by_contra,
-    apply h,
-    left,
-    simp at a,
-    assumption,
+lemma no_threads_active_nth : ∀ {n} {ac : vector bool n}, no_thread_active ac → ∀ i, ¬ac.nth i
+| n ⟨[], h'⟩ h tid := (by subst h'; apply fin_zero_elim tid)
+| (n + 1) ⟨t :: ts, h'⟩ h ⟨tid, h''⟩ := begin
+  simp [no_thread_active, vector.to_list, list.any, not_or_distrib] at h,
+  cases tid,
+  {
+    simp [vector.nth, list.nth_le],
+    exact h.left,
+  }, {
+    simp [vector.nth, list.nth_le],
+    specialize @no_threads_active_nth n ⟨ts, nat.succ_inj h'⟩,
+    simp [no_thread_active, list.any] at no_threads_active_nth,
+    specialize no_threads_active_nth h.right ⟨tid, _⟩,
+    exact no_threads_active_nth,
+    exact nat.succ_lt_succ_iff.mp h'',
   }
 end
 
-lemma all_threads_active_nth_zero (ac : vector bool (nat.succ n)) : all_threads_active ac → ac.nth 0
-| h := all_threads_active_nth h 0
+lemma no_threads_active_nth_zero (ac : vector bool (nat.succ n)) : no_thread_active ac → ¬ac.nth 0
+| h := no_threads_active_nth h 0
 
 lemma all_threads_active_repeat (n : ℕ) : all_threads_active (vector.repeat tt n) := begin
   induction n,
@@ -135,13 +129,14 @@ lemma active_map_deactivate_threads' {ac : vector bool n} {i} {f : σ → bool} 
 end
 
 lemma deactivate_threads_condition {f : σ → bool} {ac : vector bool n} {s : state n σ τ} {i} : 
-  vector.nth (deactivate_threads (bnot ∘ f) ac s) i → f ((vector.nth (s.threads) i).tlocal) := begin
-  sorry,
-end
+vector.nth (deactivate_threads (bnot ∘ f) ac s) i → f ((vector.nth (s.threads) i).tlocal) := by simp [deactivate_threads]
 
 lemma deactivate_threads_condition' {f : σ → bool} {ac : vector bool n} {s : state n σ τ} {i} : 
-  vector.nth (deactivate_threads (f) ac s) i → ¬f ((vector.nth (s.threads) i).tlocal) := begin
-  sorry,
+vector.nth (deactivate_threads (f) ac s) i → ¬f ((vector.nth (s.threads) i).tlocal) := begin
+  simp [deactivate_threads],
+  intros _ h,
+  rw ← bnot_eq_true_eq_eq_ff,
+  exact h,
 end
 
 lemma deactivate_threads_complement {f : σ → bool} {ac : vector bool n} {s : state n σ τ} {i} : 
