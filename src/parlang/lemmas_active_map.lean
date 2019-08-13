@@ -2,6 +2,7 @@ import parlang.defs
 
 namespace parlang
 variables {n : ℕ} {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
+variables {s t u : state n σ τ} {ac : vector bool n} {f f' : σ → bool} 
 
 lemma all_threads_active_nth : ∀ {n} {ac : vector bool n}, all_threads_active ac → ∀ i, ac.nth i 
 | 0 ⟨[], refl⟩ h i := by apply (vector.nat_le_zero i.is_lt).elim
@@ -146,6 +147,69 @@ lemma deactivate_threads_complement {f : σ → bool} {ac : vector bool n} {s : 
   intro _,
   cases h,
   apply h_right,
+end
+
+lemma ac_sub_deac {f : σ → bool} : ac ≥ (deactivate_threads (bnot ∘ f) ac s) := begin
+    intros t h₁ h₂,
+    apply h₁,
+    unfold deactivate_threads at h₂,
+    rw vector.nth_map at h₂,
+    rw vector.nth_map₂ at h₂,
+    rw deactivate_threads._match_1 at h₂,
+    rw band_coe_iff at h₂,
+    cases h₂,
+    assumption,
+end
+
+lemma ac_deac_comm : deactivate_threads f (deactivate_threads f' ac s) t = deactivate_threads f' (deactivate_threads f ac t) s := begin
+    apply vector.eq_element_wise,
+    unfold deactivate_threads,
+    simp [vector.nth_map, vector.nth_map₂],
+    unfold deactivate_threads._match_1,
+    simp,
+end
+
+lemma ac_trans {ac' ac'' : vector bool n} : ac ≥ ac' → ac' ≥ ac'' → ac ≥ ac'' := begin
+    intros h₁ h₂ t hna ha,
+    specialize h₁ t hna,
+    specialize h₂ t h₁,
+    contradiction,
+end
+
+instance : is_trans (vector bool n) ac_ge := ⟨begin intros a b c h₁ h₂, apply ac_trans, assumption, assumption, end⟩
+
+lemma ac_deac_ge (h : deactivate_threads f ac s ≥ deactivate_threads f' ac t) : deactivate_threads f' (deactivate_threads f ac s) t = deactivate_threads f' ac t := begin
+    apply vector.eq_element_wise,
+    intro i,
+    specialize h i,
+    unfold deactivate_threads,
+    simp [vector.nth_map, vector.nth_map₂],
+    unfold deactivate_threads._match_1,
+    simp,
+    by_cases eq : vector.nth ac i = tt,
+    {
+        rw eq,
+        simp,
+        by_cases eq₂ : bnot (f' ((vector.nth (t.threads) i).tlocal)) = tt,
+        {
+            rw eq₂,
+            simp,
+            unfold deactivate_threads at h,
+            simp [vector.nth_map, vector.nth_map₂] at h,
+            unfold deactivate_threads._match_1 at h,
+            simp [*] at h,
+            rw ← eq_ff_eq_not_eq_tt,
+            intro,
+            apply h,
+            exact a,
+        }, {
+            simp at eq₂,
+            simp [*],
+        }
+    }, {
+        simp at eq,
+        simp [*],
+    }
 end
 
 end parlang

@@ -90,6 +90,9 @@ def all_threads_active (ac : vector bool n) : bool := ac.to_list.all id
 /-- thread can only be active either in ac₁ or ac₂ -/
 def ac_distinct (ac₁ ac₂ : vector bool n) : Prop := ∀ (i : fin n), ac₁.nth i = ff ∨ ac₂.nth i = ff
 
+def ac_ge (ac' : vector bool n) (ac : vector bool n) : Prop := ∀ (t : fin n), ¬ (ac.nth t) → ¬ (ac'.nth t)
+instance : has_le (vector bool n) := ⟨ac_ge⟩
+
 /-- shared program state -/
 structure state {ι : Type} (n : ℕ) (σ : Type) (τ : ι → Type) : Type :=
 (threads : vector (thread_state σ τ) n)

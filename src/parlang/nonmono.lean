@@ -39,9 +39,6 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
 
 variables {s t u : state n σ τ} {ac : vector bool n} {f f' : σ → bool} 
 
-def ac_ge (ac' : vector bool n) (ac : vector bool n) : Prop := ∀ (t : fin n), ¬ (ac.nth t) → ¬ (ac'.nth t)
-instance : has_le (vector bool n) := ⟨ac_ge⟩
-
 lemma exec_state_inactive_threads_untouched {s u : state n σ τ} {ac : vector bool n} {k} : exec_state k ac s u → ∀ i, ¬ ac.nth i → s.threads.nth i = u.threads.nth i := begin
     intros he i hna,
     induction he,
@@ -133,69 +130,6 @@ deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t :=
         simp [deactivate_threads, *],
     }, {
         assumption,
-    }
-end
-
-lemma ac_sub_deac {f : σ → bool} : ac ≥ (deactivate_threads (bnot ∘ f) ac s) := begin
-    intros t h₁ h₂,
-    apply h₁,
-    unfold deactivate_threads at h₂,
-    rw vector.nth_map at h₂,
-    rw vector.nth_map₂ at h₂,
-    rw deactivate_threads._match_1 at h₂,
-    rw band_coe_iff at h₂,
-    cases h₂,
-    assumption,
-end
-
-lemma ac_deac_comm : deactivate_threads f (deactivate_threads f' ac s) t = deactivate_threads f' (deactivate_threads f ac t) s := begin
-    apply vector.eq_element_wise,
-    unfold deactivate_threads,
-    simp [vector.nth_map, vector.nth_map₂],
-    unfold deactivate_threads._match_1,
-    simp,
-end
-
-lemma ac_trans {ac' ac'' : vector bool n} : ac ≥ ac' → ac' ≥ ac'' → ac ≥ ac'' := begin
-    intros h₁ h₂ t hna ha,
-    specialize h₁ t hna,
-    specialize h₂ t h₁,
-    contradiction,
-end
-
-instance : is_trans (vector bool n) ac_ge := ⟨begin intros a b c h₁ h₂, apply ac_trans, assumption, assumption, end⟩
-
-lemma ac_deac_ge (h : deactivate_threads f ac s ≥ deactivate_threads f' ac t) : deactivate_threads f' (deactivate_threads f ac s) t = deactivate_threads f' ac t := begin
-    apply vector.eq_element_wise,
-    intro i,
-    specialize h i,
-    unfold deactivate_threads,
-    simp [vector.nth_map, vector.nth_map₂],
-    unfold deactivate_threads._match_1,
-    simp,
-    by_cases eq : vector.nth ac i = tt,
-    {
-        rw eq,
-        simp,
-        by_cases eq₂ : bnot (f' ((vector.nth (t.threads) i).tlocal)) = tt,
-        {
-            rw eq₂,
-            simp,
-            unfold deactivate_threads at h,
-            simp [vector.nth_map, vector.nth_map₂] at h,
-            unfold deactivate_threads._match_1 at h,
-            simp [*] at h,
-            rw ← eq_ff_eq_not_eq_tt,
-            intro,
-            apply h,
-            exact a,
-        }, {
-            simp at eq₂,
-            simp [*],
-        }
-    }, {
-        simp at eq,
-        simp [*],
     }
 end
 
