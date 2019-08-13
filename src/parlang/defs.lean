@@ -149,11 +149,11 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
   exec_state sync ac s s
 | seq (s t u : state n σ τ) (ac : vector bool n) (k₁ k₂ : kernel σ τ) :
   exec_state k₁ ac s t → exec_state k₂ ac t u → exec_state (seq k₁ k₂) ac s u
+  -- in the then-branch we deactive those threads where the condition is false and vice versa
 | ite (s t u : state n σ τ) (ac : vector bool n) (f : σ → bool) (k₁ k₂ : kernel σ τ) :
   exec_state k₁ (deactivate_threads (bnot ∘ f) ac s) s t →
   exec_state k₂ (deactivate_threads f ac s) t u →
   exec_state (ite f k₁ k₂) ac s u
-  -- in the then-branch we deactive those threads where the condition is false and vice versa
 | loop_stop (s : state n σ τ) (ac : vector bool n) (f : σ → bool) (k : kernel σ τ) :
   no_thread_active (deactivate_threads (bnot ∘ f) ac s) →
   exec_state (loop f k) ac s s
