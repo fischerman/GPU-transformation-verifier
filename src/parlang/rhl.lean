@@ -12,8 +12,7 @@ def rel_hoare_state (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n�
     ∀ (n₁ n₂ : ℕ) (s₁ s₁' : state n₁ σ₁ τ₁) (s₂ : state n₂ σ₂ τ₂) ac₁ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → exec_state k₁ ac₁ s₁ s₁' →
     ∃ s₂', exec_state k₂ ac₂ s₂ s₂' ∧ Q n₁ s₁' ac₁ n₂ s₂' ac₂
 
--- TODO change ~ to something assymetric
-notation `{* ` P : 1 ` *} ` k₁ : 1 ` ~ ` k₂ : 1 ` {* ` Q : 1 ` *}` := rel_hoare_state P k₁ k₂ Q
+notation `{* ` P : 1 ` *} ` k₁ : 1 ` ~> ` k₂ : 1 ` {* ` Q : 1 ` *}` := rel_hoare_state P k₁ k₂ Q
 
 namespace rel_hoare
 
@@ -83,7 +82,7 @@ s₁ = s₂ |
 end
 
 lemma rel_kernel_to_program {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P Q : memory τ₁ → memory τ₂ → Prop} {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ}
- (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ *} k₁ ~ k₂ 
+ (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ *} k₁ ~> k₂ 
  {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂ *} ) : -- if I have to proof syncability of s₁, do I really have to assume termination of the left?
  rel_hoare_program init₁ init₂ P (program.intro f₁ k₁) (program.intro f₂ k₂) Q :=
 begin
@@ -181,9 +180,9 @@ begin
 end
 
 lemma single_step_left {P Q f} {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} (R)
-    (h₁ : {* P *} (kernel.load f) ~ (kernel.compute id) {* R *})
-    (h₂ : {* R *} k₁ ~ k₂ {* Q *}) : 
-    {* P *} (kernel.load f ;; k₁) ~ k₂ {* Q *} := begin
+    (h₁ : {* P *} (kernel.load f) ~> (kernel.compute id) {* R *})
+    (h₂ : {* R *} k₁ ~> k₂ {* Q *}) : 
+    {* P *} (kernel.load f ;; k₁) ~> k₂ {* Q *} := begin
     intros n₁ n₂ s₁ s₁'' s₂ ac₁ ac₂ hp hek₁,
     cases hek₁,
     specialize h₁ n₁ n₂ s₁ _ s₂ ac₁ ac₂ hp hek₁_a,
@@ -207,9 +206,9 @@ variables {P Q R P' Q' : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n�
 -- from h₁ we get state after k₂
 -- from h₂ we get state after k₂'
 lemma seq (Q)
-    (h₁ : {* P *} k₁ ~ k₂ {* Q *})
-    (h₂ : {* Q *} k₁' ~ k₂' {* R *}) :
-    {* P *} (k₁ ;; k₁') ~ (k₂ ;; k₂') {* R *} := begin
+    (h₁ : {* P *} k₁ ~> k₂ {* Q *})
+    (h₂ : {* Q *} k₁' ~> k₂' {* R *}) :
+    {* P *} (k₁ ;; k₁') ~> (k₂ ;; k₂') {* R *} := begin
         intros _ _ _ _ _ _ _ hp hek₁k₁',
         cases hek₁k₁',
         specialize h₁ n₁ n₂ s₁ hek₁k₁'_t s₂ ac₁ ac₂ hp hek₁k₁'_a,
@@ -224,9 +223,9 @@ lemma seq (Q)
 end
 
 -- sometimes called sub
-lemma consequence (h : {* P *} k₁ ~ k₂ {* Q *}) 
+lemma consequence (h : {* P *} k₁ ~> k₂ {* Q *}) 
 (hp : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P' n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ ac₂)
-(hq : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q' n₁ s₁ ac₁ n₂ s₂ ac₂) : {* P' *} k₁ ~ k₂ {* Q' *} := begin
+(hq : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q' n₁ s₁ ac₁ n₂ s₂ ac₂) : {* P' *} k₁ ~> k₂ {* Q' *} := begin
     intros _ _ _ _ _ _ _ hp' he₁,
     specialize h n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ _ he₁,
     cases h with s₂ h,
@@ -244,8 +243,8 @@ def assertion_swap_side (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool
 #print assertion_swap_side
 
 -- k₁ must terminate
-lemma swap (h : {* P *} k₁ ~ k₂ {* Q *}) (he₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → ∃ s₁', exec_state k₁ ac₁ s₁ s₁') : 
-{* assertion_swap_side P *} k₂ ~ k₁ {* assertion_swap_side Q *} := begin
+lemma swap (h : {* P *} k₁ ~> k₂ {* Q *}) (he₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → ∃ s₁', exec_state k₁ ac₁ s₁ s₁') : 
+{* assertion_swap_side P *} k₂ ~> k₁ {* assertion_swap_side Q *} := begin
     intros n₂ n₁ s₂ s₂' s₁ ac₂ ac₁ hp he₂,
     simp,
     have : ∃ s₁', exec_state k₁ ac₁ s₁ s₁' := he₁ hp,
