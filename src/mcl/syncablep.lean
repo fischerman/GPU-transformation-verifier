@@ -81,6 +81,13 @@ syncable' shole lhole (map_active_threads ac (ts_updates [op.compute_list comput
     }
 end
 
+instance deciable_exists_nat (p) : decidable (@Exists ℕ p) := sorry
+instance deciable_exists_fin (n p) : decidable (@Exists (fin n) p) := sorry
+
+
+/-- Processes a store
+Which thread accesses which index doesn't matter 
+-/
 lemma syncable'_store {sig : signature} {n} {ac : vector bool n} {computes} {shole lhole : set $ mcl_address sig}
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂}
 {updates : list $ op sig}
@@ -97,6 +104,15 @@ syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list compu
     unfold syncable',
     -- proof: syncable
     split, {
+        intros i,
+        by_cases i_is_var : i.fst = var,
+        {
+            subst i_is_var,
+            specialize var_not_in_shole i.snd,
+            specialize var_not_in_lhole i.snd,
+            -- cases distinct out-of-bound
+            by_cases i_is_oob : (∃ (tid : fin n), i.snd = eq.mpr _ (idx.map (λ ind, eval (s.threads.nth tid).tlocal ind))),
+        },
         sorry,
     }, {
         -- proof: store hole
@@ -105,7 +121,7 @@ syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list compu
         
         by_cases i_is_var : i.fst = var,
         {
-            -- if i is var we store into hole
+            -- if i is var we store into hole -> contradiction
             subst i_is_var,
             specialize var_not_in_shole i.snd,
             specialize var_not_in_lhole i.snd,

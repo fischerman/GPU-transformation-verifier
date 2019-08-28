@@ -7,7 +7,7 @@ namespace parlang
 variables {n : ℕ} {σ : Type} {ι : Type} {τ : ι → Type} [decidable_eq ι]
 
 @[simp]
-lemma exec_skip {n} {ac : vector bool n} {s} : exec_state ((kernel.compute id) : kernel σ τ) ac s s := begin
+lemma exec_skip {n} {ac : vector bool n} {s} : exec_state (kernel.compute id : kernel σ τ) ac s s := begin
   rw [state.map_active_threads_id s ac] { occs := occurrences.pos [2] },
   apply exec_state.compute,
 end

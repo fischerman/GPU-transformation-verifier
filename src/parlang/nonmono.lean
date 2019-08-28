@@ -33,12 +33,13 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
 | loop_step (s t u : state n σ τ) (ac : vector bool n) (f : σ → bool) (k : kernel σ τ) :
   any_thread_active (deactivate_threads (bnot ∘ f) ac s) →
   exec_state k (deactivate_threads (bnot ∘ f) ac s) s t →
--- the only difference to to parlang is the line below; here we don't deactivate threads
+-- the only difference to parlang is the line below; here we don't deactivate threads
   exec_state (loop f k) ac t u →
   exec_state (loop f k) ac s u
 
 variables {s t u : state n σ τ} {ac : vector bool n} {f f' : σ → bool} 
 
+/-- This proof is for nonmono. Parlang proof is similar -/
 lemma exec_state_inactive_threads_untouched {s u : state n σ τ} {ac : vector bool n} {k} : exec_state k ac s u → ∀ i, ¬ ac.nth i → s.threads.nth i = u.threads.nth i := begin
     intros he i hna,
     induction he,
