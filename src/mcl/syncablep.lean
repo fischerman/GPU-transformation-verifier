@@ -111,7 +111,8 @@ syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list compu
             specialize var_not_in_shole i.snd,
             specialize var_not_in_lhole i.snd,
             -- cases distinct out-of-bound
-            by_cases i_is_oob : (∃ (tid : fin n), i.snd = eq.mpr _ (idx.map (λ ind, eval (s.threads.nth tid).tlocal ind))),
+            -- by_cases i_is_oob : (∃ (tid : fin n), i.snd = eq.mpr _ (idx.map (λ ind, eval (s.threads.nth tid).tlocal ind))),
+            sorry,
         },
         sorry,
     }, {
