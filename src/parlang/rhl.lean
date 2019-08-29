@@ -4,7 +4,7 @@ import parlang.lemmas_exec
 
 namespace parlang
 
-variables {σ σ₁ σ₂ : Type} {ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → Type} [decidable_eq ι₁] [decidable_eq ι₂]
+variables {σ σ₁ σ₂ σ₃ : Type} {ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → Type} [decidable_eq ι₁] [decidable_eq ι₂]
 
 /-- Relational Hoare logic on kernels.  -/
 def rel_hoare_state (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop) (k₁ : kernel σ₁ τ₁) (k₂ : kernel σ₂ τ₂) 
@@ -179,6 +179,7 @@ begin
     }
 end
 
+-- TODO rename this
 lemma single_step_left {P Q f} {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} (R)
     (h₁ : {* P *} (kernel.load f) ~> (kernel.compute id) {* R *})
     (h₂ : {* R *} k₁ ~> k₂ {* Q *}) : 
@@ -257,6 +258,19 @@ lemma swap (h : {* P *} k₁ ~> k₂ {* Q *}) (he₁ : ∀ {n₁ s₁ ac₁ n₂
     have : h_w = s₂' := sorry, -- by uniqueness
     subst this,
     exact h_h.right,
+end
+
+theorem trans (p₁ : program σ₁ τ₁) (p₂ : program σ₂ τ₁) (p₃ : program σ₃ τ₁) (init₁ init₂ init₃) (h₁ : rel_hoare_program init₁ init₂ eq p₁ p₂ eq) (h₂ : rel_hoare_program init₂ init₃ eq p₂ p₃ eq) :
+rel_hoare_program init₁ init₃ eq p₁ p₃ eq := begin
+    unfold rel_hoare_program at *,
+    intros _ _ _ heq he,
+    specialize h₁ m₁ m₁' m₂ heq he,
+    cases h₁ with m h,
+    cases h,
+    subst heq,
+    subst h_right,
+    specialize h₂ m₁ m₁' m₁ rfl h_left,
+    exact h₂,
 end
 
 end parlang
