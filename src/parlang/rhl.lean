@@ -272,4 +272,16 @@ rel_hoare_program init₁ init₃ eq p₁ p₃ eq := begin
     exact h₂,
 end
 
+theorem compute_right (f) : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ (s₂.map_active_threads ac₂ $ thread_state.compute f) ac₂ *} (kernel.compute id) ~> (kernel.compute f) {* Q *} := begin
+    intros _ _ _ _ _ _ _ hp he,
+    use (s₂.map_active_threads ac₂ $ thread_state.compute f),
+    split,
+    {
+        apply exec_state.compute,
+    }, {
+        cases he,
+        sorry, -- trivial
+    }
+end
+
 end parlang
