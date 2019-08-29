@@ -179,11 +179,10 @@ begin
     }
 end
 
--- TODO rename this
-lemma single_step_left {P Q f} {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} (R)
-    (h₁ : {* P *} (kernel.load f) ~> (kernel.compute id) {* R *})
+lemma single_step_left {P Q} {k₁ k : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} (R)
+    (h₁ : {* P *} k ~> (kernel.compute id) {* R *})
     (h₂ : {* R *} k₁ ~> k₂ {* Q *}) : 
-    {* P *} (kernel.load f ;; k₁) ~> k₂ {* Q *} := begin
+    {* P *} (k ;; k₁) ~> k₂ {* Q *} := begin
     intros n₁ n₂ s₁ s₁'' s₂ ac₁ ac₂ hp hek₁,
     cases hek₁,
     specialize h₁ n₁ n₂ s₁ _ s₂ ac₁ ac₂ hp hek₁_a,
