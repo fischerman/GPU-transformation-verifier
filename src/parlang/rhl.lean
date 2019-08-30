@@ -284,4 +284,18 @@ theorem compute_right (f) : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ a
     }
 end
 
+theorem store_right (f : σ₂ → (Σ (i : ι₂), τ₂ i)) : 
+{* λ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ (s₂.map_active_threads ac₂ $ thread_state.store f) ac₂ *} 
+(kernel.compute id) ~> (kernel.store f) 
+{* Q *} := begin
+    intros _ _ _ _ _ _ _ hp he,
+    use (s₂.map_active_threads ac₂ $ thread_state.store f),
+    split, {
+        apply exec_state.store,
+    }, {
+        cases he,
+        sorry, -- trivial
+    }
+end
+
 end parlang
