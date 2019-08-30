@@ -238,6 +238,16 @@ lemma consequence (h : {* P *} k₁ ~> k₂ {* Q *})
     assumption,
 end
 
+lemma consequence_pre (h : {* P *} k₁ ~> k₂ {* Q *}) 
+(hp : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P' n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ ac₂) : 
+{* P' *} k₁ ~> k₂ {* Q *} := begin
+    apply consequence,
+    exact h,
+    exact hp,
+    intros,
+    exact a,
+end
+
 def assertion_swap_side (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop) := λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₂ s₂ ac₂ n₁ s₁ ac₁
 
 #print assertion_swap_side
@@ -297,5 +307,8 @@ theorem store_right (f : σ₂ → (Σ (i : ι₂), τ₂ i)) :
         sorry, -- trivial
     }
 end
+
+lemma kernel_foldr_skip_right {k : kernel σ₂ τ₂} {ks} : 
+{* P *} k₁ ~> list.foldr kernel.seq k ks {* Q *} ↔ {* P *} k₁ ~> list.foldr kernel.seq (kernel.compute id) ks ;; k {* Q *} := sorry
 
 end parlang

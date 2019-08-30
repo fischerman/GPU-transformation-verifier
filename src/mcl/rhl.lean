@@ -16,6 +16,8 @@ def mclk_rel {sig₁ sig₂ : signature}
     (Q : state_assert sig₁ sig₂) := 
 rel_hoare_state P (mclk_to_kernel k₁) (mclk_to_kernel k₂) Q
 
+notation `{* ` P : 1 ` *} ` k₁ : 1 ` ~> ` k₂ : 1 ` {* ` Q : 1 ` *}` := mclk_rel P k₁ k₂ Q
+
 def mclp_rel {sig₁ sig₂ : signature} (P) (p₁ : mclp sig₁) (p₂ : mclp sig₂) (Q) := rel_hoare_program mcl_init mcl_init P (mclp_to_program p₁) (mclp_to_program p₂) Q
 
 --def eq_assert (sig₁ : signature) : state_assert sig₁ sig₁ := λ n₁ s₁ ac₁ n₂ s₂ ac₂, n₁ = n₂ ∧ s₁ = s₂ ∧ ac₁ = ac₂
@@ -203,6 +205,20 @@ exec_state (list.foldr kernel.seq (kernel.compute id) (load_shared_vars_for_expr
     -- }
 end
 
+lemma update_load_shared_vars_for_expr_right {t} {expr : expression sig₂ t} : 
+{* λn₁ s₁ ac₁ n₂ (s₂ : state n₂ (memory (parlang_mcl_tlocal sig₂)) (parlang_mcl_shared sig₂)) ac₂, P n₁ s₁ ac₁ n₂ (s₂.map_active_threads ac₂ (update_shared_vars_for_expr expr)) ac₂ *} 
+kernel.compute id ~> list.foldr kernel.seq (kernel.compute id) (load_shared_vars_for_expr expr) 
+{* P *} := begin
+    intros _ _ _ _ _ _ _ hp he,
+    use (s₂.map_active_threads ac₂ (update_shared_vars_for_expr expr)),
+    split, {
+        rw update_load_shared_vars_for_expr,
+    }, {
+        cases he,
+        sorry, -- trivial
+    }
+end
+
 def f := λ n, n * 2
 def g := λ(n : nat), n + 1
 #check g
@@ -253,20 +269,20 @@ def g := λ(n : nat), n + 1
 -- end
 
 -- TODO should this moved to defs?
-/-- store the locally computed value in the shadow shared -/
+/-- Stores the locally computed value in the shadow memory. This is an abstraction over *parlang.kernel.store*, which hides the lambda-term. This makes it easier to rewrite. -/
 @[irreducible]
 def mcl_store {sig : signature} {t} {dim} (var : string) (idx : vector (expression sig type.int) dim) (h₁ : type_of (sig.val var) = t) (h₂ : ((sig.val var).type).dim = dim) := 
 @thread_state.store _ _ (parlang_mcl_shared sig) _ (λ (s : memory $ parlang_mcl_tlocal sig), ⟨⟨var, vector_mpr h₂ (idx.map (eval s))⟩, s.get ⟨var, vector_mpr h₂ (idx.map (eval s))⟩⟩)
 
 /-- Processes a single shared assign on the left side  -/
 lemma shared_assign_right {t dim n} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂.val n) = t} {h₂ : ((sig₂.val n).type).dim = dim} {expr : expression sig₂ t} : 
-mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
+{* (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
     ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_shared sig₂)).map_active_threads ac₂ (
         mcl_store n idx h₁ h₂ ∘
         thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
         (update_shared_vars_for_expr expr)
-    )) ac₂)
-(skip : mclk sig₁) (shared_assign n idx h₁ h₂ expr) P := begin
+    )) ac₂) *}
+(skip : mclk sig₁) ~> shared_assign n idx h₁ h₂ expr {* P *} := begin
     intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
     use ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_shared sig₂)).map_active_threads ac₂ (
         mcl_store n idx h₁ h₂ ∘
@@ -296,6 +312,36 @@ mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂
         subst this,
         exact hp,
     },
+end
+
+lemma shared_assign_right' {t dim n} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂.val n) = t} {h₂ : ((sig₂.val n).type).dim = dim} {expr : expression sig₂ t} : 
+{* (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
+    ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_shared sig₂)).map_active_threads ac₂ (
+        mcl_store n idx h₁ h₂ ∘
+        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
+        (update_shared_vars_for_expr expr)
+    )) ac₂) *}
+(skip : mclk sig₁) ~> shared_assign n idx h₁ h₂ expr {* P *} := begin
+    rw skip_left_after,
+    rw skip_left_after,
+    unfold mclk_rel mclk_to_kernel,
+    apply parlang.seq,
+    swap, {
+        apply parlang.store_right,
+    }, {
+        unfold prepend_load_expr,
+        rw kernel_foldr_skip_right,
+        apply parlang.seq,
+        swap,
+        apply parlang.compute_right,
+        apply parlang.consequence_pre,
+        exact update_load_shared_vars_for_expr_right,
+        {
+            intros,
+            repeat { rw parlang.state.map_map_active_threads },
+            sorry,
+        }
+    }
 end
 
 lemma shared_assign_left {t dim n expr} {idx : vector (expression sig₁ type.int) dim} {h₁ : type_of (sig₁.val n) = t} {h₂ : ((sig₁.val n).type).dim = vector.length idx} : 
