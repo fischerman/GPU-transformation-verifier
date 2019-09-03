@@ -183,6 +183,8 @@ lemma exec_state_inactive_threads_untouched {s u : state n σ τ} {ac : vector b
   }
 end
 
+lemma exec_skip_eq {n} {ac : vector bool n} {s t} : exec_state (kernel.compute id : kernel σ τ) ac s t → t = s := exec_state_unique exec_skip
+
 lemma kernel_transform_inhab {k : kernel σ τ} {n} {ac} {s u} : exec_state k ac s u → ¬contains_sync k → ∃ f, kernel_transform_func k f n ac := begin
   intros h hs,
   unfold kernel_transform_func,

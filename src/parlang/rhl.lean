@@ -308,6 +308,149 @@ theorem store_right (f : σ₂ → (Σ (i : ι₂), τ₂ i)) :
     }
 end
 
+theorem else_skip {n} (k : kernel σ τ₁) (c) (ac : vector bool n) (s s' : state n σ τ₁):
+exec_state k (deactivate_threads (bnot ∘ c) ac s) s s' ↔ 
+exec_state (kernel.ite c k (kernel.compute id)) ac s s' := begin
+    split, {
+        intro h,
+        apply exec_state.ite s s',
+        exact h,
+        apply exec_skip,
+    }, {
+        intro h,
+        cases h,
+        have := eq.symm (exec_skip_eq h_a_1),
+        subst this,
+        exact h_a,
+    }
+end
+
+/-- This is not true, because branches are no longer exlusive. A thread may take both branches. -/
+theorem if_right.aux (c : σ₂ → bool) (th) (el) :
+{* P *} kernel.compute id ~> kernel.ite c th (kernel.compute id) {* Q *} →
+{* Q *} kernel.compute id ~> kernel.ite (bnot ∘ c) el (kernel.compute id) {* R *} →
+{* P *} kernel.compute id ~> kernel.ite c th el {* R *} := begin
+    intros hth hel,
+    intros _ _ _ _ _ _ _ hp he,
+    specialize hth n₁ n₂ s₁ s₁ s₂ ac₁ ac₂ hp exec_skip,
+    cases hth with s₂' hth,
+    specialize hel n₁ n₂ s₁ s₁ s₂' ac₁ ac₂ (hth.right) exec_skip,
+    cases hel with s₂'' hel,
+    have := eq.symm (exec_skip_eq he),
+    subst this,
+    use s₂'',
+    split, {
+        apply exec_state.ite s₂ s₂',
+        rw else_skip,
+        exact hth.left,
+        rw ← else_skip at hel,
+        exact hel.left,
+    }
+end
+
+-- we cannot prove that all threads are active after the else branch, because we cannot proof h₁ and h₂
+-- maybe we have to make the active map explicitly available in the postcondition of ite, but how do we relate it the precondition? This is something that ghost variables would be for.
+
+-- Q does not contain information about the pre-entry ac or state
+/-- In the if-branch, the condition holds on all active threads. The inverse is not true. Just because the condition *c* holds, does not mean that the thread is active. -/
+theorem if_right (c : σ₂ → bool) (th) (el) (AC : ∀ {n₂ : ℕ}, vector bool n₂ → Prop)
+(h₁ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
+(h₂ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s') → Q n₁ s₁ ac₁ n₂ s₂ ac₂)
+(h₃ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads c ac₂ s')) 
+(h₄ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), R n₁ s₁ ac₁ n₂ s₂ (deactivate_threads c ac₂ s') → R n₁ s₁ ac₁ n₂ s₂ ac₂) :
+{* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, c ts.tlocal) *} kernel.compute id ~> th {* Q *} →
+{* λ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, bnot $ c ts.tlocal) *} kernel.compute id ~> el {* R *} →
+{* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ AC ac₂ *} kernel.compute id ~> kernel.ite c th el {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, R n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ AC ac₂ *}
+:= begin
+    intros hth hel,
+    intros _ _ _ _ _ _ _ hp he,
+    specialize hth n₁ n₂ s₁ s₁ s₂ ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) _ exec_skip,
+    swap, {
+        split, {
+            apply h₁ _ _ _ _ _ _ hp.left,
+        }, {
+            sorry, -- not trivial
+        }
+    },
+    cases hth with s₂' hth,
+    specialize hel n₁ n₂ s₁ s₁ s₂' ac₁ (deactivate_threads c ac₂ s₂) _ (exec_skip),
+    swap, {
+        split, {
+            apply h₃,
+            apply h₂ _ _ _ _ _ _ s₂,
+            exact hth.right,
+        }, {
+            sorry, -- not trivial
+        }
+    },
+    cases hel with s₂'' hel,
+    have := eq.symm (exec_skip_eq he),
+    subst this,
+    use s₂'',
+    split, {
+        apply exec_state.ite,
+        exact hth.left,
+        exact hel.left,
+    }, 
+    simp,
+    split, {
+        apply h₄,
+        exact hel.right,
+    }, {
+        exact hp.right,
+    }
+end
+
+/-- *if_right* w/o an assertion on the active map -/
+theorem if_right' (c : σ₂ → bool) (th) (el)
+(h₁ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
+(h₂ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s') → Q n₁ s₁ ac₁ n₂ s₂ ac₂)
+(h₃ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads c ac₂ s')) 
+(h₄ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), R n₁ s₁ ac₁ n₂ s₂ (deactivate_threads c ac₂ s') → R n₁ s₁ ac₁ n₂ s₂ ac₂) :
+{* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, c ts.tlocal) *} kernel.compute id ~> th {* Q *} →
+{* λ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, bnot $ c ts.tlocal) *} kernel.compute id ~> el {* R *} →
+{* P *} kernel.compute id ~> kernel.ite c th el {* R *}
+:= begin
+    intros _ _,
+    suffices : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (λ_, true) ac₂ *} kernel.compute id ~> kernel.ite c th el {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, R n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (λ_, true) ac₂ *},
+    simp at this,
+    exact this,
+    apply if_right,
+    repeat { assumption, },
+    exact h₂,
+end
+
+theorem then_right (c : σ₂ → bool) (th)
+(h₁ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
+(h₂ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s) → Q n₁ s₁ ac₁ n₂ s₂ ac₂) :
+{* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, c ts.tlocal) *} kernel.compute id ~> th {* Q *} →
+{* P *} kernel.compute id ~> kernel.ite c th (kernel.compute id) {* Q *}
+:= begin
+    intros hth,
+    intros _ _ _ _ _ _ _ hp he,
+    have := eq.symm (exec_skip_eq he),
+    subst this,
+    specialize hth n₁ n₂ s₁ s₁ s₂ ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) _ he,
+    swap, {
+        split, {
+            apply h₁,
+            apply hp,
+        }, {
+            sorry, -- not trivial
+        }
+    },
+    cases hth with s₂' hth,
+    use s₂',
+    split, {
+        apply exec_state.ite,
+        exact hth.left,
+        apply exec_skip,
+    }, {
+        apply h₂,
+        apply hth.right,
+    }
+end
+
 lemma kernel_foldr_skip_right {k : kernel σ₂ τ₂} {ks} : 
 {* P *} k₁ ~> list.foldr kernel.seq k ks {* Q *} ↔ {* P *} k₁ ~> list.foldr kernel.seq (kernel.compute id) ks ;; k {* Q *} := sorry
 
