@@ -325,29 +325,6 @@ exec_state (kernel.ite c k (kernel.compute id)) ac s s' := begin
     }
 end
 
-/-- This is not true, because branches are no longer exlusive. A thread may take both branches. -/
-theorem if_right.aux (c : σ₂ → bool) (th) (el) :
-{* P *} kernel.compute id ~> kernel.ite c th (kernel.compute id) {* Q *} →
-{* Q *} kernel.compute id ~> kernel.ite (bnot ∘ c) el (kernel.compute id) {* R *} →
-{* P *} kernel.compute id ~> kernel.ite c th el {* R *} := begin
-    intros hth hel,
-    intros _ _ _ _ _ _ _ hp he,
-    specialize hth n₁ n₂ s₁ s₁ s₂ ac₁ ac₂ hp exec_skip,
-    cases hth with s₂' hth,
-    specialize hel n₁ n₂ s₁ s₁ s₂' ac₁ ac₂ (hth.right) exec_skip,
-    cases hel with s₂'' hel,
-    have := eq.symm (exec_skip_eq he),
-    subst this,
-    use s₂'',
-    split, {
-        apply exec_state.ite s₂ s₂',
-        rw else_skip,
-        exact hth.left,
-        rw ← else_skip at hel,
-        exact hel.left,
-    }
-end
-
 -- we cannot prove that all threads are active after the else branch, because we cannot proof h₁ and h₂
 -- maybe we have to make the active map explicitly available in the postcondition of ite, but how do we relate it the precondition? This is something that ghost variables would be for.
 
