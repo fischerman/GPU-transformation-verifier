@@ -428,6 +428,59 @@ theorem then_right (c : σ₂ → bool) (th)
     }
 end
 
+theorem while_right (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), ℕ)
+(h₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
+(h₂ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂} {s : state n₂ σ₂ τ₂}, P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s) → P n₁ s₁ ac₁ n₂ s₂ ac₂) :
+(∀ n, {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, c ts.tlocal) ∧ V s₂ ac₂ = n *} kernel.compute id ~> k {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ V s₂ ac₂ < n *}) →
+{* P *} kernel.compute id ~> kernel.loop c k {* P *}
+| hb n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he := begin
+    cases ha : (any_thread_active (deactivate_threads (bnot ∘ c) ac₂ s₂)),
+    {
+        use s₂,
+        split, {
+            apply exec_state.loop_stop,
+            sorry
+        }, {
+            sorry, -- trivial
+        }
+    }, {
+        have step := hb (V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) n₁ n₂ s₁ s₁ s₂ ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) _ exec_skip,
+        cases step with s₂' step,
+        have : V s₂' (deactivate_threads (bnot ∘ c) ac₂ s₂) < V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) := begin
+            simp at step,
+            exact step.right.right,
+        end,
+        have ih := while_right _ n₁ n₂ s₁ s₁ s₂' ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) _ exec_skip,
+        cases ih with s₂'' ih,
+        use  s₂'',
+        split, {
+            apply exec_state.loop_step,
+            exact ha,
+            exact step.left,
+            exact ih.left,
+        }, {
+            have := exec_skip_eq he,
+            subst this,
+            apply h₂ ih.right,
+        }, {
+            exact hb,
+        }, {
+            simp at step,
+            exact step.right.left,
+        }, {
+            split,
+            {
+                exact h₁ hp,
+            }, 
+            split, {
+                sorry, -- not trivial
+            }, {
+                refl,
+            }
+        }
+    }
+end
+
 lemma kernel_foldr_skip_right {k : kernel σ₂ τ₂} {ks} : 
 {* P *} k₁ ~> list.foldr kernel.seq k ks {* Q *} ↔ {* P *} k₁ ~> list.foldr kernel.seq (kernel.compute id) ks ;; k {* Q *} := sorry
 
