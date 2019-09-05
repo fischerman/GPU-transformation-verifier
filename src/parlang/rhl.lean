@@ -1,6 +1,7 @@
 import parlang.defs
 import parlang.lemmas_state
 import parlang.lemmas_exec
+import parlang.nonmono
 
 namespace parlang
 
@@ -428,12 +429,18 @@ theorem then_right (c : σ₂ → bool) (th)
     }
 end
 
-theorem while_right (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), ℕ)
+/-- TODO: 
+    - add post-condition: condition is false on all active threads 
+    - rename n
+-/
+theorem while_right.aux (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), ℕ)
 (h₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
-(h₂ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂} {s : state n₂ σ₂ τ₂}, P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s) → P n₁ s₁ ac₁ n₂ s₂ ac₂) :
-(∀ n, {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, c ts.tlocal) ∧ V s₂ ac₂ = n *} kernel.compute id ~> k {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ V s₂ ac₂ < n *}) →
-{* P *} kernel.compute id ~> kernel.loop c k {* P *}
-| hb n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he := begin
+(h₂ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂} {s : state n₂ σ₂ τ₂}, P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s) → P n₁ s₁ ac₁ n₂ s₂ ac₂)
+(h₃ : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) ≤ V s₂ ac₂)
+(hb : ∀ n, {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, c ts.tlocal) ∧ V s₂ ac₂ = n *} kernel.compute id ~> k {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ V s₂ ac₂ < n *}) :
+∀ (n : ℕ), {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) = n *} kernel.compute id ~> kernel.loop c k {* P *}
+| n n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ ⟨hp, hv⟩ he := 
+have abc : 0 < 1 := sorry, begin
     cases ha : (any_thread_active (deactivate_threads (bnot ∘ c) ac₂ s₂)),
     {
         use s₂,
@@ -444,13 +451,37 @@ theorem while_right (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ 
             sorry, -- trivial
         }
     }, {
-        have step := hb (V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) n₁ n₂ s₁ s₁ s₂ ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) _ exec_skip,
-        cases step with s₂' step,
-        have : V s₂' (deactivate_threads (bnot ∘ c) ac₂ s₂) < V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) := begin
-            simp at step,
-            exact step.right.right,
+        /- precondition holds in the first loop iteration -/
+        have hp' : P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) := begin
+            exact h₁ hp,
         end,
-        have ih := while_right _ n₁ n₂ s₁ s₁ s₂' ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) _ exec_skip,
+        /- the condition is true for all active threads in the first loop iteration -/
+        have hc : list.all (state.active_threads (deactivate_threads (bnot ∘ c) ac₂ s₂) s₂) (λ ts , c (ts.tlocal)) = tt := begin
+            sorry, -- not trivial
+        end, 
+        /- proof of first iteration -/
+        have step := hb (V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) n₁ n₂ s₁ s₁ s₂ ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) ⟨hp', ⟨hc, rfl⟩⟩ exec_skip,
+        /- s₂' is the state after first iteration -/
+        cases step with s₂' step,
+        /- condition holds after first iteration -/
+        have hp'' : P n₁ s₁ ac₁ n₂ s₂' (deactivate_threads (bnot ∘ c) ac₂ s₂) := begin
+            simp at step,
+            exact step.right.left,
+        end,
+        have wf : V s₂' (deactivate_threads (bnot ∘ c) (deactivate_threads (bnot ∘ c) ac₂ s₂) s₂') < n := begin
+            simp at step,
+            subst hv,
+            specialize h₃ s₂' (deactivate_threads (bnot ∘ c) ac₂ s₂),
+            rw le_iff_eq_or_lt at h₃,
+            cases h₃,
+            {
+                rw h₃,
+                exact step.right.right,
+            }, {
+                apply lt_trans h₃ step.right.right,
+            }
+        end,
+        have ih := while_right.aux (V s₂' (deactivate_threads (bnot ∘ c) (deactivate_threads (bnot ∘ c) ac₂ s₂) s₂')) n₁ n₂ s₁ s₁ s₂' ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) ⟨hp'', rfl⟩ exec_skip,
         cases ih with s₂'' ih,
         use  s₂'',
         split, {
@@ -462,24 +493,10 @@ theorem while_right (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ 
             have := exec_skip_eq he,
             subst this,
             apply h₂ ih.right,
-        }, {
-            exact hb,
-        }, {
-            simp at step,
-            exact step.right.left,
-        }, {
-            split,
-            {
-                exact h₁ hp,
-            }, 
-            split, {
-                sorry, -- not trivial
-            }, {
-                refl,
-            }
-        }
+        },
     }
 end
+
 
 lemma kernel_foldr_skip_right {k : kernel σ₂ τ₂} {ks} : 
 {* P *} k₁ ~> list.foldr kernel.seq k ks {* Q *} ↔ {* P *} k₁ ~> list.foldr kernel.seq (kernel.compute id) ks ;; k {* Q *} := sorry
