@@ -153,9 +153,7 @@ lemma ac_sub_deac {f : σ → bool} : ac ≥ (deactivate_threads (bnot ∘ f) ac
     intros t h₁ h₂,
     apply h₁,
     unfold deactivate_threads at h₂,
-    rw vector.nth_map at h₂,
     rw vector.nth_map₂ at h₂,
-    rw deactivate_threads._match_1 at h₂,
     rw band_coe_iff at h₂,
     cases h₂,
     assumption,
@@ -164,9 +162,7 @@ end
 lemma ac_deac_comm : deactivate_threads f (deactivate_threads f' ac s) t = deactivate_threads f' (deactivate_threads f ac t) s := begin
     apply vector.eq_element_wise,
     unfold deactivate_threads,
-    simp [vector.nth_map, vector.nth_map₂],
-    unfold deactivate_threads._match_1,
-    simp,
+    simp [vector.nth_map₂],
 end
 
 lemma ac_trans {ac' ac'' : vector bool n} : ac ≥ ac' → ac' ≥ ac'' → ac ≥ ac'' := begin
@@ -183,9 +179,7 @@ lemma ac_deac_ge (h : deactivate_threads f ac s ≥ deactivate_threads f' ac t) 
     intro i,
     specialize h i,
     unfold deactivate_threads,
-    simp [vector.nth_map, vector.nth_map₂],
-    unfold deactivate_threads._match_1,
-    simp,
+    simp [vector.nth_map₂],
     by_cases eq : vector.nth ac i = tt,
     {
         rw eq,
@@ -195,13 +189,13 @@ lemma ac_deac_ge (h : deactivate_threads f ac s ≥ deactivate_threads f' ac t) 
             rw eq₂,
             simp,
             unfold deactivate_threads at h,
-            simp [vector.nth_map, vector.nth_map₂] at h,
-            unfold deactivate_threads._match_1 at h,
+            simp [vector.nth_map₂] at h,
             simp [*] at h,
             rw ← eq_ff_eq_not_eq_tt,
             intro,
-            apply h,
-            exact a,
+            specialize h a,
+            rw h at eq₂,
+            cases eq₂,
         }, {
             simp at eq₂,
             simp [*],
