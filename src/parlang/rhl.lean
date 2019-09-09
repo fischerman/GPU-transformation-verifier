@@ -7,9 +7,11 @@ namespace parlang
 
 variables {σ σ₁ σ₂ σ₃ : Type} {ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → Type} [decidable_eq ι₁] [decidable_eq ι₂]
 
+def rhl_kernel_assertion := Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop
+
 /-- Relational Hoare logic on kernels.  -/
-def rel_hoare_state (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop) (k₁ : kernel σ₁ τ₁) (k₂ : kernel σ₂ τ₂) 
-    (Q : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop) : Prop :=
+def rel_hoare_state (P : rhl_kernel_assertion) (k₁ : kernel σ₁ τ₁) (k₂ : kernel σ₂ τ₂) 
+    (Q : rhl_kernel_assertion) : Prop :=
     ∀ (n₁ n₂ : ℕ) (s₁ s₁' : state n₁ σ₁ τ₁) (s₂ : state n₂ σ₂ τ₂) ac₁ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → exec_state k₁ ac₁ s₁ s₁' →
     ∃ s₂', exec_state k₂ ac₂ s₂ s₂' ∧ Q n₁ s₁' ac₁ n₂ s₂' ac₂
 
@@ -432,16 +434,19 @@ end
 /-- TODO: 
     - add post-condition: condition is false on all active threads 
     - rename n
+    - drop h₃ and deactivate threads in the post condition of hb
 -/
-theorem while_right.aux (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), ℕ)
+/- theorem while_right.aux (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), ℕ)
 (h₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
 (h₂ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂} {s : state n₂ σ₂ τ₂}, P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s) → P n₁ s₁ ac₁ n₂ s₂ ac₂)
 (h₃ : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) ≤ V s₂ ac₂)
 (hb : ∀ n, {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, c ts.tlocal) ∧ V s₂ ac₂ = n *} kernel.compute id ~> k {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ V s₂ ac₂ < n *}) :
 ∀ (n : ℕ), {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) = n *} kernel.compute id ~> kernel.loop c k {* P *}
 | n n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ ⟨hp, hv⟩ he := 
-have abc : 0 < 1 := sorry, begin
-    cases ha : (any_thread_active (deactivate_threads (bnot ∘ c) ac₂ s₂)),
+let ha := (any_thread_active (deactivate_threads (bnot ∘ c) ac₂ s₂)) in
+let goal := ∃ (s₂' : state n₂ σ₂ τ₂), exec_state (kernel.loop c k) ac₂ s₂ s₂' ∧ P n₁ s₁' ac₁ n₂ s₂' ac₂ in
+have base : ha = ff → goal := begin
+    intro ha,
     {
         use s₂,
         split, {
@@ -450,19 +455,22 @@ have abc : 0 < 1 := sorry, begin
         }, {
             sorry, -- trivial
         }
-    }, {
-        /- precondition holds in the first loop iteration -/
-        have hp' : P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) := begin
-            exact h₁ hp,
-        end,
-        /- the condition is true for all active threads in the first loop iteration -/
-        have hc : list.all (state.active_threads (deactivate_threads (bnot ∘ c) ac₂ s₂) s₂) (λ ts , c (ts.tlocal)) = tt := begin
-            sorry, -- not trivial
-        end, 
-        /- proof of first iteration -/
-        have step := hb (V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) n₁ n₂ s₁ s₁ s₂ ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) ⟨hp', ⟨hc, rfl⟩⟩ exec_skip,
-        /- s₂' is the state after first iteration -/
-        cases step with s₂' step,
+    }
+end,
+have it : ha = tt → goal := 
+    assume ha,
+    /- precondition holds in the first loop iteration -/
+    have hp' : P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) := begin
+        exact h₁ hp,
+    end,
+    /- the condition is true for all active threads in the first loop iteration -/
+    have hc : list.all (state.active_threads (deactivate_threads (bnot ∘ c) ac₂ s₂) s₂) (λ ts , c (ts.tlocal)) = tt := begin
+        sorry, -- not trivial
+    end, 
+    /- proof of first iteration -/
+    have step : _ := hb (V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) n₁ n₂ s₁ s₁ s₂ ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) ⟨hp', ⟨hc, rfl⟩⟩ exec_skip,
+    /- s₂' is the state after first iteration -/
+    show goal, from match step with ⟨s₂', step⟩ :=
         /- condition holds after first iteration -/
         have hp'' : P n₁ s₁ ac₁ n₂ s₂' (deactivate_threads (bnot ∘ c) ac₂ s₂) := begin
             simp at step,
@@ -481,22 +489,27 @@ have abc : 0 < 1 := sorry, begin
                 apply lt_trans h₃ step.right.right,
             }
         end,
-        have ih := while_right.aux (V s₂' (deactivate_threads (bnot ∘ c) (deactivate_threads (bnot ∘ c) ac₂ s₂) s₂')) n₁ n₂ s₁ s₁ s₂' ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) ⟨hp'', rfl⟩ exec_skip,
-        cases ih with s₂'' ih,
-        use  s₂'',
-        split, {
-            apply exec_state.loop_step,
-            exact ha,
-            exact step.left,
-            exact ih.left,
-        }, {
-            have := exec_skip_eq he,
-            subst this,
-            apply h₂ ih.right,
-        },
-    }
-end
+        have ih : _ := while_right.aux (V s₂' (deactivate_threads (bnot ∘ c) (deactivate_threads (bnot ∘ c) ac₂ s₂) s₂')) n₁ n₂ s₁ s₁ s₂' ac₁ (deactivate_threads (bnot ∘ c) ac₂ s₂) ⟨hp'', rfl⟩ exec_skip,
+        show goal, from match ih with ⟨s₂'', ih⟩ := (begin
+            use  s₂'',
+            split, {
+                apply exec_state.loop_step,
+                exact ha,
+                exact step.left,
+                exact ih.left,
+            }, {
+                have := exec_skip_eq he,
+                clear _match _match,
+                subst this,
+                apply h₂ ih.right,
+            },
+        end)
+        end -- end match
+    end -- end match
+, -- close have
+show goal, from (begin
 
+end) -/
 
 lemma kernel_foldr_skip_right {k : kernel σ₂ τ₂} {ks} : 
 {* P *} k₁ ~> list.foldr kernel.seq k ks {* Q *} ↔ {* P *} k₁ ~> list.foldr kernel.seq (kernel.compute id) ks ;; k {* Q *} := sorry
