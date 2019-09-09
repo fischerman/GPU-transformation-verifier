@@ -125,8 +125,10 @@ def precedes (s u : state n σ τ) : Prop :=
 
 end state
 
+/-- If condition *f* evaluates to *tt*, the thread is deactivated -/
 @[irreducible]
-def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := (ac.map₂ prod.mk s.threads).map (λ ⟨a, t⟩, (bnot ∘ f) t.tlocal && a)
+def deactivate_threads (f : σ → bool) (ac : vector bool n) (s : state n σ τ) : vector bool n := 
+ac.map₂ (λ a (ts : thread_state σ τ), (bnot ∘ f) ts.tlocal && a) s.threads
 
 def subkernel (q : kernel σ τ) : kernel σ τ → Prop
 | (seq k₁ k₂) := k₁ = q ∨ k₂ = q ∨ subkernel k₁ ∨ subkernel k₂
@@ -149,7 +151,7 @@ inductive exec_state {n : ℕ} : kernel σ τ → vector bool n → state n σ �
   exec_state sync ac s s
 | seq (s t u : state n σ τ) (ac : vector bool n) (k₁ k₂ : kernel σ τ) :
   exec_state k₁ ac s t → exec_state k₂ ac t u → exec_state (seq k₁ k₂) ac s u
-  -- in the then-branch we deactive those threads where the condition is false and vice versa
+  -- in the then-branch we deactivate the threads where the condition is false and similar for else
 | ite (s t u : state n σ τ) (ac : vector bool n) (f : σ → bool) (k₁ k₂ : kernel σ τ) :
   exec_state k₁ (deactivate_threads (bnot ∘ f) ac s) s t →
   exec_state k₂ (deactivate_threads f ac s) t u →
