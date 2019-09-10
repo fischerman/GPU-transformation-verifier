@@ -7,6 +7,7 @@ namespace parlang
 
 variables {σ σ₁ σ₂ σ₃ : Type} {ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → Type} [decidable_eq ι₁] [decidable_eq ι₂]
 
+@[reducible]
 def rhl_kernel_assertion := Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop
 
 /-- Relational Hoare logic on kernels.  -/
@@ -48,8 +49,6 @@ def initial_kernel_assertion_left_thread_state {init₁ : ℕ → σ₁} {init�
 {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
 {n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
 (i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.left
-
-#check initial_kernel_assertion_left_thread_state
 
 def initial_kernel_assertion.right_thread_state {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
 {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
@@ -182,6 +181,7 @@ begin
     }
 end
 
+-- TODO: define the alias skip for (compute id)
 lemma single_step_left {P Q} {k₁ k : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} (R)
     (h₁ : {* P *} k ~> (kernel.compute id) {* R *})
     (h₂ : {* R *} k₁ ~> k₂ {* Q *}) : 
@@ -202,7 +202,7 @@ lemma single_step_left {P Q} {k₁ k : kernel σ₁ τ₁} {k₂ : kernel σ₂ 
     exact hek₁_a_1,
 end
 
-variables {P Q R P' Q' : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop} {k₁ k₁' : kernel σ₁ τ₁} {k₂ k₂' : kernel σ₂ τ₂}
+variables {P Q R P' Q' I : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop} {k₁ k₁' : kernel σ₁ τ₁} {k₂ k₂' : kernel σ₂ τ₂}
 
 -- intuition of the proof (to be repurposed by further proofs):
 -- we get the intermediate state of after k₁ by cases
@@ -251,9 +251,7 @@ lemma consequence_pre (h : {* P *} k₁ ~> k₂ {* Q *})
     exact a,
 end
 
-def assertion_swap_side (P : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop) := λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₂ s₂ ac₂ n₁ s₁ ac₁
-
-#print assertion_swap_side
+def assertion_swap_side (P : @rhl_kernel_assertion σ₁ σ₂ _ _ τ₁ τ₂ _ _) := λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₂ s₂ ac₂ n₁ s₁ ac₁
 
 -- k₁ must terminate
 lemma swap (h : {* P *} k₁ ~> k₂ {* Q *}) (he₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → ∃ s₁', exec_state k₁ ac₁ s₁ s₁') : 
@@ -311,6 +309,7 @@ theorem store_right (f : σ₂ → (Σ (i : ι₂), τ₂ i)) :
     }
 end
 
+-- TODO: move to another file
 theorem else_skip {n} (k : kernel σ τ₁) (c) (ac : vector bool n) (s s' : state n σ τ₁):
 exec_state k (deactivate_threads (bnot ∘ c) ac s) s s' ↔ 
 exec_state (kernel.ite c k (kernel.compute id)) ac s s' := begin
@@ -333,7 +332,7 @@ end
 
 -- Q does not contain information about the pre-entry ac or state
 /-- In the if-branch, the condition holds on all active threads. The inverse is not true. Just because the condition *c* holds, does not mean that the thread is active. -/
-theorem if_right (c : σ₂ → bool) (th) (el) (AC : ∀ {n₂ : ℕ}, vector bool n₂ → Prop)
+theorem ite_right (c : σ₂ → bool) (th) (el) (AC : ∀ {n₂ : ℕ}, vector bool n₂ → Prop)
 (h₁ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
 (h₂ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s') → Q n₁ s₁ ac₁ n₂ s₂ ac₂)
 (h₃ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads c ac₂ s')) 
@@ -381,8 +380,8 @@ theorem if_right (c : σ₂ → bool) (th) (el) (AC : ∀ {n₂ : ℕ}, vector b
     }
 end
 
-/-- *if_right* w/o an assertion on the active map -/
-theorem if_right' (c : σ₂ → bool) (th) (el)
+/-- *ite_right* w/o an assertion on the active map -/
+theorem ite_right' (c : σ₂ → bool) (th) (el)
 (h₁ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
 (h₂ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s') → Q n₁ s₁ ac₁ n₂ s₂ ac₂)
 (h₃ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads c ac₂ s')) 
@@ -395,11 +394,12 @@ theorem if_right' (c : σ₂ → bool) (th) (el)
     suffices : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (λ_, true) ac₂ *} kernel.compute id ~> kernel.ite c th el {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, R n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (λ_, true) ac₂ *},
     simp at this,
     exact this,
-    apply if_right,
+    apply ite_right,
     repeat { assumption, },
     exact h₂,
 end
 
+-- TODO: use ite_right
 theorem then_right (c : σ₂ → bool) (th)
 (h₁ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
 (h₂ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s) → Q n₁ s₁ ac₁ n₂ s₂ ac₂) :
@@ -434,7 +434,7 @@ end
 /-- TODO: 
     - add post-condition: condition is false on all active threads 
     - rename n
-    - drop h₃ and deactivate threads in the post condition of hb
+    - drop h₃ and deactivate threads in the post condition of hb ()
 -/
 /- theorem while_right.aux (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), ℕ)
 (h₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
@@ -445,7 +445,7 @@ end
 | n n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ ⟨hp, hv⟩ he := 
 let ha := (any_thread_active (deactivate_threads (bnot ∘ c) ac₂ s₂)) in
 let goal := ∃ (s₂' : state n₂ σ₂ τ₂), exec_state (kernel.loop c k) ac₂ s₂ s₂' ∧ P n₁ s₁' ac₁ n₂ s₂' ac₂ in
-have base : ha = ff → goal := begin
+have base : ha = ff → goal, from begin
     intro ha,
     {
         use s₂,
@@ -457,8 +457,8 @@ have base : ha = ff → goal := begin
         }
     }
 end,
-have it : ha = tt → goal := 
-    assume ha,
+have it : ha = tt → goal, from (
+    assume hha,
     /- precondition holds in the first loop iteration -/
     have hp' : P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) := begin
         exact h₁ hp,
@@ -505,11 +505,19 @@ have it : ha = tt → goal :=
             },
         end)
         end -- end match
-    end -- end match
-, -- close have
-show goal, from (begin
+    end
+), 
+show goal, from begin
+    cases a : ha,
+    exact base a,
+    exact it a,
+end -/
 
-end) -/
+theorem while_right (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), ℕ)
+(h₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, I n₁ s₁ ac₁ n₂ s₂ ac₂ → I n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
+(h₂ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂} {s : state n₂ σ₂ τ₂}, I n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s) → I n₁ s₁ ac₁ n₂ s₂ ac₂)
+(hb : ∀ n, {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, I n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, c ts.tlocal) ∧ V s₂ ac₂ = n *} kernel.compute id ~> k {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, I n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) < n *}) :
+{* I *} kernel.compute id ~> kernel.loop c k {* I *} := sorry
 
 lemma kernel_foldr_skip_right {k : kernel σ₂ τ₂} {ks} : 
 {* P *} k₁ ~> list.foldr kernel.seq k ks {* Q *} ↔ {* P *} k₁ ~> list.foldr kernel.seq (kernel.compute id) ks ;; k {* Q *} := sorry

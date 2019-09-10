@@ -20,7 +20,7 @@ example {σ₁ ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → T
         intros,
         exact (a.left) h,
     },
-    apply if_right,
+    apply ite_right,
     swap 7,
     exact (λn₁ s₁ ac₁ n₂ s₂ ac₂, ∀ (h : 0 < n₂), (s₂.threads.nth ⟨0, h⟩).tlocal.get "x" = 1),
     {
