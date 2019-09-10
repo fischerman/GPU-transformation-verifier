@@ -134,46 +134,9 @@ deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t :=
     }
 end
 
-lemma exec_deac_to_ac {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u) :
-exec_state (loop f k) ac s u := begin
-    apply exec_state.loop_step,
-    repeat { assumption },
-    have hgest : deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t := monotonic_exec hi,
-    generalize_hyp eq_ac : (deactivate_threads (bnot ∘ f) ac s) = dac at h hi, -- we need this, otherwise we have two disjoint ac
-    generalize_hyp eq_l : (loop f k) = l at h ⊢,
-    clear hi,
-    induction h;
-        cases eq_l;
-    subst eq_ac,
-    {
-        apply exec_state.loop_stop,
-        rw ac_deac_ge hgest at h_a,
-        exact h_a,
-    }, {
-        clear t u,
-        rename h_s t,
-        rename h_t t₂,
-        rename h_u u,
-        rename h_ih_a_1 ih,
-        rename h_a_1 htt₂,
-        clear h_ih_a,
-        rw ac_deac_ge hgest at htt₂,
-        have hgett₂ : deactivate_threads (bnot ∘ f) ac t ≥ deactivate_threads (bnot ∘ f) ac t₂ := monotonic_exec htt₂,
-        have hgest₂ : deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t₂ := ac_trans hgest hgett₂,
-        specialize ih hgest₂ rfl rfl,
-        apply exec_state.loop_step,
-        swap 3,
-        apply ih,
-        rw ac_deac_ge hgest at h_a,
-        exact h_a,
-        exact htt₂,
-    }
-end
-
-lemma exec_ac_to_deac {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : parlang.exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : parlang.exec_state (loop f k) ac t u) :
-parlang.exec_state (loop f k) ac s u := begin
-    apply parlang.exec_state.loop_step,
-    repeat { assumption },
+-- the goal eventually has to deacs, only the most pessimistic stays
+lemma exec_ac_to_deac.aux {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : parlang.exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : parlang.exec_state (loop f k) ac t u) :
+parlang.exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u := begin
     have hgest : deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t := parlang_monotonic_exec hi,
     generalize_hyp eq_l : (loop f k) = l at h ⊢,
     clear hi,
@@ -216,6 +179,55 @@ parlang.exec_state (loop f k) ac s u := begin
             refl,
         }
     }
+end
+
+lemma exec_ac_to_deac {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : parlang.exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : parlang.exec_state (loop f k) ac t u) :
+parlang.exec_state (loop f k) ac s u := begin
+    have := exec_ac_to_deac.aux ha hi h,
+    apply parlang.exec_state.loop_step,
+    repeat { assumption },
+end
+
+-- deactivations stack up in the assumption, only the most recent one matters
+lemma exec_deac_to_ac.aux {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u) :
+exec_state (loop f k) ac t u := begin
+    have hgest : deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t := monotonic_exec hi,
+    generalize_hyp eq_ac : (deactivate_threads (bnot ∘ f) ac s) = dac at h hi, -- we need this, otherwise we have two disjoint ac
+    generalize_hyp eq_l : (loop f k) = l at h ⊢,
+    clear hi,
+    induction h;
+        cases eq_l;
+    subst eq_ac,
+    {
+        apply exec_state.loop_stop,
+        rw ac_deac_ge hgest at h_a,
+        exact h_a,
+    }, {
+        clear t u,
+        rename h_s t,
+        rename h_t t₂,
+        rename h_u u,
+        rename h_ih_a_1 ih,
+        rename h_a_1 htt₂,
+        clear h_ih_a,
+        rw ac_deac_ge hgest at htt₂,
+        have hgett₂ : deactivate_threads (bnot ∘ f) ac t ≥ deactivate_threads (bnot ∘ f) ac t₂ := monotonic_exec htt₂,
+        have hgest₂ : deactivate_threads (bnot ∘ f) ac s ≥ deactivate_threads (bnot ∘ f) ac t₂ := ac_trans hgest hgett₂,
+        specialize ih hgest₂ rfl rfl,
+        apply exec_state.loop_step,
+        swap 3,
+        apply ih,
+        rw ac_deac_ge hgest at h_a,
+        exact h_a,
+        exact htt₂,
+    }
+end
+
+lemma exec_deac_to_ac {k} (ha : any_thread_active (deactivate_threads (bnot ∘ f) ac s)) (hi : exec_state k (deactivate_threads (bnot ∘ f) ac s) s t) (h : exec_state (loop f k) (deactivate_threads (bnot ∘ f) ac s) t u) :
+exec_state (loop f k) ac s u := begin
+    have := exec_deac_to_ac.aux ha hi h,
+    apply exec_state.loop_step,
+    repeat { assumption },
 end
 
 lemma eq_parlang_parlangnonmono (k : kernel σ τ) (ac : vector bool n) (s s' : state n σ τ) : exec_state k ac s s' ↔ parlang.exec_state k ac s s' := begin
