@@ -253,6 +253,11 @@ end
 
 def assertion_swap_side (P : @rhl_kernel_assertion σ₁ σ₂ _ _ τ₁ τ₂ _ _) := λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₂ s₂ ac₂ n₁ s₁ ac₁
 
+lemma swap' (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ ∃ t, exec_state k₂ ac₂ s₂ t *} k₁ ~> k₂ {* Q *}) (he₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → ∃ s₁', exec_state k₁ ac₁ s₁ s₁') : 
+{* assertion_swap_side P *} k₂ ~> k₁ {* assertion_swap_side Q *} := begin
+    sorry,
+end
+
 -- k₁ must terminate
 lemma swap (h : {* P *} k₁ ~> k₂ {* Q *}) (he₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → ∃ s₁', exec_state k₁ ac₁ s₁ s₁') : 
 {* assertion_swap_side P *} k₂ ~> k₁ {* assertion_swap_side Q *} := begin
@@ -518,6 +523,75 @@ theorem while_right (c : σ₂ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ 
 (h₂ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂} {s : state n₂ σ₂ τ₂}, I n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s) → I n₁ s₁ ac₁ n₂ s₂ ac₂)
 (hb : ∀ n, {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, I n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₂.active_threads ac₂).all (λts, c ts.tlocal) ∧ V s₂ ac₂ = n *} kernel.compute id ~> k {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, I n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ V s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂) < n *}) :
 {* I *} kernel.compute id ~> kernel.loop c k {* I *} := sorry
+
+theorem while_left (c : σ₁ → bool) (k) (V : ∀ {n₂} (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂), ℕ)
+(h₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, I n₁ s₁ ac₁ n₂ s₂ ac₂ → I n₁ s₁ (deactivate_threads (bnot ∘ c) ac₁ s₁) n₂ s₂ ac₂) 
+(h₂ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂} {s : state n₁ σ₁ τ₁}, I n₁ s₁ (deactivate_threads (bnot ∘ c) ac₁ s) n₂ s₂ ac₂ → I n₁ s₁ ac₁ n₂ s₂ ac₂)
+(hb : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, I n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₁.active_threads ac₁).all (λts, c ts.tlocal) *} k ~> kernel.compute id {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, I n₁ s₁ ac₁ n₂ s₂ ac₂ *}) :
+{* I *} kernel.loop c k ~> kernel.compute id {* I *} := begin
+    apply swap,
+    {
+        sorry, -- we need the assumption that the loop terminates here
+    },
+    sorry,
+end
+
+theorem ite_left' (c : σ₁ → bool) (th) (el)
+(h₁ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ (deactivate_threads (bnot ∘ c) ac₁ s₁) n₂ s₂ ac₂) 
+(h₂ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₁ σ₁ τ₁), Q n₁ s₁ (deactivate_threads (bnot ∘ c) ac₁ s') n₂ s₂ ac₂ → Q n₁ s₁ ac₁ n₂ s₂ ac₂)
+(h₃ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₁ σ₁ τ₁), Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ s₁ (deactivate_threads c ac₁ s') n₂ s₂ ac₂)
+(h₄ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₁ σ₁ τ₁), R n₁ s₁ (deactivate_threads c ac₁ s') n₂ s₂ ac₂ → R n₁ s₁ ac₁ n₂ s₂ ac₂) :
+{* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₁.active_threads ac₁).all (λts, c ts.tlocal) *} th ~> kernel.compute id {* Q *} →
+{* λ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ (s₁.active_threads ac₁).all (λts, bnot $ c ts.tlocal) *} el ~> kernel.compute id {* R *} →
+{* P *} kernel.ite c th el ~> kernel.compute id {* R *} := begin
+    intros hth hel,
+    apply swap',
+    {
+        apply ite_right',
+        swap 5, {
+            apply swap,
+            apply consequence,
+            apply hth,
+            {
+                intros,
+                exact ⟨a.left.left, a.right⟩,
+            }, {
+                intros,
+                exact a,
+            },
+            intros,
+            cases a.left.right,
+            cases h,
+            
+            sorry, -- we need proof that th terminates
+        }, 
+        swap 5, {
+            apply swap,
+            apply hel,
+            sorry, -- we need proof that el terminates
+        }, {
+            intros,
+            split,
+            apply h₁,
+            exact a.left,
+            exact a.right,
+        }, {
+            intros,
+            apply h₂,
+            exact a,
+        }, {
+            intros,
+            apply h₃,
+            exact a,
+        }, {
+            sorry,
+        }
+    }, {
+        intros,
+        use s₁,
+        apply exec_skip,
+    }
+end
 
 lemma kernel_foldr_skip_right {k : kernel σ₂ τ₂} {ks} : 
 {* P *} k₁ ~> list.foldr kernel.seq k ks {* Q *} ↔ {* P *} k₁ ~> list.foldr kernel.seq (kernel.compute id) ks ;; k {* Q *} := sorry
