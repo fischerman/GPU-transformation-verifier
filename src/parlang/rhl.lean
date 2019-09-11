@@ -574,7 +574,7 @@ theorem ite_left' (c : σ₁ → bool) (th) (el)
             split,
             apply h₁,
             exact a.left,
-            exact a.right,
+            sorry,
         }, {
             intros,
             apply h₂,
