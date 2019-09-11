@@ -16,11 +16,7 @@ def sigc : signature_core
 | "tid" := { scope := scope.tlocal, type := ⟨1, type.int⟩ }
 | _ := { scope := scope.shared, type := ⟨1, type.int⟩ }
 
-def sig : signature := ⟨sigc, begin
-    split,
-    refl,
-    refl,
-end⟩
+def sig : signature := ⟨sigc, ⟨rfl, rfl, rfl⟩⟩
 
 lemma a_is_shared : is_shared (sig.val "a") := by apply eq.refl
 lemma tid_is_tlocal : is_tlocal (sig.val "tid") := by apply eq.refl

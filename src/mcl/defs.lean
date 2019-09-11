@@ -56,7 +56,10 @@ instance (t) : inhabited (type_map t) := ⟨
 @[reducible]
 def type_of : variable_def → type := λ v, v.type.type
 
-def signature := { sig : signature_core // type_of (sig "tid") = type.int ∧ (sig "tid").type.dim = (v[0] : vector ℕ 1).length}
+def signature := { sig : signature_core // 
+    type_of (sig "tid") = type.int ∧ 
+    (sig "tid").type.dim = (v[0] : vector ℕ 1).length ∧
+    (sig "tid").scope = scope.tlocal }
 
 -- todo: make sig parameter (instead of variable). That way I don't have to mention signature anywhere (see section 6.2)
 variables {sig : signature}
@@ -346,6 +349,6 @@ def mclp_to_program {sig : signature} : mclp sig → parlang.program (memory $ p
 def empty_state {sig : signature} : (memory $ parlang_mcl_tlocal sig) := λ var, default (type_map (type_of (sig.val var.1)))
 
 -- we need an assumption on the signature, i.e. tid must be int
-def mcl_init {sig : signature} : ℕ → (memory $ parlang_mcl_tlocal sig) := λ n : ℕ, empty_state.update ⟨"tid", begin rw sig.property.right, exact v[0] end⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw sig.property.left, exact n end)
+def mcl_init {sig : signature} : ℕ → (memory $ parlang_mcl_tlocal sig) := λ n : ℕ, empty_state.update ⟨"tid", begin rw sig.property.right.left, exact v[0] end⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw sig.property.left, exact n end)
 
 end mcl
