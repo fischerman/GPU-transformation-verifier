@@ -4,6 +4,11 @@ import parlang
 
 namespace parlang
 
+open kernel
+
+-- notation ac ` ⇃ ` c ` ◂ `  x:(foldr ` ◂ ` (h t, deactivate_threads c ac h) ac) := x
+notation ac ` ⇃ ` c ` ◂ `  s := deactivate_threads c ac s
+
 example {σ₁ ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → Type} [decidable_eq ι₁] [decidable_eq ι₂] : 
 {* λ n₁ s₁ ac₁ n₂ (s₂ : state n₂ (memory (λ (n: string), ℕ)) τ₂) ac₂, 0 < n₂ ∧ all_threads_active ac₂ *} 
 @kernel.compute ι₁ σ₁ τ₁ id ~> kernel.ite (λm, m.get "tid" = 1) (kernel.compute (λ m, m.update "x" 1)) (kernel.compute (λm, m.update "x" 0)) 

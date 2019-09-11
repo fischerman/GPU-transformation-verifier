@@ -17,6 +17,9 @@ open parlang.thread_state
 namespace assign_mcl
 namespace proof2
 
+notation m ` & ` n ` ::= ` v := memory.update m n v
+notation s ` § ` f ` ⇂ ` ac := map_active_threads ac f s
+
 lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
     apply rel_mclk_to_mclp,
 
