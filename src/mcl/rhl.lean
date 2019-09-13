@@ -143,6 +143,8 @@ expression.rec_on expr
     ).load (λ s, ⟨⟨n, vector_mpr h₂ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ ((vector.of_fn idx).map (eval s))⟩ v⟩))
     -- add
     (λ t a b ih_a ih_b, ih_b ∘ ih_a)
+    -- mult
+    (λ t a b ih_a ih_b, ih_b ∘ ih_a)
     -- literal_int
     (λ t n h, id)
     -- lt

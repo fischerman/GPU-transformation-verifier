@@ -80,11 +80,13 @@ def is_shared : variable_def → Prop := λ v, v.scope = scope.shared
 -- | [] n := { scope := scope.tlocal, type := ⟨1, int⟩} -- by default all variables are tlocal int's
 -- | ((m, v) :: xs) n := if m = n then v else create_signature xs n
 
--- if we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
+-- We use vectors for idx. If we compare two variable accesses to the same array: when using vectors we only have to reason about equality of elements, otherwise we have to reason about length as well
 @[reducible]
 def mcl_address (sig : signature) := (Σ n: string, vector ℕ (sig.val n).type.dim)
+/-- Type map for shared memory -/
 @[reducible]
 def parlang_mcl_shared (sig : signature) := (λ i : mcl_address sig, sig.lean_type_of i.1)
+/-- Type map for thread local memory -/
 @[reducible]
 def parlang_mcl_tlocal (sig : signature) := (λ i : mcl_address sig, sig.lean_type_of i.1)
 @[reducible]
@@ -101,12 +103,14 @@ inductive expression (sig : signature) : type → Type
 | tlocal_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = dim) (h₃ : is_tlocal (sig.val n)) : expression t
 | shared_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = dim) (h₃ : is_shared (sig.val n)) : expression t
 | add {t} : expression t → expression t → expression t
+| mult {t} : expression t → expression t → expression t
 | literal_int {} {t} (n : ℕ) (h : t = type.int) : expression t
 | lt {t} (h : t = type.bool) : expression int → expression int → expression t
 
 open expression
 
 instance (t : type) : has_add (expression sig t) := ⟨expression.add⟩
+instance (t : type) : has_mul (expression sig t) := ⟨expression.mult⟩
 instance : has_zero (expression sig int) := ⟨expression.literal_int 0 rfl⟩
 instance : has_one (expression sig int) := ⟨expression.literal_int 1 rfl⟩
 infix < := expression.lt (show type.bool = type.bool, by refl)
@@ -116,7 +120,12 @@ notation `i(` n `)`:= expression.literal_int n (by refl)
 def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 | int a b := a + b
 | float a b := a + b
-| bool a b := a ∧ b
+| bool a b := a && b
+
+def type_map_mult : Π{t : type}, type_map t → type_map t → type_map t
+| int a b := a * b
+| float a b := a * b
+| bool a b := a || b
 
 -- we have C on idx
 -- use recursor directly
@@ -134,6 +143,8 @@ def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ
     -- shared
     (λ t dim n idx h₁ h₂ h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
     -- add
+    (λ t a b ih_a ih_b, (1 : ℕ) + (ih_a : ℕ) + (ih_b : ℕ))
+    -- mult
     (λ t a b ih_a ih_b, (1 : ℕ) + (ih_a : ℕ) + (ih_b : ℕ))
     -- literal_int
     (λ t n h, (n : ℕ))
@@ -182,6 +193,8 @@ def eval {sig : signature} (s : memory $ parlang_mcl_tlocal sig) {t : type} (exp
     (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact s.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
     -- add
     (λ t a b ih_a ih_b, type_map_add ih_a ih_b)
+    -- mult
+    (λ t a b ih_a ih_b, type_map_mult ih_a ih_b)
     -- literal_int
     (λ t n h, (by rw [h]; exact n))
     -- lt
@@ -194,6 +207,8 @@ def load_shared_vars_for_expr {sig : signature} {t : type} (expr : expression si
     -- requires that the shared variable has been loaded into tstate under the same name
     (λ t dim n idx h₁ h₂ h₃ ih, ((list.range_fin dim).map ih).foldl list.append [] ++ [(kernel.load (λ s, ⟨⟨n, vector_mpr h₂ $ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ $ (vector.of_fn idx).map (eval s)⟩ v⟩) : parlang_mcl_kernel sig)])
     -- add
+    (λ t a b ih_a ih_b, ih_a ++ ih_b)
+    -- mult
     (λ t a b ih_a ih_b, ih_a ++ ih_b)
     -- literal_int
     (λ t n h, [])
@@ -235,6 +250,8 @@ def expr_reads (n : string) {t : type} (expr : expression sig t) : _root_.bool :
     -- shared
     (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || ((list.range_fin dim).map ih).any id)
     -- add
+    (λ t a b ih_a ih_b, ih_a || ih_b)
+    -- mult
     (λ t a b ih_a ih_b, ih_a || ih_b)
     -- literal_int
     (λ t n h, ff)
