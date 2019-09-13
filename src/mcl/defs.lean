@@ -185,12 +185,12 @@ lemma vector_mpr_rfl {sig : signature} {n} {α : Type} {h : (((sig.val n).type).
 -- should we make this an inductive predicate
 -- it would have implications on parlang
 -- might have to change this to rec_on
-def eval {sig : signature} (s : memory $ parlang_mcl_tlocal sig) {t : type} (expr : expression sig t) : type_map t := expression.rec_on expr 
+def eval {sig : signature} (m : memory $ parlang_mcl_tlocal sig) {t : type} (expr : expression sig t) : type_map t := expression.rec_on expr 
     -- tlocal
-    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact s.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
+    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact m.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
     -- shared
     -- requires that the shared variable has been loaded into tstate under the same name
-    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact s.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
+    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact m.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
     -- add
     (λ t a b ih_a ih_b, type_map_add ih_a ih_b)
     -- mult
