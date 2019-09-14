@@ -65,6 +65,44 @@ lemma syncable_unique {s : state n σ τ} {m m'} (h₁ : syncable s m) (h₂ : s
   }
 end
 
+theorem syncable_tlocal (s : state n σ τ) (m : memory τ) (ac : vector bool n) (tl : thread_state σ τ → σ) : s.syncable m ↔ (s.map_active_threads ac $ λts, { tlocal := tl ts, ..ts }).syncable m := begin
+  unfold syncable,
+  induction n,
+  case nat.zero {
+    split, {
+      intro h,
+      intro i,
+      left,
+      intro tid,
+      apply fin_zero_elim tid,
+    }, {
+      intros h i,
+      left,
+      intro tid,
+      apply fin_zero_elim tid,
+    }
+  },
+  case nat.succ : n ih {
+    split, {
+      intros h i,
+      specialize h i,
+      cases h,
+      {
+        left,
+        intro tid,
+        specialize h tid,
+        cases h,
+        split, {
+          sorry,
+        },
+        sorry
+      },
+      sorry,
+    },
+    sorry,
+  }
+end
+
 @[simp]
 lemma compute_stores_state {s : state n σ τ} {ac : vector bool n} {tid} {f g} : 
 (vector.nth ((map_active_threads ac (thread_state.compute g ∘ f) s).threads) tid).stores = (vector.nth ((map_active_threads ac f s).threads) tid).stores := begin
