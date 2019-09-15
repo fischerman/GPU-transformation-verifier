@@ -73,7 +73,7 @@ def signature.lean_type_of (n : string) (sig : signature) := lean_type_of (sig.v
 @[reducible]
 def is_tlocal (v : variable_def) := v.scope = scope.tlocal
 @[reducible]
-def is_shared : variable_def → Prop := λ v, v.scope = scope.shared
+def is_shared (v : variable_def) := v.scope = scope.shared
 
 -- @[reducible]
 -- def create_signature : list (string × variable_def) → signature
@@ -202,10 +202,10 @@ def eval {sig : signature} (m : memory $ parlang_mcl_tlocal sig) {t : type} (exp
 
 def load_shared_vars_for_expr {sig : signature} {t : type} (expr : expression sig t) : list (parlang_mcl_kernel sig) := expression.rec_on expr 
     -- tlocal
-    (λ t dim n idx h₁ h₂ h₃ ih, ((list.range_fin dim).map ih).foldl list.append [])
+    (λ t dim n idx h₁ h₂ h₃ ih, (vector.of_fn ih).to_list.foldl list.append [])
     -- shared
     -- requires that the shared variable has been loaded into tstate under the same name
-    (λ t dim n idx h₁ h₂ h₃ ih, ((list.range_fin dim).map ih).foldl list.append [] ++ [(kernel.load (λ s, ⟨⟨n, vector_mpr h₂ $ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ $ (vector.of_fn idx).map (eval s)⟩ v⟩) : parlang_mcl_kernel sig)])
+    (λ t dim n idx h₁ h₂ h₃ ih, (vector.of_fn ih).to_list.foldl list.append [] ++ [(kernel.load (λ s, ⟨⟨n, vector_mpr h₂ $ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ $ (vector.of_fn idx).map (eval s)⟩ v⟩) : parlang_mcl_kernel sig)])
     -- add
     (λ t a b ih_a ih_b, ih_a ++ ih_b)
     -- mult
@@ -258,9 +258,27 @@ def expr_reads (n : string) {t : type} (expr : expression sig t) : _root_.bool :
     -- lt
     (λ t h a b ih_a ih_b, ih_a || ih_b)
 
+meta def eqt : tactic unit := do
+    t ← tactic.target,
+    match t with
+    | `(eq.mpr %%x %%p = eq.mpr %%y %%z) := do
+        s ← tactic.infer_type x,
+        tactic.trace s,
+        s ← tactic.infer_type y,
+        tactic.trace s
+    | _ := tactic.fail ()
+    end
+
 lemma eval_update_ignore {sig : signature} {t t₂ : type} {n} {idx₂ : vector ℕ ((sig.val n).type).dim} {v} {expr : expression sig t} {s : memory $ parlang_mcl_tlocal sig} (h : expr_reads n expr = ff) : 
 eval (s.update ⟨n, idx₂⟩ v) expr = eval s expr := begin
-    admit
+    induction expr,
+    {
+        simp [eval],
+        simp [eval] at expr_ih,
+        eqt,
+        sorry,
+    },
+    repeat { sorry },
 end
 
 -- can we make use of functor abstraction
