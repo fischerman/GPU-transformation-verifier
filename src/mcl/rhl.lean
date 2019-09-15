@@ -151,8 +151,10 @@ expression.rec_on expr
     (λ t h a b ih_a ih_b, ih_b ∘ ih_a)
 
 -- TODO: change to double implication
+/-- Resolve semantics of loading_shared_vars_for_expr to the relation on state -/
 lemma update_load_shared_vars_for_expr {sig t} {expr : expression sig t} {n} {ac : vector bool n} {s u} : 
-exec_state (list.foldr kernel.seq (kernel.compute id) (load_shared_vars_for_expr expr)) ac s u ↔ u = s.map_active_threads ac (update_shared_vars_for_expr expr) := begin
+exec_state (list.foldr kernel.seq (kernel.compute id) (load_shared_vars_for_expr expr)) ac s u ↔ 
+u = s.map_active_threads ac (update_shared_vars_for_expr expr) := begin
     sorry,
     -- apply iff.intro,
     -- {
@@ -271,12 +273,12 @@ def g := λ(n : nat), n + 1
 -- end
 
 -- TODO should this moved to defs?
-/-- Stores the locally computed value in the shadow memory. This is an abstraction over *parlang.kernel.store*, which hides the lambda-term. This makes it easier to rewrite. -/
+/-- Stores the locally computed value in the shadow memory. This is an abstraction over *thread_state.store*, which hides the lambda-term. This makes it easier to rewrite. -/
 @[irreducible]
 def mcl_store {sig : signature} {t} {dim} (var : string) (idx : vector (expression sig type.int) dim) (h₁ : type_of (sig.val var) = t) (h₂ : ((sig.val var).type).dim = dim) := 
 @thread_state.store _ _ (parlang_mcl_shared sig) _ (λ (s : memory $ parlang_mcl_tlocal sig), ⟨⟨var, vector_mpr h₂ (idx.map (eval s))⟩, s.get ⟨var, vector_mpr h₂ (idx.map (eval s))⟩⟩)
 
-/-- Processes a single shared assign on the left side  -/
+/-- Processes a single shared assign on the right side -/
 lemma shared_assign_right {t dim n} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂.val n) = t} {h₂ : ((sig₂.val n).type).dim = dim} {expr : expression sig₂ t} : 
 {* (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
     ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_shared sig₂)).map_active_threads ac₂ (
