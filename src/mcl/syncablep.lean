@@ -155,8 +155,8 @@ syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list compu
                 -- afterwards cases on the update (either store or compute)
                 induction ups generalizing updates,
                 {
-                    simp [ts_updates, mcl_store, store],
-                    simp [ts_updates, mcl_store, store] at holes_constraint,
+                    simp [ts_updates, thread_state.tlocal_to_shared, store],
+                    simp [ts_updates, thread_state.tlocal_to_shared, store] at holes_constraint,
                     cases holes_constraint with shole_constraint lhole_constraint,
                     split, {
                         intros i_in_shole i_in_stores,
@@ -193,8 +193,8 @@ syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list compu
                                 apply holes_constraint.right a,
                             },
                         },
-                        simp [mcl_store, store],
-                        simp [mcl_store, store] at ups_ih,
+                        simp [thread_state.tlocal_to_shared, store],
+                        simp [thread_state.tlocal_to_shared, store] at ups_ih,
                         split,
                         {
                             intros i_in_shole,
@@ -202,7 +202,7 @@ syncable' shole lhole (map_active_threads ac (ts_updates $ op.compute_list compu
                             split, {
                                 -- proof that the new store doesn't store in i
                                 cases holes_constraint with shole_constraint lhole_constraint,
-                                simp [mcl_store, store] at shole_constraint,
+                                simp [thread_state.tlocal_to_shared, store] at shole_constraint,
                                 rw not_or_distrib at shole_constraint,
                                 cases shole_constraint (or.inl i_in_shole),
                                 rw ts_updates_tlocal s'.shared s'.loads s'.stores,

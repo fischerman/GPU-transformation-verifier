@@ -14,7 +14,7 @@ inductive op (sig : signature)
 
 def ts_updates {sig : signature} : list (op sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)
 | [] ts := ts
-| (op.store var idx h₁ h₂ :: ops) ts := ts_updates ops $ mcl_store var idx h₁ h₂ ts
+| (op.store var idx h₁ h₂ :: ops) ts := ts_updates ops $ thread_state.tlocal_to_shared var idx h₁ h₂ ts
 | (op.compute_list computes :: ops) ts := ts_updates ops $ compute_list computes ts
 
 lemma ts_update_compute_list {sig : signature} (ups : list (op sig)) (computes) : ts_updates (op.compute_list computes :: ups) = ts_updates ups ∘ compute_list computes := by refl
@@ -45,7 +45,7 @@ end
 
 @[simp]
 lemma ts_updates_store {sig : signature} {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂} {updates} (f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)) : 
-ts_updates updates ∘ mcl_store var idx h₁ h₂ ∘ f = ts_updates (op.store var idx h₁ h₂ :: updates) ∘ f := begin
+ts_updates updates ∘ thread_state.tlocal_to_shared var idx h₁ h₂ ∘ f = ts_updates (op.store var idx h₁ h₂ :: updates) ∘ f := begin
     refl,
 end
 

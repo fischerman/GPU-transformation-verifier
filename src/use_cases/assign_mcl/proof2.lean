@@ -65,16 +65,16 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
 
     -- split up the proof for the individual memories
     split, {
-        have : update_shared_vars_for_expr read_tid = id := by refl,
+        have : thread_state.update_shared_vars_for_expr read_tid = id := by refl,
         rw this,
-        have : update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
+        have : thread_state.update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
         rw this,
         simp,
 
         -- resolve get and update (the result should only be mcl_init, literals and memory (in case of loads))
         rw ← syncable_syncable',
         rw function.comp.assoc,
-        rw ← ts_updates_nil (mcl_store _ _ _ _ ∘ _),
+        rw ← ts_updates_nil (thread_state.tlocal_to_shared _ _ _ _ ∘ _),
         rw [ts_updates_store, ts_updates_compute, ts_updates_store],
         rw [← function.comp.right_id (compute _)],
         rw [ts_updates_compute],
@@ -135,16 +135,16 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
         sorry, --trivial from h
     }, 
     split, {
-        have : update_shared_vars_for_expr read_tid = id := by refl,
+        have : thread_state.update_shared_vars_for_expr read_tid = id := by refl,
         rw this,
-        have : update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
+        have : thread_state.update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
         rw this,
         simp,
 
         -- resolve get and update (the result should only be mcl_init, literals and memory (in case of loads))
         rw ← syncable_syncable',
         rw function.comp.assoc,
-        rw ← ts_updates_nil (mcl_store _ _ _ _ ∘ _),
+        rw ← ts_updates_nil (thread_state.tlocal_to_shared _ _ _ _ ∘ _),
         rw [ts_updates_store, ts_updates_compute, ts_updates_store],
         rw [← function.comp.right_id (compute _)],
         rw [ts_updates_compute],

@@ -20,7 +20,7 @@ lemma store_access_elim_idx {sig : signature} {n n_idx} {s : state n (memory $ p
 {t} {h₄ : ((sig.val var).type).dim = n_idx} {h₃ : type_of (sig.val var) = t } {f} {t : fin n} {i : mcl_address sig} {ac₁ : vector bool n} {updates}
 (h₂ : i.2.to_list ≠ (idx.map ((eval (((map_active_threads ac₁ (compute_list updates) s).threads).nth t).tlocal))).to_list) 
 (h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ compute_list updates) s).threads) t)) :
-i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx h₃ h₄) ∘ compute_list updates) s).threads) t) := begin
+i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (thread_state.tlocal_to_shared var idx h₃ h₄) ∘ compute_list updates) s).threads) t) := begin
     sorry,
 end
 
@@ -28,20 +28,20 @@ lemma store_access_elim_idx' {sig : signature} {n n_idx} {s : state n (memory $ 
 {t} {h₄ : ((sig.val var).type).dim = n_idx} {h₃ : type_of (sig.val var) = t } {t : fin n} {i : mcl_address sig} {ac₁ : vector bool n} {updates}
 (h₂ : i.2.to_list ≠ (idx.map ((eval (((map_active_threads ac₁ (compute_list updates) s).threads).nth t).tlocal ))).to_list) 
 (h₁ : i ∉ accesses (vector.nth (s.threads) t)) :
-i ∉ accesses (vector.nth ((map_active_threads ac₁ ((mcl_store var idx h₃ h₄) ∘ compute_list updates) s).threads) t) := begin
+i ∉ accesses (vector.nth ((map_active_threads ac₁ ((thread_state.tlocal_to_shared var idx h₃ h₄) ∘ compute_list updates) s).threads) t) := begin
     sorry,
 end
 
 lemma store_store_success {sig : signature} {i : mcl_address sig} {updates} {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} 
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂ : ((sig.val var).type).dim = dim} 
 {f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} : 
-i = ⟨var, vector_mpr h₂ (idx.map (eval (compute_list updates ts).tlocal))⟩ → i ∈ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list updates) ts).stores := by sorry
+i = ⟨var, vector_mpr h₂ (idx.map (eval (compute_list updates ts).tlocal))⟩ → i ∈ ((f ∘ thread_state.tlocal_to_shared var idx h₁ h₂ ∘ compute_list updates) ts).stores := by sorry
 
 /-- Stores can be skipped if the variable name does not match. Does not work for idx -/
 lemma store_store_skip_name {sig : signature} {i : mcl_address sig} {updates} {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} 
 {dim} {idx : vector (expression sig type.int) dim} {var t} {h₁ : type_of (sig.val var) = t} {h₂ : ((sig.val var).type).dim = dim} 
 {f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} : 
-i ∈ ((f ∘ compute_list updates) ts).stores → i ∈ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list updates) ts).stores := by sorry
+i ∈ ((f ∘ compute_list updates) ts).stores → i ∈ ((f ∘ thread_state.tlocal_to_shared var idx h₁ h₂ ∘ compute_list updates) ts).stores := by sorry
 
 lemma access_init  {sig₁ sig₂ : signature} {P : memory (parlang_mcl_shared sig₁) → memory (parlang_mcl_shared sig₂) → Prop} 
 {f₁ : memory (parlang_mcl_shared sig₁) → ℕ} {f₂ : memory (parlang_mcl_shared sig₂) → ℕ} {m₁ : memory (parlang_mcl_shared sig₁)} {m₂ : memory (parlang_mcl_shared sig₂)} 
@@ -118,7 +118,7 @@ lemma store_shared_success {sig : signature} {i : mcl_address sig} {updates}
 {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)}
 {f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} (a : array_access sig var₁ i) (h : var₁ = var₂) : ((
         f ∘
-        mcl_store var₂ idx h₁ h₂ ∘
+        thread_state.tlocal_to_shared var₂ idx h₁ h₂ ∘
         compute_list updates)
     ts
 ).shared i = (begin simp [parlang_mcl_shared, signature.lean_type_of, lean_type_of], rw a.var_eq, rw h, exact ((compute_list updates ts).tlocal.get ⟨var₂, vector_mpr h₂ $ idx.map (eval (compute_list updates ts).tlocal)⟩) end) := sorry
@@ -128,7 +128,7 @@ lemma store_shared_skip {sig : signature} {i : mcl_address sig} {updates}
 {ts : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)}
 {f : thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)} (a : array_access sig var₁ i) (h : var₁ ≠ var₂) : ((
         f ∘
-        mcl_store var₂ idx h₁ h₂ ∘
+        thread_state.tlocal_to_shared var₂ idx h₁ h₂ ∘
         compute_list updates)
     ts
 ).shared i = ((f ∘ compute_list updates) ts).shared i := sorry
@@ -237,9 +237,9 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
 
     -- split up the proof for the individual memories
     split, {
-        have : update_shared_vars_for_expr read_tid = id := by refl,
+        have : thread_state.update_shared_vars_for_expr read_tid = id := by refl,
         rw this,
-        have : update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
+        have : thread_state.update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
         rw this,
         simp,
 
@@ -404,7 +404,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                     apply store_store_skip_name,
                     rw function.comp.assoc,
                     rw compute_list_merge,
-                    rw ← function.left_id (mcl_store _ _ _ _ ∘ _),
+                    rw ← function.left_id (thread_state.tlocal_to_shared _ _ _ _ ∘ _),
                     apply store_store_success,
                     apply address_eq,
                     swap,
@@ -444,7 +444,7 @@ lemma assign_rel : mclp_rel eq p₁ p₂ eq := begin
                 rw initial_kernel_assertion_left_thread_state h,
                 rw function.comp.assoc,
                 rw compute_list_merge,
-                rw ← function.left_id (mcl_store _ _ _ _ ∘ _),
+                rw ← function.left_id (thread_state.tlocal_to_shared _ _ _ _ ∘ _),
                 rw store_shared_success hb.to_array_access,
                 swap, {
                     refl

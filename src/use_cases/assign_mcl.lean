@@ -20,7 +20,7 @@ open parlang.thread_state
 -- {t h₄} {h₃ : type_of (sig.val var) = t } {f} {t : fin n} {i} {ac₁ : vector bool n} {updates}
 -- (h₁ : i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ compute_list updates) s).threads) t)) 
 -- (h₂ : i.1 ≠ var) :
--- i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (mcl_store var idx h₃ h₄) ∘ compute_list updates) s).threads) t) := begin
+-- i ∉ accesses (vector.nth ((map_active_threads ac₁ (f ∘ (thread_state.tlocal_to_shared var idx h₃ h₄) ∘ compute_list updates) s).threads) t) := begin
 --     sorry,
 -- end
 
@@ -31,14 +31,14 @@ open parlang.thread_state
 -- syncable ((f ∘ compute_list computes) s) m →
 -- i.fst ≠ var →
 -- i ∉ ((f ∘ compute_list computes) (s.threads.nth tid)).stores →
--- i ∉ ((f ∘ mcl_store var idx h₁ h₂ ∘ compute_list computes) (s.threads.nth tid)).stores := begin
+-- i ∉ ((f ∘ thread_state.tlocal_to_shared var idx h₁ h₂ ∘ compute_list computes) (s.threads.nth tid)).stores := begin
 --     intros syncable i_not_var i_not_in_f,
 --     unfold parlang.state.syncable at syncable,
 --     specialize syncable i,
 --     cases ts,
 --     induction computes,
 --     {
---         simp [compute_list, mcl_store, store],
+--         simp [compute_list, thread_state.tlocal_to_shared, store],
 --     }, {
 
 --     }
