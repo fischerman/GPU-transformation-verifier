@@ -204,7 +204,7 @@ def load_shared_vars_for_expr {sig : signature} {t : type} (expr : expression si
     -- tlocal
     (λ t dim n idx h₁ h₂ h₃ ih, (vector.of_fn ih).to_list.foldl list.append [])
     -- shared
-    -- requires that the shared variable has been loaded into tstate under the same name
+    -- loads the shared variable in the tlocal memory under the same name
     (λ t dim n idx h₁ h₂ h₃ ih, (vector.of_fn ih).to_list.foldl list.append [] ++ [(kernel.load (λ s, ⟨⟨n, vector_mpr h₂ $ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ $ (vector.of_fn idx).map (eval s)⟩ v⟩) : parlang_mcl_kernel sig)])
     -- add
     (λ t a b ih_a ih_b, ih_a ++ ih_b)
@@ -295,7 +295,9 @@ inductive mclk (sig : signature)
 | seq : mclk → mclk → mclk
 | for (n : string) (h : sig.type_of n = int) (h₂ : (sig.val n).type.dim = 1) :
   expression sig int → expression sig bool → mclk → mclk → mclk
+| ite : expression sig bool → mclk → mclk → mclk
 | skip {} : mclk
+| sync {} : mclk
 
 infixr ` ;; `:90 := mclk.seq
 
@@ -306,22 +308,26 @@ def mclk_reads (n : string) : mclk sig → _root_.bool
 | (shared_assign _ idx _ _ expr) := expr_reads n expr || (idx.to_list.any (λ e, expr_reads n e))
 | (seq k₁ k₂) := mclk_reads k₁ || mclk_reads k₂
 | (for _ _ _ init c inc body) := expr_reads n init || expr_reads n c || mclk_reads inc || mclk_reads body
-| (skip) := false
+| (ite c th el) := expr_reads n c || mclk_reads th || mclk_reads el
+| skip := false
+| sync := false
 
 --lemma mclk_expr_reads (k) : mclk_reads n k → ∃ expr, (expr_reads n expr ∧ subexpr expr k)
 
 def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
-| (skip) := kernel.compute id
+| skip := kernel.compute id
+| sync := kernel.sync
 | (tlocal_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)))
 | (shared_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end))) ;; kernel.store (λ s, ⟨⟨n, vector_mpr h₂ $ idx.map (eval s)⟩, s.get ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩⟩)
+| (ite c th el) := prepend_load_expr c (kernel.ite (λs, eval s c) (mclk_to_kernel th) (mclk_to_kernel el))
 | (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  v[eval s expr]⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, unfold signature.type_of at h, rw h, exact eval s expr end))) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
     )
 
 -- if a kernel does not contain a shared referencce it must not contain any loads
-example (k : mclk sig) (h : ∀ n, is_shared (sig.val n) → ¬mclk_reads n k) : ∀ sk, subkernel sk (mclk_to_kernel k) → ¬∃ f, sk = (kernel.load f) := begin
+/- example (k : mclk sig) (h : ∀ n, is_shared (sig.val n) → ¬mclk_reads n k) : ∀ sk, subkernel sk (mclk_to_kernel k) → ¬∃ f, sk = (kernel.load f) := begin
     intros sk hsk hl,
     cases hl with f hl,
     subst hl,
@@ -373,7 +379,7 @@ example (k : mclk sig) (h : ∀ n, is_shared (sig.val n) → ¬mclk_reads n k) :
         rw subkernel at hsk,
         contradiction,
     }
-end
+end -/
 
 inductive mclp (sig : signature)
 | intro (f : memory (parlang_mcl_shared sig) → ℕ) (k : mclk sig) : mclp
