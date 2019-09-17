@@ -59,7 +59,7 @@ def type_of : variable_def → type := λ v, v.type.type
 
 def signature := { sig : signature_core // 
     type_of (sig "tid") = type.int ∧ 
-    (sig "tid").type.dim = (v[0] : vector ℕ 1).length ∧
+    (sig "tid").type.dim = 1 ∧
     (sig "tid").scope = scope.tlocal }
 
 -- todo: make sig parameter (instead of variable). That way I don't have to mention signature anywhere (see section 6.2)
