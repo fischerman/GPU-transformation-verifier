@@ -1,5 +1,6 @@
 
 import parlang.defs
+import data.rat
 open parlang
 
 notation `v[` v:(foldr `, ` (h t, vector.cons h t) vector.nil `]`) := v
@@ -40,7 +41,7 @@ def signature_core := string → variable_def
 @[reducible]
 def type_map : type → Type
 | int := ℕ
-| float := ℕ
+| float := rat
 | bool := _root_.bool
 
 instance (t) : inhabited (type_map t) := ⟨
