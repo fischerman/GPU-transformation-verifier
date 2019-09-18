@@ -101,22 +101,20 @@ def array_address_range {sig : signature} (var : string) : set (mcl_address sig)
 -- expression is an inductive family over types
 -- type is called an index
 inductive expression (sig : signature) : type → Type
-| tlocal_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = dim) (h₃ : is_tlocal (sig.val n)) : expression t
-| shared_var {t} {dim : ℕ} (n : string) (idx : fin dim → (expression int)) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = dim) (h₃ : is_shared (sig.val n)) : expression t
+| tlocal_var (n : string) (idx : fin ((sig.val n).type.dim) → (expression int)) (h₃ : is_tlocal (sig.val n)) : expression (sig.type_of n)
+| shared_var (n : string) (idx : fin ((sig.val n).type.dim) → (expression int)) (h₃ : is_shared (sig.val n)) : expression (sig.type_of n)
 | add {t} : expression t → expression t → expression t
 | mult {t} : expression t → expression t → expression t
-| literal_int {} {t} (n : ℕ) (h : t = type.int) : expression t
-| lt {t} (h : t = type.bool) : expression int → expression int → expression t
+| literal_int {} (n : ℕ) : expression int
+| lt : expression int → expression int → expression bool
 
 open expression
 
 instance (t : type) : has_add (expression sig t) := ⟨expression.add⟩
 instance (t : type) : has_mul (expression sig t) := ⟨expression.mult⟩
-instance : has_zero (expression sig int) := ⟨expression.literal_int 0 rfl⟩
-instance : has_one (expression sig int) := ⟨expression.literal_int 1 rfl⟩
-infix < := expression.lt (show type.bool = type.bool, by refl)
-notation `v(` n `)`:= expression.tlocal_var n (by refl)
-notation `i(` n `)`:= expression.literal_int n (by refl)
+instance : has_zero (expression sig int) := ⟨expression.literal_int 0⟩
+instance : has_one (expression sig int) := ⟨expression.literal_int 1⟩
+infix < := expression.lt
 
 def type_map_add : Π{t : type}, type_map t → type_map t → type_map t
 | int a b := a + b
@@ -138,9 +136,9 @@ def type_map_mult : Π{t : type}, type_map t → type_map t → type_map t
 -- pattern matching does not work due to problems with the parser
 -- implicit argument C of recursor is filled in by the special elaborator "eliminator"
 -- arguments sig t and expr must be named, otherwise the eliminator elaborator fails
-def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ := expression.rec_on expr 
+/- def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ := expression.rec_on expr 
     -- tlocal
-    (λ t dim n idx h₁ h₂ h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
+    (λ n idx h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
     -- shared
     (λ t dim n idx h₁ h₂ h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
     -- add
@@ -150,7 +148,7 @@ def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ
     -- literal_int
     (λ t n h, (n : ℕ))
     -- lt
-    (λ t h a b ih_a ih_b, ih_a + ih_b + 1)
+    (λ t h a b ih_a ih_b, ih_a + ih_b + 1) -/
 
 -- def s₁ : signature
 -- | _ := { scope := scope.shared, type := ⟨1, type.int⟩ }
@@ -163,15 +161,8 @@ def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ
 -- #eval expression_size (tlocal_var "n" idx₁ sorry sorry sorry  : expression s₁ int)
 -- #eval expression_size (expression.add (literal_int 123 (by refl)) (literal_int 123 (by refl)) : expression s₁ int)
 
-#print expression_size
-
-@[simp]
-lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
-
-#print psigma.has_well_founded
-#print psigma.lex
-#print has_well_founded_of_has_sizeof 
-#print expression.sizeof
+/- @[simp]
+lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry -/
 
 def vector_mpr {α : Type} {dim : ℕ} {sig : signature} {n} (h : (((sig.val n).type).dim) = dim) (v : vector α dim) : vector α (((sig.val n).type).dim) := begin
     rw h,
@@ -188,33 +179,35 @@ lemma vector_mpr_rfl {sig : signature} {n} {α : Type} {h : (((sig.val n).type).
 -- might have to change this to rec_on
 def eval {sig : signature} (m : memory $ parlang_mcl_tlocal sig) {t : type} (expr : expression sig t) : type_map t := expression.rec_on expr 
     -- tlocal
-    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact m.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
+    (λ n idx h₁ ih, m.get ⟨n, vector.of_fn ih⟩)
     -- shared
     -- requires that the shared variable has been loaded into tstate under the same name
-    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact m.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
+    (λ n idx h₁ ih, m.get ⟨n, vector.of_fn ih⟩)
     -- add
     (λ t a b ih_a ih_b, type_map_add ih_a ih_b)
     -- mult
     (λ t a b ih_a ih_b, type_map_mult ih_a ih_b)
     -- literal_int
-    (λ t n h, (by rw [h]; exact n))
+    (λ n, n)
     -- lt
-    (λ t h a b ih_a ih_b, (by rw h; exact (ih_a < ih_b)))
+    (λ a b ih_a ih_b, ih_a < ih_b)
 
 def load_shared_vars_for_expr {sig : signature} {t : type} (expr : expression sig t) : list (parlang_mcl_kernel sig) := expression.rec_on expr 
     -- tlocal
-    (λ t dim n idx h₁ h₂ h₃ ih, (vector.of_fn ih).to_list.foldl list.append [])
+    (λ n idx h₁ ih, (vector.of_fn ih).to_list.foldl list.append [])
     -- shared
     -- loads the shared variable in the tlocal memory under the same name
-    (λ t dim n idx h₁ h₂ h₃ ih, (vector.of_fn ih).to_list.foldl list.append [] ++ [(kernel.load (λ s, ⟨⟨n, vector_mpr h₂ $ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ $ (vector.of_fn idx).map (eval s)⟩ v⟩) : parlang_mcl_kernel sig)])
+    (λ n idx h₁ ih, (vector.of_fn ih).to_list.foldl list.append [] ++ 
+        [kernel.load (λ s, ⟨⟨n, (vector.of_fn idx).map (eval s)⟩, 
+        λ v, s.update ⟨n, (vector.of_fn idx).map (eval s)⟩ v⟩)])
     -- add
     (λ t a b ih_a ih_b, ih_a ++ ih_b)
     -- mult
     (λ t a b ih_a ih_b, ih_a ++ ih_b)
     -- literal_int
-    (λ t n h, [])
+    (λ n, [])
     -- lt
-    (λ t h a b ih_a ih_b, ih_a ++ ih_b)
+    (λ a b ih_a ih_b, ih_a ++ ih_b)
 
 def prepend_load_expr {sig : signature} {t : type} (expr : expression sig t) (k : parlang_mcl_kernel sig) :=
 (load_shared_vars_for_expr expr).foldr kernel.seq k
@@ -225,7 +218,7 @@ def append_load_expr  {sig : signature} {t : type} (expr : expression sig t) (k 
 --list_to_kernel_seq ([k] ++ load_shared_vars_for_expr expr)
 
 example (k) : prepend_load_expr (7 : expression sig int) k = k := by refl
-example (k) (n idx h₁ h₂ h₃) : prepend_load_expr (@shared_var sig _ 1 n idx h₁ h₂ h₃ : expression sig int) k = k := begin
+example (k) (n idx h₁) : prepend_load_expr (@shared_var sig n idx h₁ : expression sig (signature.type_of n sig)) k = k := begin
     rw prepend_load_expr,
     rw load_shared_vars_for_expr,
     repeat { rw list.foldr },
@@ -233,7 +226,7 @@ example (k) (n idx h₁ h₂ h₃) : prepend_load_expr (@shared_var sig _ 1 n id
 end
 
 example (k) : append_load_expr (7 : expression sig int) k = k := by refl
-example (k) (n idx h₁ h₂ h₃) : append_load_expr (@shared_var sig _ 1 n idx h₁ h₂ h₃ : expression sig int) k = k := begin
+example (k) (n idx h₁) : append_load_expr (@shared_var sig n idx h₁ : expression sig (signature.type_of n sig)) k = k := begin
     rw append_load_expr,
     rw load_shared_vars_for_expr,
     repeat { rw list.foldl },
@@ -247,17 +240,17 @@ end
 
 def expr_reads (n : string) {t : type} (expr : expression sig t) : _root_.bool := expression.rec_on expr
     -- tlocal
-    (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || ((list.range_fin dim).map ih).any id)
+    (λ m idx h₁ ih, (m = n) || (vector.of_fn ih).to_list.any id)
     -- shared
-    (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || ((list.range_fin dim).map ih).any id)
+    (λ m idx h₁ ih, (m = n) || (vector.of_fn ih).to_list.any id)
     -- add
     (λ t a b ih_a ih_b, ih_a || ih_b)
     -- mult
     (λ t a b ih_a ih_b, ih_a || ih_b)
     -- literal_int
-    (λ t n h, ff)
+    (λ n, ff)
     -- lt
-    (λ t h a b ih_a ih_b, ih_a || ih_b)
+    (λ a b ih_a ih_b, ih_a || ih_b)
 
 meta def eqt : tactic unit := do
     t ← tactic.target,
@@ -276,7 +269,7 @@ eval (s.update ⟨n, idx₂⟩ v) expr = eval s expr := begin
     {
         simp [eval],
         simp [eval] at expr_ih,
-        eqt,
+        --eqt,
         sorry,
     },
     repeat { sorry },

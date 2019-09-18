@@ -141,19 +141,19 @@ def thread_state.update_shared_vars_for_expr {t : type} (expr : expression sig t
 thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) → thread_state (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig) :=
 expression.rec_on expr 
     -- tlocal
-    (λ t dim n idx h₁ h₂ h₃ ih, id)
+    (λ n idx h₁ ih, id)
     -- shared
-    (λ t dim n idx h₁ h₂ h₃ ih, λ ts,
-    ((list.range_fin dim).foldl (λ ts e, ih e ts) ts
-    ).load (λ s, ⟨⟨n, vector_mpr h₂ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ ((vector.of_fn idx).map (eval s))⟩ v⟩))
+    (λ n idx h₁ ih, λ ts,
+    ((list.range_fin (((sig.val n).type).dim)).foldl (λ ts e, ih e ts) ts
+    ).load (λ s, ⟨⟨n, (vector.of_fn idx).map (eval s)⟩, λ v, s.update ⟨n, (vector.of_fn idx).map (eval s)⟩ v⟩))
     -- add
     (λ t a b ih_a ih_b, ih_b ∘ ih_a)
     -- mult
     (λ t a b ih_a ih_b, ih_b ∘ ih_a)
     -- literal_int
-    (λ t n h, id)
+    (λ n, id)
     -- lt
-    (λ t h a b ih_a ih_b, ih_b ∘ ih_a)
+    (λ a b ih_a ih_b, ih_b ∘ ih_a)
 
 -- TODO: change to double implication
 /-- Resolve semantics of loading_shared_vars_for_expr to the relation on state -/
