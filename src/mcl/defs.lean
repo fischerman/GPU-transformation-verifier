@@ -140,9 +140,9 @@ def type_map_mult : Π{t : type}, type_map t → type_map t → type_map t
 -- arguments sig t and expr must be named, otherwise the eliminator elaborator fails
 def expression_size {sig : signature} {t : type} (expr : expression sig t) : ℕ := expression.rec_on expr 
     -- tlocal
-    (λ t dim n idx h₁ h₂ h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
+    (λ t dim n idx h₁ h₂ h₃ ih, 1 + (vector.of_fn ih).to_list.sum)
     -- shared
-    (λ t dim n idx h₁ h₂ h₃ ih, 1 + ((list.range_fin dim).map ih).sum)
+    (λ t dim n idx h₁ h₂ h₃ ih, 1 + (vector.of_fn ih).to_list.sum)
     -- add
     (λ t a b ih_a ih_b, (1 : ℕ) + (ih_a : ℕ) + (ih_b : ℕ))
     -- mult
@@ -185,13 +185,12 @@ lemma vector_mpr_rfl {sig : signature} {n} {α : Type} {h : (((sig.val n).type).
 
 -- should we make this an inductive predicate
 -- it would have implications on parlang
--- might have to change this to rec_on
 def eval {sig : signature} (m : memory $ parlang_mcl_tlocal sig) {t : type} (expr : expression sig t) : type_map t := expression.rec_on expr 
     -- tlocal
-    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact m.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
+    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; rw ← h₂ at ih; exact m.get ⟨n, vector.of_fn ih⟩)
     -- shared
     -- requires that the shared variable has been loaded into tstate under the same name
-    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; exact m.get ⟨n, vector_mpr h₂ $ (vector.range_fin dim).map ih⟩)
+    (λ t dim n idx h₁ h₂ h₃ ih, by rw ← h₁; rw ← h₂ at ih; exact m.get ⟨n, vector.of_fn ih⟩)
     -- add
     (λ t a b ih_a ih_b, type_map_add ih_a ih_b)
     -- mult
@@ -201,12 +200,16 @@ def eval {sig : signature} (m : memory $ parlang_mcl_tlocal sig) {t : type} (exp
     -- lt
     (λ t h a b ih_a ih_b, (by rw h; exact (ih_a < ih_b)))
 
+/-- h₂ corresponds to h₂ of expr and mclk -/
+def mcl_addr_from_var {sig : signature} {n dim} (h₂ : (sig.val n).type.dim = dim) (idx : vector (expression sig type.int) dim) (m : memory $ parlang_mcl_tlocal sig) : mcl_address sig := 
+⟨n, by rw ← h₂ at idx; exact idx.map (eval m)⟩
+
 def load_shared_vars_for_expr {sig : signature} {t : type} (expr : expression sig t) : list (parlang_mcl_kernel sig) := expression.rec_on expr 
     -- tlocal
     (λ t dim n idx h₁ h₂ h₃ ih, (vector.of_fn ih).to_list.foldl list.append [])
     -- shared
     -- loads the shared variable in the tlocal memory under the same name
-    (λ t dim n idx h₁ h₂ h₃ ih, (vector.of_fn ih).to_list.foldl list.append [] ++ [(kernel.load (λ s, ⟨⟨n, vector_mpr h₂ $ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ $ (vector.of_fn idx).map (eval s)⟩ v⟩) : parlang_mcl_kernel sig)])
+    (λ t dim n idx h₁ h₂ h₃ ih, (vector.of_fn ih).to_list.foldl list.append [] ++ [kernel.load (λ m, ⟨mcl_addr_from_var h₂ (vector.of_fn idx) m, λ v, m.update (mcl_addr_from_var h₂ (vector.of_fn idx) m) v⟩)])
     -- add
     (λ t a b ih_a ih_b, ih_a ++ ih_b)
     -- mult
@@ -315,14 +318,19 @@ def mclk_reads (n : string) : mclk sig → _root_.bool
 
 --lemma mclk_expr_reads (k) : mclk_reads n k → ∃ expr, (expr_reads n expr ∧ subexpr expr k)
 
+/-- A variation of *memory.update*, that is optimized for the arguments of MCL -/
+def memory.update_assign {sig : signature} {t : type} {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = idx.length)
+(expr : expression sig t) 
+(m : memory $ parlang_mcl_tlocal sig) : memory $ parlang_mcl_tlocal sig := m.update (mcl_addr_from_var h₂ idx m) (begin unfold mcl_addr_from_var parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval m expr) end)
+
 def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | skip := kernel.compute id
 | sync := kernel.sync
-| (tlocal_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)))
-| (shared_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end))) ;; kernel.store (λ s, ⟨⟨n, vector_mpr h₂ $ idx.map (eval s)⟩, s.get ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩⟩)
-| (ite c th el) := prepend_load_expr c (kernel.ite (λs, eval s c) (mclk_to_kernel th) (mclk_to_kernel el))
-| (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute (λ s, s.update ⟨n, vector_mpr h₂ $  v[eval s expr]⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, unfold signature.type_of at h, rw h, exact eval s expr end))) ;; 
+| (tlocal_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute $ memory.update_assign n idx h₁ h₂ expr)
+| (shared_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute $ memory.update_assign n idx h₁ h₂ expr) ;; kernel.store (λ m, ⟨mcl_addr_from_var h₂ idx m, m.get $ mcl_addr_from_var h₂ idx m⟩)
+| (ite c th el) := prepend_load_expr c (kernel.ite (λm, eval m c) (mclk_to_kernel th) (mclk_to_kernel el))
+| (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute $ memory.update_assign n v[0] h h₂ expr) ;; 
     prepend_load_expr c (
         kernel.loop (λ s, eval s c) (mclk_to_kernel k_body ;; append_load_expr c (mclk_to_kernel k_inc))
     )

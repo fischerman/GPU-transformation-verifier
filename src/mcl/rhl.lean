@@ -238,7 +238,7 @@ def g := λ(n : nat), n + 1
 /-- Stores the locally computed value in the shadow memory. This is an abstraction over *thread_state.store*, which hides the lambda-term. This makes it easier to rewrite. -/
 @[irreducible]
 def thread_state.tlocal_to_shared {sig : signature} {t} {dim} (var : string) (idx : vector (expression sig type.int) dim) (h₁ : type_of (sig.val var) = t) (h₂ : ((sig.val var).type).dim = dim) := 
-@thread_state.store _ _ (parlang_mcl_shared sig) _ (λ (s : memory $ parlang_mcl_tlocal sig), ⟨⟨var, vector_mpr h₂ (idx.map (eval s))⟩, s.get ⟨var, vector_mpr h₂ (idx.map (eval s))⟩⟩)
+@thread_state.store _ _ (parlang_mcl_shared sig) _ (λ (m : memory $ parlang_mcl_tlocal sig), ⟨mcl_addr_from_var h₂ idx m, m.get $ mcl_addr_from_var h₂ idx m⟩)
 
 /-- Evaluates an expressions and assigns the value -/
 def thread_state.assign_expr {sig : signature} (var) (expr : expression sig $ sig.type_of var)
@@ -330,15 +330,15 @@ lemma shared_assign_right {t dim n} {idx : vector (expression sig₂ type.int) d
 {* (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
     ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_shared sig₂)).map_active_threads ac₂ (
         thread_state.tlocal_to_shared n idx h₁ h₂ ∘
-        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
+        thread_state.compute (memory.update_assign n idx h₁ h₂ expr) ∘ 
         thread_state.update_shared_vars_for_expr expr
     )) ac₂) *}
 (skip : mclk sig₁) ~> shared_assign n idx h₁ h₂ expr {* P *} := begin
     intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
     use ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_shared sig₂)).map_active_threads ac₂ (
         thread_state.tlocal_to_shared n idx h₁ h₂ ∘
-        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
-        (thread_state.update_shared_vars_for_expr expr)
+        thread_state.compute (memory.update_assign n idx h₁ h₂ expr) ∘ 
+        thread_state.update_shared_vars_for_expr expr
     )),
     split, {
         unfold mclk_to_kernel,
@@ -400,7 +400,7 @@ lemma shared_assign_left {t dim n expr} {idx : vector (expression sig₁ type.in
 mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ 
     ((s₁ : parlang.state n₁ (memory $ parlang_mcl_tlocal sig₁) (parlang_mcl_shared sig₁)).map_active_threads ac₁ (
         thread_state.tlocal_to_shared n idx h₁ h₂ ∘
-        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₁, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
+        thread_state.compute (memory.update_assign n idx h₁ h₂ expr) ∘ 
         (thread_state.update_shared_vars_for_expr expr)
     )) ac₁ n₂ s₂ ac₂) 
 (shared_assign n idx h₁ h₂ expr) (skip : mclk sig₂) P := begin
@@ -411,7 +411,7 @@ lemma shared_assign_left' {t dim n expr} {idx : vector (expression sig₁ type.i
 (hi : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → Q n₁ 
     (s₁.map_active_threads ac₁ (
         thread_state.tlocal_to_shared n idx h₁ h₂ ∘
-        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₁, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
+        thread_state.compute (memory.update_assign n idx h₁ h₂ expr) ∘ 
         (thread_state.update_shared_vars_for_expr expr)
     )) ac₁ n₂ s₂ ac₂) : 
 mclk_rel P (shared_assign n idx h₁ h₂ expr) (skip : mclk sig₂) Q := begin
