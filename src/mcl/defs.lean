@@ -321,7 +321,7 @@ def mclk_reads (n : string) : mclk sig → _root_.bool
 /-- A variation of *memory.update*, that is optimized for the arguments of MCL -/
 def memory.update_assign {sig : signature} {t : type} {dim : ℕ} (n : string) (idx : vector (expression sig int) dim) (h₁ : type_of (sig.val n) = t) (h₂ : (sig.val n).type.dim = idx.length)
 (expr : expression sig t) 
-(m : memory $ parlang_mcl_tlocal sig) : memory $ parlang_mcl_tlocal sig := m.update (mcl_addr_from_var h₂ idx m) (begin unfold mcl_addr_from_var parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval m expr) end)
+(m : memory $ parlang_mcl_tlocal sig) : memory $ parlang_mcl_tlocal sig := m.update (mcl_addr_from_var h₂ idx m) (by rw ← h₁ at expr; exact (eval m expr))
 
 def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
