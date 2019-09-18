@@ -234,6 +234,35 @@ def g := λ(n : nat), n + 1
 #check g
 #eval (f ∘ g) 4
 
+-- TODO should this moved to defs?
+/-- Stores the locally computed value in the shadow memory. This is an abstraction over *thread_state.store*, which hides the lambda-term. This makes it easier to rewrite. -/
+@[irreducible]
+def thread_state.tlocal_to_shared {sig : signature} {t} {dim} (var : string) (idx : vector (expression sig type.int) dim) (h₁ : type_of (sig.val var) = t) (h₂ : ((sig.val var).type).dim = dim) := 
+@thread_state.store _ _ (parlang_mcl_shared sig) _ (λ (s : memory $ parlang_mcl_tlocal sig), ⟨⟨var, vector_mpr h₂ (idx.map (eval s))⟩, s.get ⟨var, vector_mpr h₂ (idx.map (eval s))⟩⟩)
+
+/-- Evaluates an expressions and assigns the value -/
+def thread_state.assign_expr {sig : signature} (var) (expr : expression sig $ sig.type_of var)
+(idx : vector (expression sig type.int) (sig.val var).type.dim) :=
+@thread_state.compute (memory $ parlang_mcl_tlocal sig) _ (parlang_mcl_shared sig) _
+    $ λs, s.update ⟨var, idx.map (eval s)⟩ $ eval s expr
+
+
+/-- Processes a single tlocal assign on the right side. Proven by operational semantics -/
+lemma tlocal_assign_right {var} 
+{expr : expression sig₂ $ sig₂.type_of var}
+{idx : vector (expression sig₂ type.int) (sig₂.val var).type.dim} :
+{* (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
+    ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_shared sig₂)).map_active_threads ac₂ (
+        thread_state.assign_expr var expr idx ∘ 
+        thread_state.update_shared_vars_for_expr expr
+    )) ac₂) *}
+(skip : mclk sig₁) ~> tlocal_assign var idx rfl rfl expr {* P *} := begin
+    unfold mclk_rel,
+    unfold mclk_to_kernel,
+    unfold prepend_load_expr,
+    sorry,
+end
+
 -- lemma tlocal_assign_right {t dim n expr} {idx : vector (expression sig₂ type.int) dim} {h₁ : type_of (sig₂ n) = t} {h₂ : ((sig₂ n).type).dim = vector.length idx} : 
 -- mclk_rel (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ (s₂.map_active_threads ac₂ (λ ts, (thread_state.update_shared_vars_for_expr expr ts).map (λ s, s.update' h₁ (exprs_to_indices h₂ s) (eval s expr)))) ac₂) (skip : mclk sig₁) (tlocal_assign n idx h₁ h₂ expr) P := begin
 --     intros n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp he₁,
@@ -278,18 +307,7 @@ def g := λ(n : nat), n + 1
 --     assumption,
 -- end
 
--- TODO should this moved to defs?
-/-- Stores the locally computed value in the shadow memory. This is an abstraction over *thread_state.store*, which hides the lambda-term. This makes it easier to rewrite. -/
-@[irreducible]
-def thread_state.tlocal_to_shared {sig : signature} {t} {dim} (var : string) (idx : vector (expression sig type.int) dim) (h₁ : type_of (sig.val var) = t) (h₂ : ((sig.val var).type).dim = dim) := 
-@thread_state.store _ _ (parlang_mcl_shared sig) _ (λ (s : memory $ parlang_mcl_tlocal sig), ⟨⟨var, vector_mpr h₂ (idx.map (eval s))⟩, s.get ⟨var, vector_mpr h₂ (idx.map (eval s))⟩⟩)
-
-/-- Evaluates an expressions and assigns the value -/
-def thread_state.assign_expr {sig : signature} (var) (expr : expression sig $ sig.type_of var)
-(idx : vector (expression sig type.int) (sig.val var).type.dim) :=
-@thread_state.compute (memory $ parlang_mcl_tlocal sig) _ (parlang_mcl_shared sig) _
-    $ λs, s.update ⟨var, idx.map (eval s)⟩ $ eval s expr
-
+-- todo define in terms of 
 /-- Processes a single shared assign on the right side. Proven by operational semantics -/
 lemma shared_assign_right'' {var} 
 {expr : expression sig₂ $ sig₂.type_of var}
