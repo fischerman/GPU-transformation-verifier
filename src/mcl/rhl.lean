@@ -145,7 +145,7 @@ expression.rec_on expr
     -- shared
     (λ t dim n idx h₁ h₂ h₃ ih, λ ts,
     ((list.range_fin dim).foldl (λ ts e, ih e ts) ts
-    ).load (λ s, ⟨⟨n, vector_mpr h₂ ((vector.of_fn idx).map (eval s))⟩, λ v, s.update ⟨n, vector_mpr h₂ ((vector.of_fn idx).map (eval s))⟩ v⟩))
+    ).load (λ m, ⟨mcl_addr_from_var h₂ (vector.of_fn idx) m, λ v, m.update (mcl_addr_from_var h₂ (vector.of_fn idx) m) v⟩))
     -- add
     (λ t a b ih_a ih_b, ih_b ∘ ih_a)
     -- mult
