@@ -231,6 +231,8 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
             sorry, -- trivial
         },
         refl,
+    }, {
+        sorry, --trivial
     }
 end
 
