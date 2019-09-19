@@ -70,7 +70,7 @@ s.syncable m →
 (∀ tid : fin n, (s.threads.nth tid).loads = ∅) →
 syncable' shole lhole (map_active_threads ac (ts_updates [op.compute_list computes]) s) m := begin
     intros syncable no_stores no_loads,
-    unfold syncable',
+    unfold syncable' state.syncable,
     split,
     {
         simp only [accesses, compute_list_stores', compute_list_loads', compute_list_shared'],
