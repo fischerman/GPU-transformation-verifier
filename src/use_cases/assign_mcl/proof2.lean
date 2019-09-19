@@ -44,7 +44,7 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
         apply shared_assign_left,
     },
     apply shared_assign_left',
-    intros _ _ _ _ _ _ h,
+    intros _ _ _ _ _ _ h hs,
     cases h with m₁ h,
     cases h with m₂ h,
     simp only [map_map_active_threads],

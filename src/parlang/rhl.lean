@@ -85,7 +85,8 @@ end
 
 lemma rel_kernel_to_program {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P Q : memory τ₁ → memory τ₂ → Prop} {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ}
  (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ *} k₁ ~> k₂ 
- {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂ *} ) : -- if I have to proof syncability of s₁, do I really have to assume termination of the left?
+ {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, (∃ m₁, s₁.syncable m₁) → ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂ *} )
+ (hg : ∀ {m₁ m₂}, P m₁ m₂ → 0 < f₁ m₁) :
  rel_hoare_program init₁ init₂ P (program.intro f₁ k₁) (program.intro f₂ k₂) Q :=
 begin
     unfold rel_hoare_state at h,
@@ -99,7 +100,7 @@ begin
         (vector.repeat tt (f₁ m₁))
         (vector.repeat tt (f₂ m₂)),
     have hh : (∃ (s₂' : state (f₂ m₂) σ₂ τ₂), exec_state k₂ (vector.repeat tt (f₂ m₂)) (init_state init₂ f₂ m₂) s₂' ∧
-    ∃ (m₁_1 : memory τ₁) (m₂_1 : memory τ₂), state.syncable hep_s' m₁_1 ∧ state.syncable s₂' m₂_1 ∧ Q m₁_1 m₂_1) := begin
+    ((∃ m₁, hep_s'.syncable m₁) → ∃ (m₁_1 : memory τ₁) (m₂_1 : memory τ₂), state.syncable hep_s' m₁_1 ∧ state.syncable s₂' m₂_1 ∧ Q m₁_1 m₂_1)) := begin
         apply h,
         {
             apply exists.intro m₁,
@@ -159,6 +160,7 @@ begin
     end,
     cases hh,
     cases hh_h,
+    specialize hh_h_right ⟨_, hep_hsync⟩,
     cases hh_h_right with m₁'',
     cases hh_h_right_h with m₂',
     apply exists.intro m₂',
@@ -169,12 +171,8 @@ begin
         { exact hh_h_left, },
     }, {
         have hu : m₁' = m₁'' := begin
-            by_cases hz : 0 < (f₁ m₁),
-            {
-                apply state.syncable_unique hep_hsync hh_h_right_h_h.left hz,
-            }, {
-                sorry
-            }
+            have hz : 0 < (f₁ m₁) := hg hp,
+            apply state.syncable_unique hep_hsync hh_h_right_h_h.left hz,
         end,
         subst hu,
         exact hh_h_right_h_h.right.right,
