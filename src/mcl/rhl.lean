@@ -111,6 +111,11 @@ lemma skip_right : {* P *} k₁ ~> k₂ {* Q *} ↔
 lemma skip_right_after : {* P *} k₁ ~> k₂ {* Q *} ↔ 
 {* P *} k₁ ~> k₂ ;; skip {* Q *} := sorry
 
+lemma single_step_left :
+{* P *} k₁ ~> skip {* Q *} →
+{* Q *} k₁' ~> k₂ {* R *} →
+{* P *} (k₁ ;; k₁') ~> k₂ {* R *} := parlang.single_step_left Q
+
 @[irreducible]
 def exprs_to_indices {n dim} {idx : vector (expression sig type.int) dim} (h : ((sig.val n).type).dim = vector.length idx) (s : (memory $ parlang_mcl_tlocal sig)) : 
 (sig.val n).type.dim = (idx.map (eval s)).length := h
