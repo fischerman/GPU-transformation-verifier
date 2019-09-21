@@ -327,8 +327,8 @@ def mclk_to_kernel {sig : signature} : mclk sig → parlang_mcl_kernel sig
 | (seq k₁ k₂) := kernel.seq (mclk_to_kernel k₁) (mclk_to_kernel k₂)
 | skip := kernel.compute id
 | sync := kernel.sync
-| (tlocal_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute $ memory.update_assign n idx h₁ h₂ expr)
-| (shared_assign n idx h₁ h₂ expr) := prepend_load_expr expr (kernel.compute $ memory.update_assign n idx h₁ h₂ expr) ;; kernel.store (λ m, ⟨mcl_addr_from_var h₂ idx m, m.get $ mcl_addr_from_var h₂ idx m⟩)
+| (tlocal_assign n idx h₁ h₂ expr) := idx.to_list.foldr (λexpr' k, prepend_load_expr expr' k) $ prepend_load_expr expr (kernel.compute $ memory.update_assign n idx h₁ h₂ expr)
+| (shared_assign n idx h₁ h₂ expr) := idx.to_list.foldr (λexpr' k, prepend_load_expr expr' k) $ prepend_load_expr expr (kernel.compute $ memory.update_assign n idx h₁ h₂ expr) ;; kernel.store (λ m, ⟨mcl_addr_from_var h₂ idx m, m.get $ mcl_addr_from_var h₂ idx m⟩)
 | (ite c th el) := prepend_load_expr c (kernel.ite (λm, eval m c) (mclk_to_kernel th) (mclk_to_kernel el))
 | (for n h h₂ expr c k_inc k_body) := prepend_load_expr expr (kernel.compute $ memory.update_assign n v[0] h h₂ expr) ;; 
     prepend_load_expr c (

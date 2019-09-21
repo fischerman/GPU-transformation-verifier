@@ -67,6 +67,8 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
     split, {
         have : thread_state.update_shared_vars_for_expr read_tid = id := by refl,
         rw this,
+        have : thread_state.update_shared_vars_for_exprs v[read_tid] = id := by refl,
+        rw this,
         have : thread_state.update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
         rw this,
         simp,
@@ -136,6 +138,8 @@ lemma assign_rel' : mclp_rel eq p₁ p₂ eq := begin
     }, 
     split, {
         have : thread_state.update_shared_vars_for_expr read_tid = id := by refl,
+        rw this,
+        have : thread_state.update_shared_vars_for_exprs v[read_tid] = id := by refl,
         rw this,
         have : thread_state.update_shared_vars_for_expr (read_tid + (expression.literal_int 1 (show type_of (sig.val "b") = type_of (sig.val "b"), by refl))) = id := by refl,
         rw this,
