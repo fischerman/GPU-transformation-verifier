@@ -249,6 +249,16 @@ lemma consequence_pre (h : {* P *} k₁ ~> k₂ {* Q *})
     exact a,
 end
 
+lemma consequence_post (h : {* P *} k₁ ~> k₂ {* Q *}) 
+(hp : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, Q n₁ s₁ ac₁ n₂ s₂ ac₂ → Q' n₁ s₁ ac₁ n₂ s₂ ac₂) : 
+{* P *} k₁ ~> k₂ {* Q' *} := begin
+    apply consequence,
+    exact h,
+    intros,
+    exact a,
+    exact hp,
+end
+
 def assertion_swap_side (P : @rhl_kernel_assertion σ₁ σ₂ _ _ τ₁ τ₂ _ _) := λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₂ s₂ ac₂ n₁ s₁ ac₁
 
 lemma swap' (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ ∧ ∃ t, exec_state k₂ ac₂ s₂ t *} k₁ ~> k₂ {* Q *}) (he₁ : ∀ {n₁ s₁ ac₁ n₂ s₂ ac₂}, P n₁ s₁ ac₁ n₂ s₂ ac₂ → ∃ s₁', exec_state k₁ ac₁ s₁ s₁') : 
@@ -625,7 +635,11 @@ theorem known_branch_left (c : σ₁ → bool) (th) (el)
     specialize h₁ n₁ s₁ ac₁ n₂ s₂ ac₂ hp,
     apply h₂ n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp,
     have : (deactivate_threads (bnot ∘ c) ac₁ s₁) = ac₁ := begin
-        sorry,
+        apply ac_deac_ge',
+        intros _ h' _,
+        specialize h₁ t,
+        simp [deactivate_threads, *] at h',
+        exact h',
     end,
     rw this at he_a,
     have : no_thread_active (deactivate_threads c ac₁ s₁) = tt := sorry,
