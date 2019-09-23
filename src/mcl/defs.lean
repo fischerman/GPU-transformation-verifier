@@ -250,9 +250,9 @@ end
 
 def expr_reads (n : string) {t : type} (expr : expression sig t) : _root_.bool := expression.rec_on expr
     -- tlocal
-    (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || ((list.range_fin dim).map ih).any id)
+    (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || (vector.of_fn ih).to_list.any id)
     -- shared
-    (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || ((list.range_fin dim).map ih).any id)
+    (λ t dim m idx h₁ h₂ h₃ ih, (m = n) || (vector.of_fn ih).to_list.any id)
     -- add
     (λ t a b ih_a ih_b, ih_a || ih_b)
     -- mult
