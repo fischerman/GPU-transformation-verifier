@@ -227,4 +227,12 @@ lemma no_thread_active_ge {ac' : vector bool n} (h : no_thread_active ac) : ac' 
   sorry,
 end
 
+lemma all_threads_active_eq {ac' : vector bool n} (h : all_threads_active ac) (h' : all_threads_active ac') : ac = ac' := begin
+  apply vector.eq_element_wise,
+  intro i,
+  have := all_threads_active_nth h i,
+  have := all_threads_active_nth h' i,
+  sorry,
+end
+
 end parlang

@@ -200,6 +200,11 @@ lemma single_step_left {P Q} {k₁ k : kernel σ₁ τ₁} {k₂ : kernel σ₂ 
     exact hek₁_a_1,
 end
 
+lemma single_step_right {P Q} {k₁ : kernel σ₁ τ₁} {k₂ k : kernel σ₂ τ₂} (R)
+    (h₁ : {* P *} (kernel.compute id) ~> k  {* R *})
+    (h₂ : {* R *} k₁ ~> k₂ {* Q *}) : 
+    {* P *} k₁ ~> k ;; k₂ {* Q *} := sorry
+
 variables {P Q R P' Q' I : Π n₁:ℕ, state n₁ σ₁ τ₁ → vector bool n₁ → Π n₂:ℕ, state n₂ σ₂ τ₂ → vector bool n₂ → Prop} {k₁ k₁' : kernel σ₁ τ₁} {k₂ k₂' : kernel σ₂ τ₂}
 
 -- intuition of the proof (to be repurposed by further proofs):
