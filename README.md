@@ -1,4 +1,4 @@
-# MCL Verify
+# GPU Transformation Verifier
 
 > ## WORK IN PROGRESS. DO NOT USE.
 
