@@ -276,4 +276,42 @@ end
 
 lemma kernel_foldr_skip {k : kernel σ τ} {n} {ks s u} {ac : vector bool n} : exec_state (list.foldr kernel.seq k ks) ac s u = exec_state (list.foldr kernel.seq (kernel.compute id) ks ;; k) ac s u := sorry
 
+lemma exec_no_threads_active {k : kernel σ τ} {n} {s} {ac : vector bool n} 
+(h : no_thread_active ac = tt) :
+exec_state k ac s s := begin
+  induction k,
+  {
+    rw [← state.map_active_threads_no_thread_active s ac _ h] { occs := occurrences.pos [2] },
+    apply exec_state.load,
+  }, {
+    rw [← state.map_active_threads_no_thread_active s ac _ h] { occs := occurrences.pos [2] },
+    apply exec_state.store,
+  }, {
+    rw [← state.map_active_threads_no_thread_active s ac _ h] { occs := occurrences.pos [2] },
+    apply exec_state.compute,
+  }, {
+    apply exec_state.seq,
+    repeat { assumption },
+  }, {
+    apply exec_state.ite,
+    rw ac_deac_ge',
+    exact k_ih_a,
+    apply no_thread_active_ge,
+    exact h,
+    rw ac_deac_ge',
+    exact k_ih_a_1,
+    apply no_thread_active_ge,
+    exact h,
+  }, {
+    apply exec_state.loop_stop,
+    rw ac_deac_ge',
+    exact h,
+    apply no_thread_active_ge,
+    exact h,
+  }, {
+    apply exec_state.sync_none,
+    exact h,
+  }
+end
+
 end parlang

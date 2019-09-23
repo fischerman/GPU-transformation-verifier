@@ -234,5 +234,24 @@ lemma map_active_threads_comm {s : state n σ τ} {ac₁ ac₂ : vector bool n} 
   }
 end
 
+lemma map_active_threads_no_thread_active (s : state n σ τ) (ac : vector bool n) (f) 
+(h : no_thread_active ac) :
+s.map_active_threads ac f = s := begin
+  unfold map_active_threads,
+  cases s,
+  simp,
+  apply vector.eq_element_wise,
+  intro i,
+  simp,
+  by_cases h' : vector.nth ac i = tt,
+  {
+    have : _ := no_threads_active_nth h i,
+    contradiction,
+  }, {
+    rw eq_ff_eq_not_eq_tt at h',
+    simp *,
+  }
+end
+
 end state
 end parlang

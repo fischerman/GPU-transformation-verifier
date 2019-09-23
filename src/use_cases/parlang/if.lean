@@ -57,4 +57,25 @@ example {σ₁ ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → T
     }
 end
 
+def p₁ : program bool (λ (s : string), ℕ) :=
+program.intro (λ_, 1) (
+    compute (λ_, tt) ;;
+    ite id (
+        store (λ_, ⟨"a", 7⟩)
+    ) (
+        store (λ_, ⟨"a", 5⟩)
+    )
+)
+
+def p₂ : program bool (λ (s : string), ℕ) :=
+program.intro (λ_, 1) (
+    store (λ_, ⟨"a", 7⟩)
+)
+
+example : rel_hoare_program (λ_, ff) (λ_, ff) (λ_ _, true) p₁ p₂ eq := begin
+    apply rel_kernel_to_program,
+    sorry,
+    sorry,
+end
+
 end parlang

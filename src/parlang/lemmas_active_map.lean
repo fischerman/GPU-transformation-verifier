@@ -206,4 +206,25 @@ lemma ac_deac_ge (h : deactivate_threads f ac s ≥ deactivate_threads f' ac t) 
     }
 end
 
+lemma deac_ff : (deactivate_threads (λ_, ff) ac s) = ac := begin
+  apply vector.eq_element_wise,
+  intro,
+  unfold deactivate_threads,
+  simp [vector.nth_map₂],
+end 
+
+lemma ac_deac_ge' (h : deactivate_threads f ac s ≥ ac) : deactivate_threads f ac s = ac := begin
+  rw ← @deac_ff _ _ _ _ _ _ ac,
+  rw ac_deac_comm,
+  apply ac_deac_ge,
+  rw ← @deac_ff _ _ _ _ _ _ ac at h { occs := occurrences.pos [2] },
+  exact h,
+  exact s,
+end
+
+lemma no_thread_active_ge {ac' : vector bool n} (h : no_thread_active ac) : ac' ≥ ac := begin
+  intros i h',
+  sorry,
+end
+
 end parlang

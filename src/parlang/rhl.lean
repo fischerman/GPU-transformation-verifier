@@ -594,4 +594,45 @@ end
 lemma kernel_foldr_skip_right {k : kernel σ₂ τ₂} {ks} : 
 {* P *} k₁ ~> list.foldr kernel.seq k ks {* Q *} ↔ {* P *} k₁ ~> list.foldr kernel.seq (kernel.compute id) ks ;; k {* Q *} := sorry
 
+lemma rhl_eq :
+{* λn₁ (s₁ : state n₁ σ₁ τ₁) ac₁ n₂ s₂ ac₂, n₁ = n₂ ∧ ∀ h : n₁ = n₂, s₁ = (by rw h; exact s₂) ∧ ac₁ = (by rw h; exact ac₂) *}
+k₁ ~> k₁
+{* λn₁ s₁ ac₁ n₂ s₂ ac₂, n₁ = n₂ ∧ ∀ h : n₁ = n₂, s₁ = (by rw h; exact s₂) ∧ ac₁ = (by rw h; exact ac₂) *} := begin
+    intros _ _ _ _ _ _ _ hp  he,
+    cases hp,
+    subst hp_left,
+    specialize hp_right rfl,
+    have : s₁ = s₂ := hp_right.left,
+    subst this,
+    have : ac₁ = ac₂ := hp_right.right,
+    subst this,
+    use s₁',
+    split,
+    exact he,
+    simp,
+    split,
+    refl,
+    refl,
+end
+
+
+theorem known_branch_left (c : σ₁ → bool) (th) (el)
+(h₁ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → ∀ tid : fin n₁, c $ (s₁.threads.nth tid).tlocal)
+(h₂ : {* P *} th ~> k₂ {* Q *}) :
+{* P *} kernel.ite c th el ~> k₂ {* Q *} := begin
+    intros _ _ _ _ _ _ _ hp he,
+    cases he,
+    specialize h₁ n₁ s₁ ac₁ n₂ s₂ ac₂ hp,
+    apply h₂ n₁ n₂ s₁ s₁' s₂ ac₁ ac₂ hp,
+    have : (deactivate_threads (bnot ∘ c) ac₁ s₁) = ac₁ := begin
+        sorry,
+    end,
+    rw this at he_a,
+    have : no_thread_active (deactivate_threads c ac₁ s₁) = tt := sorry,
+    have : exec_state el (deactivate_threads c ac₁ s₁) he_t he_t := exec_no_threads_active this,
+    have : he_t = s₁' := exec_state_unique he_a_1 this,
+    subst this,
+    exact he_a,
+end
+
 end parlang
