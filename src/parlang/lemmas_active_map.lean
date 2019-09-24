@@ -224,15 +224,18 @@ end
 
 lemma no_thread_active_ge {ac' : vector bool n} (h : no_thread_active ac) : ac' ≥ ac := begin
   intros i h',
-  sorry,
+  apply no_threads_active_nth h,
 end
 
 lemma all_threads_active_eq {ac' : vector bool n} (h : all_threads_active ac) (h' : all_threads_active ac') : ac = ac' := begin
   apply vector.eq_element_wise,
   intro i,
   have := all_threads_active_nth h i,
+  unfold coe_sort has_coe_to_sort.coe at this,
+  rw this,
   have := all_threads_active_nth h' i,
-  sorry,
+  unfold coe_sort has_coe_to_sort.coe at this,
+  rw this,
 end
 
 end parlang

@@ -16,6 +16,10 @@ lemma lt_zero_one : 0 < 1 := nat.lt.base 0
 @[simp]
 lemma nat.succ_lt_succ_iff {n m : ℕ} : n + 1 < m + 1 ↔ n < m := nat.lt_succ_iff
 
+lemma eq.mpr.intro {α : Type} (x : α) : eq.mpr rfl x = x := begin
+  refl,
+end
+
 namespace fin
 
 lemma fin_eq {f f' : fin n} : f ≠ f' → f.val ≠ f'.val := begin

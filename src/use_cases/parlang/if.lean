@@ -57,23 +57,27 @@ example {σ₁ ι₁ ι₂ : Type} {τ₁ : ι₁ → Type} {τ₂ : ι₂ → T
     }
 end
 
+section
+
+parameters (k : kernel bool (λ (s : string), ℕ))
+
 def p₁ : program bool (λ (s : string), ℕ) :=
-program.intro (λ_, 1) (
+program.intro (λm, m.get "x") (
     compute (λ_, tt) ;;
     ite id (
-        store (λ_, ⟨"a", 7⟩)
+        k
     ) (
         store (λ_, ⟨"a", 5⟩)
     )
 )
 
 def p₂ : program bool (λ (s : string), ℕ) :=
-program.intro (λ_, 1) (
+program.intro (λm, m.get "x") (
     compute (λ_, tt) ;;
-    store (λ_, ⟨"a", 7⟩)
+    k
 )
 
-example : rel_hoare_program (λ_, ff) (λ_, ff) eq p₁ p₂ eq := begin
+example : rel_hoare_program (λ_, ff) (λ_, ff) (λ m₁ m₂, eq m₁ m₂ ∧ 0 < m₁.get "x") p₁ p₂ eq := begin
     apply rel_kernel_to_program,
     apply single_step_left,
     swap,
@@ -137,14 +141,25 @@ example : rel_hoare_program (λ_, ff) (λ_, ff) eq p₁ p₂ eq := begin
             }, 
             split,
             {
-                subst h₇,
+                cases h₇,
+                subst h₇_left,
                 rw [h₃, ← h₄],
             },
             intro h',
             subst h',
             split, {
+                rw eq.mpr.intro,
                 unfold state.map_active_threads,
-                sorry, -- from initial
+                simp,
+                apply vector.eq_element_wise,
+                intro i,
+                simp,
+                have : ac₁ = ac₂ := all_threads_active_eq h₈ h₉,
+                subst this,
+                rw h₆,
+                rw h₅,
+                cases h₇,
+                subst h₇_left,
             }, {
                 have : ac₁ = ac₂ := all_threads_active_eq h₈ h₉,
                 exact this,
@@ -152,8 +167,10 @@ example : rel_hoare_program (λ_, ff) (λ_, ff) eq p₁ p₂ eq := begin
         }
     }, {
         intros,
-        sorry, -- trivial
+        exact a.right,
     }
+end
+
 end
 
 end parlang
