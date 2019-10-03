@@ -182,16 +182,6 @@ lemma abc (t) (expr : expression sig t) : 0 < expression_size expr := sorry
 #print has_well_founded_of_has_sizeof 
 #print expression.sizeof
 
-def vector_mpr {α : Type} {dim : ℕ} {sig : signature} {n} (h : (((sig.val n).type).dim) = dim) (v : vector α dim) : vector α (((sig.val n).type).dim) := begin
-    rw h,
-    exact v,
-end
-
-lemma vector_mpr_singleton {α : Type} {a : α} {sig : signature} {n} (h : (((sig.val n).type).dim) = 1) : vector_mpr h v[a] = eq.mpr (by rw h) v[a] := sorry
-
-@[simp]
-lemma vector_mpr_rfl {sig : signature} {n} {α : Type} {h : (((sig.val n).type).dim) = (((sig.val n).type).dim)} {v : vector α (((sig.val n).type).dim)} : vector_mpr h v = v := by refl
-
 -- should we make this an inductive predicate
 -- it would have implications on parlang
 def eval {sig : signature} (m : memory $ parlang_mcl_tlocal sig) {t : type} (expr : expression sig t) : type_map t := expression.rec_on expr 

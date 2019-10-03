@@ -406,7 +406,7 @@ lemma shared_assign_right' {t dim n} {idx : vector (expression sig₂ type.int) 
 {* (λ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ 
     ((s₂ : parlang.state n₂ (memory $ parlang_mcl_tlocal sig₂) (parlang_mcl_shared sig₂)).map_active_threads ac₂ (
         thread_state.tlocal_to_shared n idx h₁ h₂ ∘
-        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, vector_mpr h₂ $ idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
+        thread_state.compute (λ s : memory $ parlang_mcl_tlocal sig₂, s.update ⟨n, by rw h₂; exact idx.map (eval s)⟩ (begin unfold parlang_mcl_tlocal signature.lean_type_of lean_type_of, rw h₁, exact (eval s expr) end)) ∘ 
         thread_state.update_shared_vars_for_expr expr ∘
         thread_state.update_shared_vars_for_exprs idx
     )) ac₂) *}
