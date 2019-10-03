@@ -93,7 +93,16 @@ def parlang_mcl_tlocal (sig : signature) := (λ i : mcl_address sig, sig.lean_ty
 @[reducible]
 def parlang_mcl_kernel (sig : signature) := kernel (memory $ parlang_mcl_tlocal sig) (parlang_mcl_shared sig)
 
-lemma address_eq {sig : mcl.signature} {a b : mcl.mcl_address sig} (h : a.1 = b.1) (g: a.2 = begin rw h, exact b.2 end) : a = b := sorry
+
+lemma address_eq {sig : mcl.signature} {a b : mcl.mcl_address sig} (h : a.1 = b.1) (g: a.2 = begin rw h, exact b.2, end) : a = b := begin
+    cases a,
+    cases b,
+    simp at h,
+    subst h,
+    simp,
+    simp[eq.mpr.intro] at g,
+    exact g,
+end
 
 /-- all addresses of array *var* -/
 def array_address_range {sig : signature} (var : string) : set (mcl_address sig) := {i | i.1 = var}
