@@ -32,11 +32,15 @@ namespace rel_hoare
 
 end rel_hoare
 
+/-- Relational Hoare logic on Parlang programs with assertions on memory -/
 def rel_hoare_program (init₁ : ℕ → σ₁) (init₂ : ℕ → σ₂) (P : memory τ₁ → memory τ₂ → Prop) (p₁ : program σ₁ τ₁) (p₂ : program σ₂ τ₂) (Q : memory τ₁ → memory τ₂ → Prop) := 
 ∀ m₁ m₁' m₂, P m₁ m₂ → exec_prog init₁ p₁ m₁ m₁' → ∃ m₂', exec_prog init₂ p₂ m₂ m₂' ∧ Q m₁' m₂'
 
 -- notation `{* ` P : 1 ` *} ` p₁ : 1 ` ~ ` p₂ : 1 ` {* ` Q : 1 ` *}` := rel_hoare_state P p₁ p₂ Q
 
+/-- The initial kernel assertion that holds on state and ac 
+    TODO: change to a struct to get projections for free?
+-/
 def initial_kernel_assertion (init₁ : ℕ → σ₁) (init₂ : ℕ → σ₂) (P : memory τ₁ → memory τ₂ → Prop) 
 (f₁ : memory τ₁ → ℕ) (f₂ : memory τ₂ → ℕ) (m₁ : memory τ₁) (m₂ : memory τ₂) 
 (n₁) (s₁ : state n₁ σ₁ τ₁) (ac₁ : vector bool n₁) (n₂) (s₂ : state n₂ σ₂ τ₂) (ac₂ : vector bool n₂) := 
@@ -45,44 +49,47 @@ s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ n₁ = f₁ m₁ ∧ n₂ = f₂ m
 (∀ i : fin n₂, s₂.threads.nth i = { tlocal := init₂ i, shared := m₂, stores := ∅, loads := ∅ }) ∧
 P m₁ m₂ ∧ all_threads_active ac₁ ∧ all_threads_active ac₂
 
-def initial_kernel_assertion_left_thread_state {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
-{f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
-{n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
-(i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.left
+/- Projections of initial_kernel_assertion -/
+section
 
-def initial_kernel_assertion.right_thread_state {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
-{f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
-{n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
-(i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.right.left
+    def initial_kernel_assertion_left_thread_state {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
+    {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
+    {n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
+    (i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.left
 
+    def initial_kernel_assertion.right_thread_state {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
+    {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
+    {n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
+    (i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.right.left
 
-def initial_kernel_assertion.left_all_threads_active {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
-{f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
-{n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
-(i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.right.right.right.left
+    def initial_kernel_assertion.left_all_threads_active {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
+    {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
+    {n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
+    (i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.right.right.right.left
 
-def initial_kernel_assertion.precondition {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
-{f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
-{n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
-(i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.right.right.left
+    def initial_kernel_assertion.precondition {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P : memory τ₁ → memory τ₂ → Prop} 
+    {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₂} 
+    {n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {n₂} {s₂ : state n₂ σ₂ τ₂} {ac₂ : vector bool n₂}
+    (i : initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂) := i.right.right.right.right.right.right.left
 
-#check initial_kernel_assertion.left_all_threads_active
+    lemma initial_kernel_assertion.initial_state_eq {init₁ : ℕ → σ₁}
+    {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₁ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₁} 
+    {n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {s₂ : state n₁ σ₁ τ₁} {ac₂ : vector bool n₁} :
+    initial_kernel_assertion init₁ init₁ eq f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₁ s₂ ac₂ →
+    s₁ = s₂ |
+    (and.intro _ (and.intro _ (and.intro _ (and.intro _ (and.intro s_eq (and.intro s'_eq _)))))) := begin
+        clear initial_kernel_assertion.initial_state_eq,
+        cases s₁,
+        cases s₂,
+        simp,
+        apply vector.eq_element_wise,
+        intro tid,
+        simp *,
+    end
 
-lemma initial_kernel_assertion.initial_state_eq {init₁ : ℕ → σ₁}
-{f₁ : memory τ₁ → ℕ} {f₂ : memory τ₁ → ℕ} {m₁ : memory τ₁} {m₂ : memory τ₁} 
-{n₁} {s₁ : state n₁ σ₁ τ₁} {ac₁ : vector bool n₁} {s₂ : state n₁ σ₁ τ₁} {ac₂ : vector bool n₁} :
-initial_kernel_assertion init₁ init₁ eq f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₁ s₂ ac₂ →
-s₁ = s₂ |
-(and.intro _ (and.intro _ (and.intro _ (and.intro _ (and.intro s_eq (and.intro s'_eq _)))))) := begin
-    clear initial_kernel_assertion.initial_state_eq,
-    cases s₁,
-    cases s₂,
-    simp,
-    apply vector.eq_element_wise,
-    intro tid,
-    simp *,
 end
 
+/- Reduces proofs on programs to proofs on kernels -/
 lemma rel_kernel_to_program {k₁ : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} {init₁ : ℕ → σ₁} {init₂ : ℕ → σ₂} {P Q : memory τ₁ → memory τ₂ → Prop} {f₁ : memory τ₁ → ℕ} {f₂ : memory τ₂ → ℕ}
  (h : {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, ∃ m₁ m₂, initial_kernel_assertion init₁ init₂ P f₁ f₂ m₁ m₂ n₁ s₁ ac₁ n₂ s₂ ac₂ *} k₁ ~> k₂ 
  {* λ n₁ s₁ ac₁ n₂ s₂ ac₂, (∃ m₁, s₁.syncable m₁) → ∃ m₁ m₂, s₁.syncable m₁ ∧ s₂.syncable m₂ ∧ Q m₁ m₂ *} )
@@ -178,6 +185,10 @@ begin
         exact hh_h_right_h_h.right.right,
     }
 end
+
+/- 
+    Inference rules
+ -/
 
 -- TODO: define the alias skip for (compute id)
 lemma single_step_left {P Q} {k₁ k : kernel σ₁ τ₁} {k₂ : kernel σ₂ τ₂} (R)
@@ -345,11 +356,10 @@ exec_state (kernel.ite c k (kernel.compute id)) ac s s' := begin
     }
 end
 
--- we cannot prove that all threads are active after the else branch, because we cannot proof h₁ and h₂
--- maybe we have to make the active map explicitly available in the postcondition of ite, but how do we relate it the precondition? This is something that ghost variables would be for.
-
--- Q does not contain information about the pre-entry ac or state
-/-- In the if-branch, the condition holds on all active threads. The inverse is not true. Just because the condition *c* holds, does not mean that the thread is active. -/
+/-- 
+Breaks a ite-instruction into the individual branches
+The assertions can be used to carry information about the active map from before the branch to after the branch
+In the if-branch, the condition holds on all active threads (similar in else-branch). The inverse is not true. Just because the condition *c* holds, does not mean that the thread is active (e.g. if the thread was already inactive). -/
 theorem ite_right (c : σ₂ → bool) (th) (el) (AC : ∀ {n₂ : ℕ}, vector bool n₂ → Prop)
 (h₁ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂, P n₁ s₁ ac₁ n₂ s₂ ac₂ → P n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s₂)) 
 (h₂ : ∀ n₁ s₁ ac₁ n₂ s₂ ac₂ (s' : state n₂ σ₂ τ₂), Q n₁ s₁ ac₁ n₂ s₂ (deactivate_threads (bnot ∘ c) ac₂ s') → Q n₁ s₁ ac₁ n₂ s₂ ac₂)
